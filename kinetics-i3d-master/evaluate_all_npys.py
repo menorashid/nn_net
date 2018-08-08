@@ -116,6 +116,17 @@ def get_video_names(out_dir, batchsize):
 
     videos = [os.path.split(dir_curr)[1] for dir_curr in glob.glob(os.path.join(dir_rgb,'*')) if os.path.isdir(dir_curr)]
     print len(videos)
+    
+    print len(videos)
+    videos = [video for video in videos if not os.path.exists(os.path.join(out_dir,video+'.npy'))]
+    print len(videos)
+    mid_point = len(videos)//2
+    print mid_point
+
+    # videos = videos[:mid_point]
+    # videos = videos[mid_point:]
+    print len(videos)
+    
     for video_curr in videos:
         out_file = os.path.join(out_dir,video_curr+'.npy')
         if os.path.exists(out_file):
