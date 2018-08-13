@@ -208,6 +208,9 @@ def redo_numpys():
 
 
 
+def create_train_test_files():
+	pass
+
 
 def main():
 	redo_numpys();
