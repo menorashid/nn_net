@@ -8,7 +8,10 @@ import glob
 import scipy.misc
 import scipy.stats
 import multiprocessing
+import subprocess
 
+
+dir_meta = '../data/ucf101'
 
 def compare_rgb(old_rgb,new_rgb_folder):
 	old_rgb = np.load(old_rgb)
@@ -149,7 +152,6 @@ def get_numpys(video, dir_rgb, dir_flos, crop_size):
 
 
 def script_save_numpys():
-	dir_meta = '../data/ucf101'
 	
 	out_dir = os.path.join(dir_meta,'npys')
 	util.mkdir(out_dir)
@@ -207,148 +209,136 @@ def redo_numpys():
 	util.writeFile(out_file, problem_npys)
 
 
+def extract_frames((input_path,out_dir,fps,out_res,idx)):
+	# command = 'ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of default=nw=1:nk=1 '
+	# command = command+input_path
+	# ret_vals = os.popen(command).readlines()
+	
+	# ret_vals = [int(val.strip('\n')) for val in ret_vals]
+	
+	# if ret_vals[0]>ret_vals[1]:
+	# 	pass
+	# else:
+	# 	print 'width bigger!!!'
+	print idx
+	util.mkdir(out_dir)
+	command = ['ffmpeg']
 
-def create_train_test_files():
-	pass
+	command += ['-i',input_path]
+
+	command += ['-r' , str(fps)]
+	command += ['-vf' ,'scale='+ '-1:'+str(out_res)]
+	command += [os.path.join(out_dir,'frame%06d.jpg')]
+	command += ['-hide_banner']
+	command += ['> /dev/null 2> err.txt']
+	command = ' '.join(command)
+
+	# print command
+	subprocess.call(command,shell=True)
+
+
+def checking_frame_extraction(in_dir=None,out_dir=None, small_dim = 256, fps = 10):
+	
+	if in_dir is None:
+		in_dir = os.path.join(dir_meta,'val_data','validation')
+
+	if out_dir is None:
+		out_dir = os.path.join(dir_meta,'val_data','rgb_'+str(fps)+'_fps_'+str(small_dim))
+
+	util.mkdir(out_dir)
+
+	in_files = glob.glob(os.path.join(in_dir,'*.mp4'))
+	in_files.sort()
+
+	print len(in_files)
+	
+	out_file_problem = os.path.join(out_dir,'problem_files.txt')
+
+	problem = []
+	for idx_in_file, in_file in enumerate(in_files):
+		print idx_in_file
+		out_dir_curr = os.path.split(in_file)[1]
+		out_dir_curr = out_dir_curr[:out_dir_curr.rindex('.')]
+		out_dir_curr = os.path.join(out_dir,out_dir_curr)
+
+		command = ['ffmpeg', '-i']
+		command += [in_file, '2>&1']
+		command += ['|','grep "Duration"']
+		command += ['|', 'cut -d', "' '",'-f 4']
+		command += ['|', 'sed s/,//']
+		# command += ['|', 'sed','s@\..*@@g' ]
+		# command += ['|', 'awk',"'{", 'split($1, A, ":");', 'split(A[3], B, ".");', 'print 3600*A[1] + 60*A[2] + B[1]', "}'"]
+		command = ' '.join(command)
+		# print command
+
+		secs = os.popen(command).readlines()
+		try:
+			secs = secs[0].strip('\n')
+			secs = secs.split(':')
+			assert len(secs)==3
+			secs = secs[:-1] + secs[-1].split('.')[:1]
+			secs = int(secs[0])*3600+int(secs[1])*60+int(secs[2])
+			# print secs
+			num_frames = secs*fps
+
+			num_frames_ac = len(glob.glob(os.path.join(out_dir_curr,'*.jpg')))
+			if (num_frames_ac-num_frames)<0:
+				print 'PROBLEM',num_frames_ac,num_frames
+				problem.append(' '.join([in_file,str(num_frames_ac),str(num_frames)]))
+		except:
+			print 'PROBLEM SERIOUS',in_file
+			problem.append(in_file)
+
+	util.writeFile(out_file_problem,problem)
+
+		# break
+		
+
+def script_extract_frames(in_dir=None,out_dir=None, small_dim = 256, fps = 10):
+	
+	if in_dir is None:
+		in_dir = os.path.join(dir_meta,'val_data','validation')
+
+	if out_dir is None:
+		out_dir = os.path.join(dir_meta,'val_data','rgb_'+str(fps)+'_fps_'+str(small_dim))
+
+	util.mkdir(out_dir)
+
+	in_files = glob.glob(os.path.join(in_dir,'*.mp4'))
+	in_files.sort()
+
+	print len(in_files)
+
+	args = []
+	for idx_in_file, in_file in enumerate(in_files):
+		out_dir_curr = os.path.split(in_file)[1]
+		out_dir_curr = out_dir_curr[:out_dir_curr.rindex('.')]
+		out_dir_curr = os.path.join(out_dir,out_dir_curr)
+		
+		if os.path.exists(os.path.join(out_dir_curr,'frame000001.jpg')):
+			continue
+
+		args.append((in_file, out_dir_curr, fps, small_dim, idx_in_file))
+
+	print len(args)
+	# print args[0]
+	# extract_frames(args[0])
+	pool = multiprocessing.Pool(multiprocessing.cpu_count())
+	pool.map(extract_frames, args)
+	# print 'done'
 
 
 def main():
-	redo_numpys();
-	# script_save_numpys()
-	# npz = np.load('../data/ucf101/npys/v_RopeClimbing_g06_c01.npz')
-	# rgb = npz['rgb']
-	# flo= npz['flo']
-	# print rgb.shape, np.min(rgb), np.max(rgb)
-	# print flo.shape, np.min(flo), np.max(flo)
-
-	return 
-	out_dir = '../scratch/checking_ucf'
-	util.mkdir(out_dir)
-
-	old_rgb = '../kinetics-i3d-master/data/v_CricketShot_g04_c01_rgb.npy'
-	old_flo = '../kinetics-i3d-master/data/v_CricketShot_g04_c01_flow.npy'
-	video_name = 'v_CricketShot_g04_c01'
-	dir_rgb = '../data/ucf101/rgb_ziss/jpegs_256'
-	dir_flo = '../data/ucf101/flow_ziss/tvl1_flow'
-	dir_flos = [os.path.join(dir_flo,'u'),os.path.join(dir_flo,'v')]
-
-	new_rgb_folder = os.path.join(dir_rgb,video_name)
-	new_flo_folders = [os.path.join(dir_curr,video_name) for dir_curr in dir_flos]
-	# compare_rgb(old_rgb, new_rgb_folder)
-	# compare_flo(old_flo, new_flo_folders)
-
-	new_flo = make_flo_np(new_flo_folders, 224)
-	print new_flo.shape, np.min(new_flo), np.max(new_flo), np.mean(new_flo)
-	new_rgb = make_rgb_np(new_rgb_folder, 224)
-	print new_rgb.shape, np.min(new_rgb), np.max(new_rgb), np.mean(new_rgb)
-
-	np.save(os.path.join(out_dir,'new_rgb.npy'),new_rgb)
-	np.save(os.path.join(out_dir,'new_flo.npy'),new_flo)
-
-
-	return 
-	# out_dir = '../../scratch/kin_look_at'
-	rgb_path = '../kinetics-i3d-master/data/v_CricketShot_g04_c01_rgb.npy'
-	flow_path = '../kinetics-i3d-master/data/v_CricketShot_g04_c01_flow.npy'
-
-	dir_flow = '../data/ucf101/flow_ziss/tvl1_flow'
-
-
-	im_paths = glob.glob(os.path.join(dir_rgb,video_name,'*.jpg'))
-	im_paths.sort()
-	print im_paths[0]
-
-	u_flow_paths = glob.glob(os.path.join(dir_flow,'u',video_name,'*'))
-	v_flow_paths = glob.glob(os.path.join(dir_flow,'v',video_name,'*'))
-	u_flow_paths.sort()
-	v_flow_paths.sort()
-	print u_flow_paths[0],v_flow_paths[0]
-
-	u_im = scipy.misc.imread(u_flow_paths[0]).astype(float)[:,:,np.newaxis]
-	v_im = scipy.misc.imread(v_flow_paths[1]).astype(float)[:,:,np.newaxis]
-	flo = np.concatenate([u_im,v_im],2)
-	# flo = flo/255. 
-
-	start_row = (flo.shape[0]-224)//2 
-	start_col = (flo.shape[1]-224)//2 
-
-	flo_crop = flo[start_row:start_row+224,start_col:start_col+224]
-	flo_crop = np.concatenate([flo_crop,128*np.ones((flo_crop.shape[0],flo_crop.shape[1],1))], 2)
-	print flo_crop.shape
-	print np.min(flo_crop),np.max(flo_crop)
 
 	
-	flo = np.load(flow_path)
-	print 'min all',np.min(flo),np.max(flo)
-	flo_check = flo[0,0] 
-	flo_check = flo_check+0.5
-	flo_check = np.concatenate([flo_check,0.5*np.ones((flo_check.shape[0],flo_check.shape[1],1))], 2) * 255
 
-	print flo_check.shape
-	print np.min(flo_check),np.max(flo_check)
+	in_dir = os.path.join(dir_meta,'test_data','TH14_test_set_mp4')
+	out_dir = os.path.join(dir_meta,'test_data','rgb_10_fps_256')
+
+	# script_extract_frames(in_dir, out_dir)
+	checking_frame_extraction(in_dir, out_dir)
 
 
-	diff = np.abs(flo_check - flo_crop)
-	print np.min(diff),np.max(diff)
-	print 'hello'
-	
-	scipy.misc.imsave('../scratch/flo_diff.jpg',diff)
-	scipy.misc.imsave('../scratch/flo_npy.jpg',flo_check)
-	scipy.misc.imsave('../scratch/flo_crop.jpg',flo_crop)
-
-	visualize.writeHTMLForFolder('../scratch')
-
-	return
-
-	im = scipy.misc.imread(im_paths[0]).astype(float)
-	
-	start_row = (im.shape[0]-224)//2 
-	start_col = (im.shape[1]-224)//2 
-
-	im_crop = im[start_row:start_row+224,start_col:start_col+224]
-
-	# im_crop = im_crop/255 *2 -1
-
-	print im_crop.shape, np.min(im_crop),np.max(im_crop)
-
-
-	# print im.shape,np.min(im),np.max(im)
-
-
-	rgb = np.load(rgb_path)
-
-	im_check = rgb[0,0]
-	print im_check.shape
-	im_check = (im_check+1)/2. * 255.
-	print np.allclose(im_crop,im_check)
-	diff = np.abs(im_check - im_crop)
-	print np.min(diff),np.max(diff)
-	print 'hello'
-	# print diff[:,:,0]
-
-
-	# flow = np.load(flow_path)
-
-	# print rgb.shape
-	# print np.min(rgb)
-	# print np.max(rgb)
-
-	# print flow.shape
-	# print np.min(flow)
-	# print np.max(flow)
-
-	single_frame = (rgb[0,0,:,:]+1)/2. *255.
-	print np.min(single_frame),np.max(single_frame)
-	scipy.misc.imsave('../scratch/diff.jpg',diff)
-	scipy.misc.imsave('../scratch/npy.jpg',single_frame)
-	scipy.misc.imsave('../scratch/crop.jpg',im_crop)
-
-
-
-
-
-	# out_file = os.path.join(,'first.jpg')
-	# print rgb.shape
 
 if __name__=='__main__':
 	main()
