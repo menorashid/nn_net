@@ -46,3 +46,5 @@ data
 *.png
 *.pyc
 kinetics-i3d-master/data
+writing
+*.docx

@@ -85,6 +85,37 @@ def script_save_flows():
 	# save_flows((in_dir_meta, out_dir_u, out_dir_v, video_name, 1))
 
 
+def check_done(in_dir_meta, out_dir_u, out_dir_v, video_name, sample, idx):
+	# print idx
+	in_dir_curr = os.path.join(in_dir_meta, video_name)
+	in_files = glob.glob(os.path.join(in_dir_curr, '*.jpg'))
+	in_files.sort()
+	# print len(in_files)
+	in_files =in_files[::sample]
+	# print len(in_files)
+
+
+	# optical_flow = cv2.DualTVL1OpticalFlow_create()
+
+	out_dir_u_curr = os.path.join(out_dir_u, video_name)
+	out_dir_v_curr = os.path.join(out_dir_v, video_name)
+	
+	util.mkdir(out_dir_u_curr)
+	util.mkdir(out_dir_v_curr)
+
+	out_file_input = os.path.join(out_dir_u_curr,'list_input.txt')
+	util.writeFile(out_file_input,in_files)
+
+	out_file_final_u = os.path.join(out_dir_u,video_name,os.path.split(in_files[-2])[1])
+	out_file_final_v = os.path.join(out_dir_v,video_name,os.path.split(in_files[-2])[1])
+	# print out_file_final_u
+
+	if os.path.exists(out_file_final_u) and os.path.exists(out_file_final_v):
+		print video_name, 'DONE already'
+		return 1
+	return 0
+
+
 def save_flows_gpu((in_dir_meta, out_dir_u, out_dir_v, video_name, sample, idx)):
 	print idx
 	in_dir_curr = os.path.join(in_dir_meta, video_name)
@@ -112,7 +143,7 @@ def save_flows_gpu((in_dir_meta, out_dir_u, out_dir_v, video_name, sample, idx))
 
 	if os.path.exists(out_file_final_u) and os.path.exists(out_file_final_v):
 		print video_name, 'DONE already'
-	# 	return 1
+		return 1
 	# return 0
 
 	
@@ -148,19 +179,22 @@ def script_save_flows_gpu():
 	print len(video_names)
 	video_names.sort()
 	args = []
+	to_del = []
 	for idx_video_name, video_name in enumerate(video_names):
 		# file_check = os.path.join(out_dir_u, video_name, 'frame000001.jpg')
 		# if os.path.exists(file_check):
 		# 	continue
-
-		args.append((in_dir_meta, out_dir_u, out_dir_v, video_name, sample, idx_video_name))
+		if not check_done(in_dir_meta, out_dir_u, out_dir_v, video_name, sample, idx_video_name):
+			args.append((in_dir_meta, out_dir_u, out_dir_v, video_name, sample, idx_video_name))
 
 	print len(args)
-	args = args[500:]
+
+	# return
+	args = args[100:]
 	print len(args)
 	# for arg in args:
-	# 	print arg
-	# 	save_flows_gpu(arg)
+	# 	print arg[-1]
+		# save_flows_gpu(arg)
 		# raw_input()
 		# break
 
@@ -229,10 +263,20 @@ def script_checking_flows():
 
 
 
+def dangerous_script_never_run():
+	dir_meta = '../data/ucf101'
+	file_curr = os.path.join(dir_meta,'test_data','completed.txt')
+	to_del = util.readLinesFromFile(file_curr)
+	for folder_curr in to_del:
+		command_curr = 'rm -rf '+folder_curr
+		print command_curr
+		os.popen('rm -rf '+folder_curr)
 
 
 
 def main():
+
+
 	# script_checking_flows()
 	script_save_flows_gpu()
 
