@@ -1,7 +1,11 @@
-import os
 import sys
+sys.path.append('./')
+import os
 import numpy as np
 import scipy.io
+import glob
+from helpers import util, visualize
+
 
 def interval_single_overlap_val_seconds(i1, i2, norm_type = 0):
     i1 = [np.min(i1), np.max(i1)]
@@ -153,41 +157,50 @@ def event_det_pr(det_vid_names, det_time_intervals, det_class_names, det_conf, g
 
 
 def test_event_det_pr():
-    loaded = scipy.io.loadmat('../TH14evalkit/gt_det_stuff.mat')
-    gt_vid_names = loaded['gtvideonames'][0]
-    det_vid_names = loaded['detvideonames'][0]
-    gt_class_names = loaded['gt_events_class'][0]
-    det_class_names = loaded['det_events_class'][0]
-    gt_time_intervals = loaded['gt_time_intervals'][0]
-    det_time_intervals = loaded['det_time_intervals'][0]
-    det_conf = loaded['det_conf'][0]
-
-    class_name = 'BaseballPitch'
-    overlap_thresh = 0.1
-
-    arr_meta = [gt_vid_names,det_vid_names,gt_class_names,det_class_names]
-
-    arr_out = []
-    for arr_curr in arr_meta:
-        arr_curr = [str(a[0]) for a in arr_curr]
-        arr_out.append(arr_curr)
+    # loaded = scipy.io.loadmat('../TH14evalkit/gt_det_stuff.mat')
+    class_names = ['BaseballPitch', 'BasketballDunk', 'Billiards', 'CleanAndJerk', 'CliffDiving', 'CricketBowling', 'CricketShot', 'Diving', 'FrisbeeCatch', 'GolfSwing', 'HammerThrow', 'HighJump', 'JavelinThrow', 'LongJump', 'PoleVault', 'Shotput', 'SoccerPenalty', 'TennisSwing', 'ThrowDiscus', 'VolleyballSpiking']
     
-    [gt_vid_names,det_vid_names,gt_class_names,det_class_names] = arr_out
+    gt_ov = util.readLinesFromFile('analysis/test.txt')
+    gt_ov = [float(val) for val in gt_ov]
+    diffs = []
+    idx_ov = 0
 
-    gt_time_intervals = np.array([a[0] for a in gt_time_intervals])
-    det_time_intervals = np.array([a[0] for a in det_time_intervals])
-    det_conf = np.array([a[0][0] for a in det_conf])
-    # print gt_time_intervals.shape
-    # print det_time_intervals.shape
-    # print det_conf.shape
-    # print det_conf[0]
-    # print type(det_conf[0])
-    # raw_input()
+    for class_name in class_names:
+        print class_name
+        mat_file = os.path.join('../TH14evalkit',class_name+'.mat')
+        loaded = scipy.io.loadmat(mat_file)
+        gt_vid_names = loaded['gtvideonames'][0]
+        det_vid_names = loaded['detvideonames'][0]
+        gt_class_names = loaded['gt_events_class'][0]
+        det_class_names = loaded['det_events_class'][0]
+        gt_time_intervals = loaded['gt_time_intervals'][0]
+        det_time_intervals = loaded['det_time_intervals'][0]
+        det_conf = loaded['det_conf'][0]
 
-    for overlap_thresh in np.arange(0.1,0.6,0.1):
-        rec, prec, ap = event_det_pr(det_vid_names, det_time_intervals, det_class_names, det_conf, gt_vid_names, gt_time_intervals, gt_class_names, class_name, overlap_thresh)
-        print ap, overlap_thresh
+        # class_name = 'BaseballPitch'
+        # overlap_thresh = 0.1
+
+        arr_meta = [gt_vid_names,det_vid_names,gt_class_names,det_class_names]
+
+        arr_out = []
+        for arr_curr in arr_meta:
+            arr_curr = [str(a[0]) for a in arr_curr]
+            arr_out.append(arr_curr)
+        
+        [gt_vid_names,det_vid_names,gt_class_names,det_class_names] = arr_out
+
+        gt_time_intervals = np.array([a[0] for a in gt_time_intervals])
+        det_time_intervals = np.array([a[0] for a in det_time_intervals])
+        det_conf = np.array([a[0][0] for a in det_conf])
+
+        for overlap_thresh in np.arange(0.1,0.6,0.1):
+            rec, prec, ap = event_det_pr(det_vid_names, det_time_intervals, det_class_names, det_conf, gt_vid_names, gt_time_intervals, gt_class_names, class_name, overlap_thresh)
+            print ap, overlap_thresh
+            diffs.append(ap - gt_ov[idx_ov])
+            idx_ov+=1
     
+    diffs = np.abs(np.array(diffs))
+    print np.mean(diffs), np.min(diffs), np.max(diffs)
 
 
 

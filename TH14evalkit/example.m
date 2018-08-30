@@ -1,6 +1,7 @@
 clear all; close all; clc;
 % running evaluation (simulated detection results)
-[pr_all,ap_all,map]=TH14evaldet('results/Run-2-det.txt','groundtruth','val');
+% [pr_all,ap_all,map]=TH14evaldet('results/Run-2-det.txt','groundtruth','val');
+[pr_all,ap_all,map]=TH14evaldet('results/Run-1-det_new.txt','groundtruth', 'test');
 
 % plotting precision-recall results
 overlapthresh=0.1;

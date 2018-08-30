@@ -4,14 +4,20 @@ function [rec,prec,ap]=TH14eventdetpr(detevents,gtevents,class,overlapthresh)
 gtvideonames={gtevents.videoname};
 detvideonames={detevents(:).videoname};
 
-% gt_events_class = {gtevents.class}
-% det_events_class = {detevents.class}
-% gt_time_intervals = {gtevents(:).timeinterval}
-% det_time_intervals = {detevents(:).timeinterval}
-% det_conf = {detevents(:).conf}
+gt_events_class = {gtevents.class};
+det_events_class = {detevents.class};
+gt_time_intervals = {gtevents(:).timeinterval};
+det_time_intervals = {detevents(:).timeinterval};
+det_conf = {detevents(:).conf};
 
-% save('gt_det_stuff.mat','gtvideonames','detvideonames','gt_events_class','det_events_class','gt_time_intervals','det_time_intervals','det_conf')
+% save([class '_test.mat'],'gtvideonames','detvideonames','gt_events_class','det_events_class','gt_time_intervals','det_time_intervals','det_conf')
 % keyboard
+
+
+save(['mat_files/' class '_test.mat'],'gtvideonames','detvideonames','gt_events_class','det_events_class','gt_time_intervals','det_time_intervals','det_conf')
+% keyboard
+
+
 
 videonames=unique(cat(2,gtvideonames,detvideonames));
 
@@ -77,7 +83,7 @@ function ap=prap(rec,prec)
 
   
 ap=0;
-recallpoints=0:0.1:1
+recallpoints=0:0.1:1;
 
 for t=recallpoints
     p=max(prec(rec>=t));
