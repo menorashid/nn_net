@@ -6,19 +6,23 @@ from helpers import util, visualize
 import torch.nn as nn
 
 class MultiCrossEntropy(nn.Module):
-    def __init__(self):
+    def __init__(self,class_weights=None):
         super(MultiCrossEntropy, self).__init__()
         self.LogSoftmax = nn.LogSoftmax(dim = 1)
-        
+        if class_weights is None:
+            self.class_weights = None
+        else: 
+            self.class_weights = nn.Parameter(torch.Tensor(class_weights[np.newaxis,:]), requires_grad = False)
 
     def forward(self, gt, pred):
-    	# print pred.size()
         pred = self.LogSoftmax(pred)
-        # print pred.size()
-        loss = -1*gt* pred
-        # print loss.size()
+
+        if self.class_weights is not None:
+            assert self.class_weights.size(1)==pred.size(1)
+            loss = self.class_weights*-1*gt*pred
+        else:
+            loss = -1*gt* pred
+
         loss = torch.sum(loss, dim = 1)
-        # print loss.size()
         loss = torch.mean(loss)
-        # print  loss.size()
         return loss

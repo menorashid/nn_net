@@ -667,11 +667,89 @@ def write_train_test_files(test = False):
     print out_file, len(out_lines)
     util.writeFile(out_file,out_lines)
 
+def write_train_test_files_all(test = False):
+    out_dir_files = os.path.join(dir_meta,'train_test_files')
+    util.mkdir(out_dir_files)
+
+
+    dir_meta_curr = os.path.join(dir_meta, 'val_data')
+    val_meta_path  = '../data/ucf101/val_data/validation_set_meta/validation_set_meta/validation_set.mat'
+    key = 'validation_videos'
+    feature_dir = os.path.join(dir_meta_features,'Thumos14-I3D-JOINTFeatures_val')
+    out_file = os.path.join(out_dir_files,'train_all.txt')
+
+    if test:
+        dir_meta_curr = os.path.join(dir_meta, 'test_data')
+        val_meta_path = '../data/ucf101/test_data/test_set_meta.mat'
+        key = 'test_videos'
+        feature_dir = os.path.join(dir_meta_features,'Thumos14-I3D-JOINTFeatures_test')
+        out_file = os.path.join(out_dir_files,'test_all.txt')
+
+    anno_dir = os.path.join(dir_meta_curr, 'annotation')
+    rough_dir = os.path.join(dir_meta_curr, 'anno_rough')
+
+
+    classes_file = os.path.join(dir_meta,'train_data','Class Index.txt')
+    lines = util.readLinesFromFile(classes_file)
+    classes = [line_curr.split(' ')[1].strip('\r') for line_curr in lines]
+    
+    print classes
+    assert len(classes)==101
+
+    # to_check = glob.glob(os.path.join(rough_dir,'*.npy'))
+    # to_check = [os.path.split(file_curr)[1].replace('.npy','') for file_curr in to_check]
+    val = scipy.io.loadmat(val_meta_path, struct_as_record = False)[key][0]
+    print len(val)
+    # idx_old = 0
+
+    out_lines = []
+
+
+    for val_curr in val:
+
+    #     if val_curr.video_name[0].replace('.mp4','') not in to_check:
+    #         continue
+    
+        class_1 = list(val_curr.primary_action)
+        if len(val_curr.secondary_actions)>0:
+            class_1 +=list(val_curr.secondary_actions[0][0])
+        
+        anno_1 = [1 if classes[idx] in class_1 else 0 for idx in range(len(classes))]
+        if sum(anno_1)>0:
+            file_feat = os.path.join(feature_dir,val_curr.video_name[0]+'.npy')
+            assert os.path.exists(file_feat)
+            out_line = ' '.join([str(val) for val in [file_feat]+anno_1])
+            out_lines.append(out_line)
+
+    print out_file, len(out_lines)
+    print  out_lines[0] 
+    assert not os.path.exists(out_file)
+    util.writeFile(out_file,out_lines)
+
+def write_classes_list_files():
+    classes_file = os.path.join(dir_meta,'train_data','Class Index.txt')
+    lines = util.readLinesFromFile(classes_file)
+    classes = [line_curr.split(' ')[1].strip('\r') for line_curr in lines]
+    
+    out_file = os.path.join(dir_meta,'train_test_files','classes_all_list.txt')
+    util.writeFile(out_file, classes)
+
+    classes= ['BaseballPitch', 'BasketballDunk', 'Billiards', 'CleanAndJerk', 'CliffDiving', 'CricketBowling', 'CricketShot', 'Diving', 'FrisbeeCatch', 'GolfSwing', 'HammerThrow', 'HighJump', 'JavelinThrow', 'LongJump', 'PoleVault', 'Shotput', 'SoccerPenalty', 'TennisSwing', 'ThrowDiscus', 'VolleyballSpiking']
+    
+    out_file = os.path.join(dir_meta,'train_test_files','classes_rel_list.txt')
+    util.writeFile(out_file, classes)
+
+
 
 def main():
 
-    write_train_test_files()
-    write_train_test_files(True)
+    write_train_test_files_all(True)
+    # write_train_test_files_all(False)
+    # write_train_test_files_all(True)
+
+
+    # write_train_test_files()
+    # write_train_test_files(True)
 
     # verify_class_labels(False)
     # make_real_anno_mat(True)

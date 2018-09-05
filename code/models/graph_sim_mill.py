@@ -32,7 +32,7 @@ class Just_Mill(nn.Module):
         # print pmf.size()
         pmf = pmf[:k,:]
         # print pmf.size()
-        pmf = torch.sum(pmf[:k,:], dim = 0)/k
+        pmf = torch.sum(pmf[:k,:], dim = 0)
         # print pmf.size()
         # pmf = pmf
         # print pmf.size()

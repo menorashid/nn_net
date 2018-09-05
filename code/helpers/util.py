@@ -142,25 +142,18 @@ def get_class_weights_au(train_files):
         arr.append([int(val) for val in line_curr.split(' ')[1:]] )
     arr = np.array(arr)
     arr[arr>0]=1
-    
-    # print np.min(arr),np.max(arr)
-    # raw_input()
     counts = np.sum(arr,0)
-
-    # print counts
     counts = counts/float(np.sum(counts))
-    # print counts
     counts = np.array([1./val  if val>0 else 0 for val in counts])
-    # print counts
-    # counts[counts!=counts]=0
     counts = counts/float(np.sum(counts))  
-
-    # print counts
-    # print counts.shape
-    
-    # raw_input()
         
     return counts
+
+def softmax(x):
+    """Compute softmax values for each sets of scores in x."""
+    e_x = np.exp(x - np.max(x))
+    return e_x / e_x.sum()
+
 
 def get_class_weights(train_files,au=False):
     classes = [int(line_curr.split(' ')[1]) for line_curr in train_files]

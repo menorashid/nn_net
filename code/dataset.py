@@ -10,12 +10,10 @@ import random
 
 class UCF_dataset(Dataset):
     def __init__(self, text_file, feature_limit):
-        self.files = util.readLinesFromFile(text_file)[:10]
+        self.files = util.readLinesFromFile(text_file)
         self.feature_limit = feature_limit
 
-        # random.shuffle(self.files)
-        # self.files = self.files[:10]
-
+        
     def __len__(self):
         return len(self.files)
 
@@ -30,7 +28,7 @@ class UCF_dataset(Dataset):
 
         sample = np.load(train_file_curr)
         
-        if sample.shape[0]>self.feature_limit:
+        if sample.shape[0]>self.feature_limit and self.feature_limit is not None:
             idx_start = sample.shape[0] - self.feature_limit
             idx_start = np.random.randint(idx_start+1)
             sample = sample[idx_start:idx_start+self.feature_limit]
@@ -43,8 +41,15 @@ class UCF_dataset(Dataset):
 
         return sample
 
+    def collate_fn(self,batch):
+        data = [torch.FloatTensor(item['features']) for item in batch]
+        target = [item['label'] for item in batch]
+        target = torch.FloatTensor(target)
+        return {'features':data, 'label':target}
+
 
 def main():
+    print 'hello'
 
     train_file = '../data/ucf101/train_test_files/train.txt'
     limit = 500
@@ -54,8 +59,8 @@ def main():
     criterion = MultiCrossEntropy().cuda()
     
     train_data = UCF_dataset(train_file, limit)
-    train_dataloader = DataLoader(train_data, 
-                        batch_size=1,
+    train_dataloader = DataLoader(train_data, collate_fn = train_data.collate_fn,
+                        batch_size=10,
                         shuffle=False)
     network = models.get(model_name,network_params)
     model = network.model
@@ -80,12 +85,16 @@ def main():
 
         for num_iter, train_batch in enumerate(train_dataloader):
             # print num_iter
-            sample = train_batch['features'][0].cuda()
-            label = train_batch['label'].float().cuda()
+            sample = train_batch['features']
+            # [0].cuda()
+            label = train_batch['label'].cuda()
 
-            # print sample.size()
+            print label.size()
+            print len(sample)
+            print sample[0].size()
+
             # print labels.size()
-            # raw_input()
+            raw_input()
 
             out,pmf = model.forward(sample)
             preds.append(pmf.unsqueeze(0))
@@ -98,7 +107,7 @@ def main():
         # raw_input()
             # print pmf.size()
             
-        # optimizer.zero_grad()
+        optimizer.zero_grad()
 
         # loss = model.multi_ce(labels, pmf)
 

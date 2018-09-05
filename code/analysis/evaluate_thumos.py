@@ -100,6 +100,7 @@ def event_det_pr(det_vid_names, det_time_intervals, det_class_names, det_conf, g
     ind_gt_class = gt_class_names==class_name
     ind_amb_class = gt_class_names=='Ambiguous'
     ind_det_class = det_class_names==class_name
+    # print det_class_names[:10]
 
     tp_conf = []
     fp_conf = []
@@ -107,6 +108,9 @@ def event_det_pr(det_vid_names, det_time_intervals, det_class_names, det_conf, g
         gt = np.logical_and(gt_vid_names==video_name, ind_gt_class)
         amb = np.logical_and(gt_vid_names==video_name, ind_amb_class)
         det = np.logical_and(det_vid_names==video_name, ind_det_class)
+        
+        # print 'np.sum(det_vid_names==video_name)', np.sum(det_vid_names==video_name)
+        # print 'np.sum(ind_det_class)', np.sum(ind_det_class)
         # det = det_vid_names==video_name
 
         if np.sum(det)>0:
@@ -130,6 +134,9 @@ def event_det_pr(det_vid_names, det_time_intervals, det_class_names, det_conf, g
 
                 for k in range(ov.shape[0]):    
                     ind = np.where(ind_free>0)[0]
+                    if ind.size==0:
+                        continue
+
                     im = np.argmax(ov[k,ind])
                     vm = ov[k,ind][im]
                     if vm>overlap_thresh:
@@ -141,6 +148,7 @@ def event_det_pr(det_vid_names, det_time_intervals, det_class_names, det_conf, g
 
             tp_conf.extend(list(det_conf_curr[np.where(ind_free==0)[0]]))
             fp_conf.extend(list(det_conf_curr[np.where(np.logical_and(ind_free==1, ind_amb==0))[0]]))
+    # raw_input()
 
     # print tp_conf, fp_conf
     conf = np.array([tp_conf + fp_conf,list(np.ones((len(tp_conf),))) + list(2*np.ones((len(fp_conf),)))])
@@ -153,6 +161,91 @@ def event_det_pr(det_vid_names, det_time_intervals, det_class_names, det_conf, g
     return rec, prec, ap
         
 
+def test_overlap(det_vid_names_all, det_conf_all, det_time_intervals_all, second_thresh, train=False, log_arr = []):
+    class_names = ['BaseballPitch', 'BasketballDunk', 'Billiards', 'CleanAndJerk', 'CliffDiving', 'CricketBowling', 'CricketShot', 'Diving', 'FrisbeeCatch', 'GolfSwing', 'HammerThrow', 'HighJump', 'JavelinThrow', 'LongJump', 'PoleVault', 'Shotput', 'SoccerPenalty', 'TennisSwing', 'ThrowDiscus', 'VolleyballSpiking']
+    class_names.sort()
+
+    aps = np.zeros((len(class_names)+1,5))
+    overlap_thresh_all = np.arange(0.1,0.6,0.1)
+    
+    str_print = '\t'.join(['Overlap\t']+['%.1f' % ov for ov in overlap_thresh_all])
+    print str_print
+    for idx_class_name, class_name in enumerate(class_names):
+        # if idx_class_name<6:
+        #     continue
+
+        if train:
+            mat_file = os.path.join('../TH14evalkit',class_name+'.mat')
+        else:
+            mat_file = os.path.join('../TH14evalkit','mat_files', class_name+'_test.mat')
+
+        loaded = scipy.io.loadmat(mat_file)
+        
+        gt_vid_names = loaded['gtvideonames'][0]
+        gt_class_names = loaded['gt_events_class'][0]
+        gt_time_intervals = loaded['gt_time_intervals'][0]
+        
+        arr_meta = [gt_vid_names, gt_class_names]
+
+        arr_out = []
+        for arr_curr in arr_meta:
+            arr_curr = [str(a[0]) for a in arr_curr]
+            arr_out.append(arr_curr)
+
+        [gt_vid_names, gt_class_names] = arr_out
+        gt_time_intervals = np.array([a[0] for a in gt_time_intervals])
+        
+
+
+        det_conf = det_conf_all[:,idx_class_name]
+
+        bin_keep = det_conf>=second_thresh
+        # print np.sum(bin_keep), det_conf.shape
+        # raw_input()
+        det_time_intervals = det_time_intervals_all[bin_keep,:]
+        det_vid_names = list(np.array(det_vid_names_all)[bin_keep])
+        # det_vid_names_all
+        det_conf = det_conf[bin_keep]
+        det_class_names = [class_name]*det_conf.shape[0]
+        # print det_conf.shape
+
+        # print gt_time_intervals[10]
+        # print det_time_intervals_all[10:15]
+        
+
+        # raw_input()
+
+        # bin_keep = class_keep == idx_class_name
+        # det_time_intervals = det_time_intervals_all[bin_keep,:]
+        # det_vid_names = list(np.array(det_vid_names_all)[bin_keep])
+        # det_conf = det_conf_all[bin_keep]
+        # det_class_names = [class_name]*det_conf.shape[0]
+        
+        for idx_overlap_thresh, overlap_thresh in enumerate(overlap_thresh_all):
+            rec, prec, ap = event_det_pr(det_vid_names, det_time_intervals, det_class_names, det_conf, gt_vid_names, gt_time_intervals, gt_class_names, class_name, overlap_thresh)
+            aps[idx_class_name, idx_overlap_thresh] = ap*100
+        
+        str_print = [class_name+'\t' if len(class_name)<8 else class_name]+['%.2f' % ap_curr for ap_curr in aps[idx_class_name,:]]
+        str_print = '\t'.join(str_print)
+        print str_print
+    
+    aps[-1,:]= np.mean(aps[:len(class_names),:],0)
+    class_names.append('Average')
+    
+    # print aps
+    str_print = '\t'.join(['%.1f' % ov for ov in overlap_thresh_all])
+    log_arr.append(str_print)
+    # print log_arr[-1]
+    for idx_class_name, class_name in enumerate(class_names):
+        if len(class_name)<8:
+            class_name +='\t'
+        str_print = [class_name]+['%.2f' % ap_curr for ap_curr in aps[idx_class_name,:]]
+        str_print = '\t'.join(str_print)
+        log_arr.append(str_print)
+    
+    print log_arr[-1]
+
+    return aps
 
 
 
@@ -170,10 +263,11 @@ def test_event_det_pr():
         mat_file = os.path.join('../TH14evalkit',class_name+'.mat')
         loaded = scipy.io.loadmat(mat_file)
         gt_vid_names = loaded['gtvideonames'][0]
-        det_vid_names = loaded['detvideonames'][0]
-        gt_class_names = loaded['gt_events_class'][0]
-        det_class_names = loaded['det_events_class'][0]
         gt_time_intervals = loaded['gt_time_intervals'][0]
+        gt_class_names = loaded['gt_events_class'][0]
+        
+        det_vid_names = loaded['detvideonames'][0]
+        det_class_names = loaded['det_events_class'][0]
         det_time_intervals = loaded['det_time_intervals'][0]
         det_conf = loaded['det_conf'][0]
 
