@@ -610,7 +610,7 @@ def verify_class_labels(test= False):
 
 
 
-def write_train_test_files(test = False):
+def write_train_test_files(test = False, just_primary = False):
     out_dir_files = os.path.join(dir_meta,'train_test_files')
     util.mkdir(out_dir_files)
 
@@ -631,8 +631,15 @@ def write_train_test_files(test = False):
     anno_dir = os.path.join(dir_meta_curr, 'annotation')
     rough_dir = os.path.join(dir_meta_curr, 'anno_rough')
 
+    if just_primary:
+        out_file = out_file[:out_file.rindex('.')]+'_just_primary.txt'
 
-    files_anno = glob.glob(os.path.join(anno_dir,'*.txt'))
+    files_anno = os.path.join(anno_dir,'*.txt') if not test else os.path.join(anno_dir,'*_test.txt')
+    files_anno = glob.glob(files_anno)
+    print len(files_anno)
+    for file_curr in files_anno:
+        print file_curr 
+
     assert len(files_anno)==21
     files_anno = [file_curr for file_curr in files_anno if not os.path.split(file_curr)[1].startswith('Ambiguous')]
     classes = [os.path.split(file_curr[:file_curr.rindex('_')])[1] for file_curr in files_anno]
@@ -654,7 +661,7 @@ def write_train_test_files(test = False):
             continue
     
         class_1 = list(val_curr.primary_action)
-        if len(val_curr.secondary_actions)>0:
+        if len(val_curr.secondary_actions)>0 and not just_primary:
             class_1 +=list(val_curr.secondary_actions[0][0])
         
         anno_1 = [1 if classes[idx] in class_1 else 0 for idx in range(20)]
@@ -667,7 +674,7 @@ def write_train_test_files(test = False):
     print out_file, len(out_lines)
     util.writeFile(out_file,out_lines)
 
-def write_train_test_files_all(test = False):
+def write_train_test_files_all(test = False, just_primary = False):
     out_dir_files = os.path.join(dir_meta,'train_test_files')
     util.mkdir(out_dir_files)
 
@@ -684,6 +691,9 @@ def write_train_test_files_all(test = False):
         key = 'test_videos'
         feature_dir = os.path.join(dir_meta_features,'Thumos14-I3D-JOINTFeatures_test')
         out_file = os.path.join(out_dir_files,'test_all.txt')
+
+    if just_primary:
+        out_file = out_file[:out_file.rindex('.')]+'_just_primary.txt'
 
     anno_dir = os.path.join(dir_meta_curr, 'annotation')
     rough_dir = os.path.join(dir_meta_curr, 'anno_rough')
@@ -711,7 +721,7 @@ def write_train_test_files_all(test = False):
     #         continue
     
         class_1 = list(val_curr.primary_action)
-        if len(val_curr.secondary_actions)>0:
+        if len(val_curr.secondary_actions)>0 and not just_primary:
             class_1 +=list(val_curr.secondary_actions[0][0])
         
         anno_1 = [1 if classes[idx] in class_1 else 0 for idx in range(len(classes))]
@@ -742,10 +752,11 @@ def write_classes_list_files():
 
 
 def main():
-
-    write_train_test_files_all(True)
-    # write_train_test_files_all(False)
-    # write_train_test_files_all(True)
+    just_primary = True
+    # write_train_test_files_all(False, just_primary = just_primary)
+    # write_train_test_files_all(True, just_primary = just_primary)
+    # write_train_test_files(False, just_primary = just_primary)
+    write_train_test_files(True, just_primary = just_primary)
 
 
     # write_train_test_files()

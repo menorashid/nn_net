@@ -13,24 +13,13 @@ class Graph_Sim_Mill(nn.Module):
 
 
         self.features = []
-        self.features.append(nn.Linear(2048,512))
+        self.features.append(nn.Linear(2048,1024))
         self.features.append(nn.ReLU())
         self.features.append(nn.Dropout(0.5))
-        
-        self.features.append(Graph_Layer(512,128,512))
+        self.features.append(Graph_Layer(1024,64))
         self.features.append(nn.ReLU())
-        self.features.append(torch.nn.LayerNorm(512, eps=1e-05, elementwise_affine=False))
         self.features.append(nn.Dropout(0.5))
-
-        # self.features.append(Graph_Layer(512,4,2048))
-        # self.features.append(nn.ReLU())
-        # self.features.append(nn.Dropout(0.5))
-
-        # self.features.append(Graph_Layer(2048,32, n_out = n_classes))
-        # self.features.append(nn.ReLU())
-        # self.features.append(nn.Dropout(0.5))
-        
-        self.features.append(nn.Linear(512,n_classes))
+        self.features.append(nn.Linear(1024,n_classes))
         # self.features.append(nn.Linear(2048,n_classes))
         self.features = nn.Sequential(*self.features)
         
@@ -42,7 +31,6 @@ class Graph_Sim_Mill(nn.Module):
 
     def forward(self, input):
         x = self.features(input)
-        # print x.size()
         # x = self.graph_layer(x)
 
         # return x
@@ -58,7 +46,7 @@ class Graph_Sim_Mill(nn.Module):
         # print pmf.size()
         pmf = pmf[:k,:]
         # print pmf.size()
-        pmf = torch.sum(pmf[:k,:], dim = 0)
+        pmf = torch.sum(pmf[:k,:], dim = 0)/k
         # print pmf.size()
         # pmf = pmf
         # print pmf.size()

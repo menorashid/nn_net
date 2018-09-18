@@ -2,7 +2,7 @@ from torchvision import models
 import torch.nn as nn
 import torch
 import torch.nn.functional as F
-from graph_layer import Graph_Layer
+from graph_layer_i3d_sim_mat import Graph_Layer
 
 class Graph_Sim_Mill(nn.Module):
     def __init__(self, n_classes, deno):
@@ -13,15 +13,14 @@ class Graph_Sim_Mill(nn.Module):
 
 
         self.features = []
-        self.features.append(nn.Linear(2048,512))
+        self.features.append(nn.Linear(2048,2048))
         self.features.append(nn.ReLU())
         self.features.append(nn.Dropout(0.5))
         
-        self.features.append(Graph_Layer(512,128,512))
-        self.features.append(nn.ReLU())
-        self.features.append(torch.nn.LayerNorm(512, eps=1e-05, elementwise_affine=False))
-        self.features.append(nn.Dropout(0.5))
-
+        # self.graph_layer = []
+        print 'NO GRAPH'
+        self.graph_layer = Graph_Layer(2048)
+        
         # self.features.append(Graph_Layer(512,4,2048))
         # self.features.append(nn.ReLU())
         # self.features.append(nn.Dropout(0.5))
@@ -29,10 +28,14 @@ class Graph_Sim_Mill(nn.Module):
         # self.features.append(Graph_Layer(2048,32, n_out = n_classes))
         # self.features.append(nn.ReLU())
         # self.features.append(nn.Dropout(0.5))
-        
-        self.features.append(nn.Linear(512,n_classes))
+        self.final_layer = []
+        self.final_layer.append(nn.ReLU())
+        self.final_layer.append(nn.Dropout(0.5))
+        self.final_layer.append(nn.Linear(2048,n_classes))
         # self.features.append(nn.Linear(2048,n_classes))
         self.features = nn.Sequential(*self.features)
+        # self.graph_layer = nn.Sequential(*self.graph_layer)
+        self.final_layer = nn.Sequential(*self.final_layer)
         
 
 
@@ -41,7 +44,11 @@ class Graph_Sim_Mill(nn.Module):
         # self.LogSoftmax = nn.LogSoftmax()
 
     def forward(self, input):
+        # print input.size()
         x = self.features(input)
+        # print x.size()
+        x = self.graph_layer(x, input)
+        x = self.final_layer(x)
         # print x.size()
         # x = self.graph_layer(x)
 
@@ -58,7 +65,7 @@ class Graph_Sim_Mill(nn.Module):
         # print pmf.size()
         pmf = pmf[:k,:]
         # print pmf.size()
-        pmf = torch.sum(pmf[:k,:], dim = 0)
+        pmf = torch.sum(pmf[:k,:], dim = 0)/k
         # print pmf.size()
         # pmf = pmf
         # print pmf.size()
@@ -81,7 +88,9 @@ class Network:
 
 
     def get_lr_list(self, lr):
-        lr_list= [{'params': self.model.features.parameters(), 'lr': lr[0]}]
+        lr_list= [{'params': self.model.features.parameters(), 'lr': lr[0]},
+        {'params': self.model.graph_layer.parameters(), 'lr': lr[1]},
+        {'params': self.model.final_layer.parameters(), 'lr': lr[2]}]
         return lr_list
 
 def main():

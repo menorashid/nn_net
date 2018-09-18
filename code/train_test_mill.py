@@ -95,7 +95,7 @@ def test_model_core(model, test_dataloader, criterion, log_arr):
 
         return accuracy, loss_iter
 
-def test_model_overlap(model, test_dataloader, criterion, log_arr, overlap_thresh=0.1, bin_trim = None, first_thresh = 0, second_thresh = 0.05):
+def test_model_overlap_old(model, test_dataloader, criterion, log_arr, overlap_thresh=0.1, bin_trim = None, first_thresh = 0, second_thresh = 0.5):
 
     model.eval()
 
@@ -114,6 +114,7 @@ def test_model_overlap(model, test_dataloader, criterion, log_arr, overlap_thres
     det_vid_names = []
     idx_test = 0
 
+    threshes_all = []
     for num_iter_test,batch in enumerate(test_dataloader):
         samples = batch['features']
         labels = batch['label'].cuda()
@@ -138,25 +139,28 @@ def test_model_overlap(model, test_dataloader, criterion, log_arr, overlap_thres
                 # print out.size()
                 # raw_input()
 
-            # out = torch.nn.functional.softmax(out,dim = 1)
+            out = torch.nn.functional.softmax(out,dim = 1)
 
             pmf = pmf.data.cpu().numpy()
             out = out.data.cpu().numpy()
 
             bin_not_keep = pmf<first_thresh
-            # print pmf, bin_not_keep
-            out[:,bin_not_keep]= second_thresh-1
-            for r in range(out.shape[0]):
-                out[r,~bin_not_keep]=util.softmax(out[r,~bin_not_keep])
+            
+            # for r in range(out.shape[0]):
+            #     out[r,~bin_not_keep]=util.softmax(out[r,~bin_not_keep])
 
-            # print out.shape
-            # print out[0]
+            max_vals = np.max(out, axis = 0)
+            min_vals = np.min(out, axis = 0)
+            threshes = max_vals - (max_vals - min_vals)*second_thresh
+            
+            out[:,bin_not_keep]= np.min(threshes)-1
+            for idx_class in range(threshes.shape[0]):
+                out[out[:,idx_class]<threshes[idx_class],idx_class] = threshes[idx_class]-1
+            threshes = np.tile(threshes[np.newaxis,:],[out.shape[0],1])
+            threshes_all.append(threshes)
 
-            # print out
-            # raw_input()
-            # print np.sum(out,1)
-            # raw_input()
-            # print out.shape
+
+            
 
             start_seq = np.array(range(0,out.shape[0]))*16./25.
             end_seq = np.array(range(1,out.shape[0]+1))*16./25.
@@ -168,14 +172,148 @@ def test_model_overlap(model, test_dataloader, criterion, log_arr, overlap_thres
             det_time_intervals.append(time_intervals)
             idx_test +=1
 
+    threshes_all = np.concatenate(threshes_all,0)
     det_conf = np.concatenate(det_conf,axis =0)
     det_time_intervals = np.concatenate(det_time_intervals,axis = 0)
     class_keep = np.argmax(det_conf , axis = 1)
-    # det_conf = np.max(det_conf,axis = 1)
+
+    # np.savez('../scratch/debug_det.npz', det_vid_names = det_vid_names, det_conf = det_conf, det_time_intervals = det_time_intervals)
+    # raw_input()
+
+    aps = et.test_overlap(det_vid_names, det_conf, det_time_intervals, threshes_all,log_arr = log_arr)
     
-    aps = et.test_overlap(det_vid_names, det_conf, det_time_intervals, second_thresh,log_arr = log_arr)
     return aps
+
+def merge_detections(bin_keep, det_conf, det_time_intervals):
+    bin_keep = bin_keep.astype(int)
+    bin_keep_rot = np.roll(bin_keep, 1)
+    bin_keep_rot[0] = 0
+    diff = bin_keep - bin_keep_rot
+    # diff[-3]=1
+    idx_start_all = list(np.where(diff==1)[0])
+    idx_end_all = list(np.where(diff==-1)[0])
+    if len(idx_start_all)>len(idx_end_all):
+        assert len(idx_start_all)-1==len(idx_end_all)
+        idx_end_all.append(bin_keep.shape[0])
     
+    assert len(idx_start_all)==len(idx_end_all)
+    num_det = len(idx_start_all)
+    
+    det_conf_new = np.zeros((num_det,))
+    det_time_intervals_new = np.zeros((num_det,2))
+
+    for idx_curr in range(num_det):
+        idx_start = idx_start_all[idx_curr]
+        idx_end = idx_end_all[idx_curr]
+
+        det_conf_rel = det_conf[idx_start:idx_end]
+        det_conf_new[idx_curr]=np.max(det_conf_rel)
+
+        # print det_time_intervals.shape, idx_start
+        det_time_intervals_new[idx_curr,0]=det_time_intervals[idx_start,0]
+        # print idx_end, det_time_intervals.shape, idx_curr, num_det
+        det_time_intervals_new[idx_curr,1]=det_time_intervals[idx_end,0] if idx_end<det_time_intervals.shape[0] else det_time_intervals[idx_end-1,1]
+
+        # print bin_keep[idx_start:idx_end]
+        # print diff[idx_start:idx_end]
+        assert np.all(bin_keep[idx_start:idx_end]==1)
+
+    # print det_conf.shape
+    # print det_time_intervals.shape
+    # print det_conf_new.shape
+    # print det_time_intervals_new.shape
+
+    # raw_input()
+    return det_conf_new, det_time_intervals_new
+
+def test_model_overlap(model, test_dataloader, criterion, log_arr, overlap_thresh=0.1, bin_trim = None, first_thresh = 0, second_thresh = 0.5):
+
+    model.eval()
+
+    preds = []
+    labels_all = []
+
+    det_vid_names_ac = [os.path.split(line.split(' ')[0])[1][:-4] for line in test_dataloader.dataset.files]
+    
+    outs = []
+    min_all = None
+    max_all = None
+
+    det_events_class = []
+    det_time_intervals_all = []
+    det_conf_all = []
+    det_vid_names = []
+    idx_test = 0
+
+    threshes_all = []
+    for num_iter_test,batch in enumerate(test_dataloader):
+        samples = batch['features']
+        labels = batch['label'].cuda()
+
+        preds_mini = []
+        for sample in samples:
+
+            out, pmf = model.forward(sample.cuda())
+
+
+            # print out.size(),torch.min(out), torch.max(out)
+            # print pmf.size(),torch.min(pmf), torch.max(pmf)
+
+            # raw_input()
+
+            if bin_trim is not None:
+                # print out.size()
+                out = out[:,np.where(bin_trim)[0]]
+                pmf = pmf[np.where(bin_trim)[0]]
+
+
+                # print out.size()
+                # raw_input()
+
+            out = torch.nn.functional.softmax(out,dim = 1)
+
+            start_seq = np.array(range(0,out.shape[0]))*16./25.
+            end_seq = np.array(range(1,out.shape[0]+1))*16./25.
+            det_time_intervals_meta = np.concatenate([start_seq[:,np.newaxis],end_seq[:,np.newaxis]],axis=1)
+            
+
+            pmf = pmf.data.cpu().numpy()
+            out = out.data.cpu().numpy()
+
+
+            bin_not_keep = pmf<first_thresh
+            
+            for class_idx in range(pmf.size):
+                if bin_not_keep[class_idx]:
+                    continue
+
+                det_conf = out[:,class_idx]
+                thresh = np.max(w)-(np.max(det_conf)-np.min(det_conf))*second_thresh
+                bin_second_thresh = det_conf>thresh
+
+
+                # det_conf, det_time_intervals = merge_detections(bin_second_thresh, det_conf, det_time_intervals_meta)
+                det_time_intervals = det_time_intervals_meta
+                
+                det_vid_names.extend([det_vid_names_ac[idx_test]]*det_conf.shape[0])
+                det_events_class.extend([class_idx]*det_conf.shape[0])
+                det_conf_all.append(det_conf)
+                det_time_intervals_all.append(det_time_intervals)
+
+            idx_test +=1
+
+    # threshes_all = np.concatenate(threshes_all,0)
+    det_conf = np.concatenate(det_conf_all,axis =0)
+    det_time_intervals = np.concatenate(det_time_intervals_all,axis = 0)
+    det_events_class = np.array(det_events_class)
+    # class_keep = np.argmax(det_conf , axis = 1)
+
+    # np.savez('../scratch/debug_det_graph.npz', det_vid_names = det_vid_names, det_conf = det_conf, det_time_intervals = det_time_intervals, det_events_class = det_events_class)
+    # raw_input()
+
+    aps = et.test_overlap(det_vid_names, det_conf, det_time_intervals,det_events_class,log_arr = log_arr)
+    
+    return aps
         
 
 def test_model(out_dir_train,

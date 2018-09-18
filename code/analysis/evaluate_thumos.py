@@ -105,6 +105,7 @@ def event_det_pr(det_vid_names, det_time_intervals, det_class_names, det_conf, g
     tp_conf = []
     fp_conf = []
     for idx_video_name, video_name in enumerate(video_names):
+        # print video_name
         gt = np.logical_and(gt_vid_names==video_name, ind_gt_class)
         amb = np.logical_and(gt_vid_names==video_name, ind_amb_class)
         det = np.logical_and(det_vid_names==video_name, ind_det_class)
@@ -130,6 +131,9 @@ def event_det_pr(det_vid_names, det_time_intervals, det_class_names, det_conf, g
 
             if np.sum(gt)>0:
                 ov = interval_overlap_val_seconds(gt_time_intervals[gt,:], det_time_intervals[idx_sort,:])
+                # print gt_time_intervals[gt,:].shape[0],det_time_intervals[idx_sort,:].shape[0]
+                # print ov
+                # raw_input()
                 # print ov.shape
 
                 for k in range(ov.shape[0]):    
@@ -160,6 +164,9 @@ def event_det_pr(det_vid_names, det_time_intervals, det_class_names, det_conf, g
     ap = pr_ap(rec, prec)
     return rec, prec, ap
         
+
+
+
 
 def test_overlap(det_vid_names_all, det_conf_all, det_time_intervals_all, second_thresh, train=False, log_arr = []):
     class_names = ['BaseballPitch', 'BasketballDunk', 'Billiards', 'CleanAndJerk', 'CliffDiving', 'CricketBowling', 'CricketShot', 'Diving', 'FrisbeeCatch', 'GolfSwing', 'HammerThrow', 'HighJump', 'JavelinThrow', 'LongJump', 'PoleVault', 'Shotput', 'SoccerPenalty', 'TennisSwing', 'ThrowDiscus', 'VolleyballSpiking']
@@ -196,24 +203,20 @@ def test_overlap(det_vid_names_all, det_conf_all, det_time_intervals_all, second
         gt_time_intervals = np.array([a[0] for a in gt_time_intervals])
         
 
-
-        det_conf = det_conf_all[:,idx_class_name]
-
-        bin_keep = det_conf>=second_thresh
-        # print np.sum(bin_keep), det_conf.shape
-        # raw_input()
-        det_time_intervals = det_time_intervals_all[bin_keep,:]
+        bin_keep = second_thresh == idx_class_name
+        det_conf = det_conf_all[bin_keep]
+        det_time_intervals = det_time_intervals_all[bin_keep]
         det_vid_names = list(np.array(det_vid_names_all)[bin_keep])
-        # det_vid_names_all
-        det_conf = det_conf[bin_keep]
         det_class_names = [class_name]*det_conf.shape[0]
-        # print det_conf.shape
 
-        # print gt_time_intervals[10]
-        # print det_time_intervals_all[10:15]
         
-
-        # raw_input()
+        # det_conf = det_conf_all[:,idx_class_name]
+        # bin_keep = det_conf>=second_thresh[:,idx_class_name]
+        # det_time_intervals = det_time_intervals_all[bin_keep,:]
+        # det_vid_names = list(np.array(det_vid_names_all)[bin_keep])
+        # det_conf = det_conf[bin_keep]
+        # det_class_names = [class_name]*det_conf.shape[0]
+        
 
         # bin_keep = class_keep == idx_class_name
         # det_time_intervals = det_time_intervals_all[bin_keep,:]

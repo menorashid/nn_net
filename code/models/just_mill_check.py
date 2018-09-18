@@ -2,51 +2,25 @@ from torchvision import models
 import torch.nn as nn
 import torch
 import torch.nn.functional as F
-from graph_layer import Graph_Layer
 
-class Graph_Sim_Mill(nn.Module):
+class Just_Mill(nn.Module):
     def __init__(self, n_classes, deno):
-        super(Graph_Sim_Mill, self).__init__()
+        super(Just_Mill, self).__init__()
         
         self.num_classes = n_classes
         self.deno = deno
 
 
         self.features = []
-        self.features.append(nn.Linear(2048,512))
+        self.features.append(nn.Linear(2048,2048))
         self.features.append(nn.ReLU())
         self.features.append(nn.Dropout(0.5))
-        
-        self.features.append(Graph_Layer(512,128,512))
-        self.features.append(nn.ReLU())
-        self.features.append(torch.nn.LayerNorm(512, eps=1e-05, elementwise_affine=False))
-        self.features.append(nn.Dropout(0.5))
-
-        # self.features.append(Graph_Layer(512,4,2048))
-        # self.features.append(nn.ReLU())
-        # self.features.append(nn.Dropout(0.5))
-
-        # self.features.append(Graph_Layer(2048,32, n_out = n_classes))
-        # self.features.append(nn.ReLU())
-        # self.features.append(nn.Dropout(0.5))
-        
-        self.features.append(nn.Linear(512,n_classes))
-        # self.features.append(nn.Linear(2048,n_classes))
+        self.features.append(nn.Linear(2048,n_classes))
         self.features = nn.Sequential(*self.features)
-        
-
-
-
-        # self.graph_layer = 
         # self.LogSoftmax = nn.LogSoftmax()
 
     def forward(self, input):
         x = self.features(input)
-        # print x.size()
-        # x = self.graph_layer(x)
-
-        # return x
-
         pmf = self.make_pmf(x)
         return x, pmf
 
@@ -58,7 +32,7 @@ class Graph_Sim_Mill(nn.Module):
         # print pmf.size()
         pmf = pmf[:k,:]
         # print pmf.size()
-        pmf = torch.sum(pmf[:k,:], dim = 0)
+        pmf = torch.sum(pmf[:k,:], dim = 0)/k
         # print pmf.size()
         # pmf = pmf
         # print pmf.size()
@@ -68,7 +42,7 @@ class Graph_Sim_Mill(nn.Module):
 
 class Network:
     def __init__(self, n_classes, deno, init = False):
-        model = Graph_Sim_Mill(n_classes, deno)
+        model = Just_Mill(n_classes, deno)
 
         if init:
             for idx_m,m in enumerate(model.features):
@@ -92,12 +66,10 @@ def main():
     net = Network(n_classes= 20, deno = 8)
     print net.model
     net.model = net.model.cuda()
-    input = np.zeros((16,2048))
+    input = np.zeros((32,2048))
     input = torch.Tensor(input).cuda()
     input = Variable(input)
-    output,pmf = net.model(input)
-    # print output.shape
-
+    output, pmf = net.model(input)
 
     print output.data.shape
 

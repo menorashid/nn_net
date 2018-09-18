@@ -2,7 +2,7 @@ from torchvision import models
 import torch.nn as nn
 import torch
 import torch.nn.functional as F
-from graph_layer import Graph_Layer
+from graph_layer_with_time import Graph_Layer
 
 class Graph_Sim_Mill(nn.Module):
     def __init__(self, n_classes, deno):
@@ -13,13 +13,14 @@ class Graph_Sim_Mill(nn.Module):
 
 
         self.features = []
-        self.features.append(nn.Linear(2048,512))
+        self.features.append(nn.Linear(2048,1024))
         self.features.append(nn.ReLU())
         self.features.append(nn.Dropout(0.5))
         
-        self.features.append(Graph_Layer(512,128,512))
+        self.features.append(Graph_Layer(1024,64,1024))
         self.features.append(nn.ReLU())
-        self.features.append(torch.nn.LayerNorm(512, eps=1e-05, elementwise_affine=False))
+        # self.features.append(nn.LayerNorm([1024], eps=0, elementwise_affine=False))
+        # self.features.append(nn.BatchNorm1d(1024,affine = False, track_running_stats = False))
         self.features.append(nn.Dropout(0.5))
 
         # self.features.append(Graph_Layer(512,4,2048))
@@ -30,7 +31,7 @@ class Graph_Sim_Mill(nn.Module):
         # self.features.append(nn.ReLU())
         # self.features.append(nn.Dropout(0.5))
         
-        self.features.append(nn.Linear(512,n_classes))
+        self.features.append(nn.Linear(1024,n_classes))
         # self.features.append(nn.Linear(2048,n_classes))
         self.features = nn.Sequential(*self.features)
         
