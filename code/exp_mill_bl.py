@@ -147,14 +147,14 @@ def train_simple_mill_all_classes(model_name,
         test_model(**test_params)
 
 def super_simple_experiment():
-    model_name = 'graph_sim_mill_big'
+    model_name = 'mill_bg_max'
     lr = [0.0001]
     epoch_stuff = [100,100]
     dataset = 'ucf'
     limit  = 500
     deno = 8
     save_after = 25
-    test_mode = True
+    test_mode = False
     class_weights = True
     test_after = 10
     all_classes = False

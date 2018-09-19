@@ -452,8 +452,9 @@ def train_model(out_dir_train,
             labels = batch['label'].cuda()
 
             preds = []
-            for sample in samples:
-                out,pmf = model.forward(sample.cuda())
+            for idx_sample, sample in enumerate(samples):
+                # print labels[idx_sample]
+                out,pmf = model.forward(sample.cuda(),labels[idx_sample])
                 preds.append(pmf.unsqueeze(0))
             preds = torch.cat(preds,0)        
 
