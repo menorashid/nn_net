@@ -48,31 +48,41 @@ def test_model_core(model, test_dataloader, criterion, log_arr):
         for num_iter_test,batch in enumerate(test_dataloader):
             samples = batch['features']
             labels = batch['label'].cuda()
-
-            preds_mini = []
-            for sample in samples:
-                out,pmf = model.forward(sample.cuda())
-                preds.append(pmf.unsqueeze(0))
-                preds_mini.append(pmf.unsqueeze(0))
-
             labels_all.append(labels)
+            # print model.__class__.__name__.lower()
+            # print 'centerloss' in model.__class__.__name__.lower()
+            # raw_input()
 
-            loss = criterion(labels, torch.cat(preds_mini,0))
+            if 'centerloss' in model.__class__.__name__.lower():
+                preds_mini,extra = model.forward(samples, labels)
+                preds.append(preds_mini)
+                labels = [labels]+extra
+            else:
+                preds_mini = []
+                for sample in samples:
+                    out,pmf = model.forward(sample.cuda())
+                    preds.append(pmf.unsqueeze(0))
+                    preds_mini.append(pmf.unsqueeze(0))
+                preds_mini = torch.cat(preds_mini,0)
+            
+            
+            loss = criterion(labels, preds_mini)
             loss_iter = loss.data[0]
             
             str_display = 'val iter: %d, val loss: %.4f' %(num_iter_test,loss_iter)
             log_arr.append(str_display)
             print str_display
             
-        preds = torch.cat(preds,0)        
+        preds = torch.cat(preds,0)
         labels_all = torch.cat(labels_all,0)
-            
-        loss = criterion(labels_all, preds)
-        loss_iter = loss.data[0]
+        
+        if 'centerloss' not in criterion.__class__.__name__.lower():    
+            loss = criterion(labels_all, preds)
+            loss_iter = loss.data[0]
 
-        str_display = 'val total loss: %.4f' %(loss_iter)
-        log_arr.append(str_display)
-        print str_display
+            str_display = 'val total loss: %.4f' %(loss_iter)
+            log_arr.append(str_display)
+            print str_display
         
 
         preds = torch.nn.functional.softmax(preds).data.cpu().numpy()
@@ -226,8 +236,113 @@ def merge_detections(bin_keep, det_conf, det_time_intervals):
     # raw_input()
     return det_conf_new, det_time_intervals_new
 
-def test_model_overlap(model, test_dataloader, criterion, log_arr, overlap_thresh=0.1, bin_trim = None, first_thresh = 0, second_thresh = 0.5):
+def visualize_dets(model, test_dataloader, dir_viz, first_thresh , second_thresh, bin_trim = None,  det_class = -1):
 
+    model.eval()
+
+    preds = []
+    labels_all = []
+
+    det_vid_names_ac = [os.path.split(line.split(' ')[0])[1][:-4] for line in test_dataloader.dataset.files]
+    
+    outs = []
+    min_all = None
+    max_all = None
+
+    det_events_class = []
+    det_time_intervals_all = []
+    det_conf_all = []
+    det_vid_names = []
+    out_shapes = []
+    idx_test = 0
+
+    threshes_all = []
+    for num_iter_test,batch in enumerate(test_dataloader):
+        samples = batch['features']
+        labels = batch['label']
+
+        preds_mini = []
+        for idx_sample, sample in enumerate(samples):
+            # print idx_test
+            out, pmf, bg = model.forward(sample.cuda(), ret_bg = True)
+            # out = out-bg
+            if bin_trim is not None:
+                out = out[:,np.where(bin_trim)[0]]
+                pmf = pmf[np.where(bin_trim)[0]]
+
+            # out = torch.nn.functional.softmax(out,dim = 1)
+
+            start_seq = np.array(range(0,out.shape[0]))*16./25.
+            end_seq = np.array(range(1,out.shape[0]+1))*16./25.
+            det_time_intervals_meta = np.concatenate([start_seq[:,np.newaxis],end_seq[:,np.newaxis]],axis=1)
+            
+
+            pmf = pmf.data.cpu().numpy()
+            out = out.data.cpu().numpy()
+
+            if det_class==-1:
+                class_idx = np.where(labels[idx_sample].numpy())[0][0]
+                class_idx_gt = class_idx
+            elif det_class ==-2:
+                bg = bg.data.cpu().numpy()
+                bg = bg[:,:1]
+                out = np.concatenate([out,bg],axis = 1)
+                class_idx = out.shape[1] - 1
+                class_idx_gt = np.where(labels[idx_sample].numpy())[0][0]
+            else:
+                class_idx = det_class
+                class_idx_gt = class_idx
+
+            if det_class>=-1:
+                bin_not_keep = pmf<first_thresh
+                # print pmf
+                # print bin_not_keep
+                # print class_idx
+                # raw_input()
+                # for class_idx in range(pmf.size):
+                if bin_not_keep[class_idx]:
+                    idx_test +=1
+                    print 'PROBLEM'
+                    continue
+            
+            det_conf = out[:,class_idx]
+            if second_thresh<0:
+                thresh = 0
+            else:
+                thresh = np.max(det_conf)-(np.max(det_conf)-np.min(det_conf))*second_thresh
+            bin_second_thresh = det_conf>thresh
+            
+            # det_conf, det_time_intervals = merge_detections(bin_second_thresh, det_conf, det_time_intervals_meta)
+            det_time_intervals = det_time_intervals_meta
+
+            det_vid_names.extend([det_vid_names_ac[idx_test]]*det_conf.shape[0])
+            det_events_class.extend([class_idx_gt]*det_conf.shape[0])
+            out_shapes.extend([out.shape[0]]*det_conf.shape[0])
+            
+            det_conf_all.append(det_conf)
+            det_time_intervals_all.append(det_time_intervals)
+
+
+            idx_test +=1
+            
+
+    det_conf_all = np.concatenate(det_conf_all,axis =0)
+    det_time_intervals_all = np.concatenate(det_time_intervals_all,axis = 0)
+    det_events_class_all = np.array(det_events_class)
+    out_shapes = np.array(out_shapes)
+
+    et.viz_overlap(dir_viz, det_vid_names, det_conf_all, det_time_intervals_all, det_events_class_all,out_shapes)
+
+    # np.savez('../scratch/debug_det_graph.npz', det_vid_names = det_vid_names, det_conf = det_conf, det_time_intervals = det_time_intervals, det_events_class = det_events_class)
+
+
+
+
+def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh , second_thresh , bin_trim = None ):
+
+    # print 'FIRST THRESH', first_thresh
+    # print 'SECOND THRESH', second_thresh
+    # raw_input()
     model.eval()
 
     preds = []
@@ -253,7 +368,10 @@ def test_model_overlap(model, test_dataloader, criterion, log_arr, overlap_thres
         preds_mini = []
         for sample in samples:
 
-            out, pmf = model.forward(sample.cuda())
+            if 'centerloss' in model.__class__.__name__.lower():
+                out, pmf = model.forward_single_test(sample.cuda())
+            else:    
+                out, pmf = model.forward(sample.cuda())
 
 
             # print out.size(),torch.min(out), torch.max(out)
@@ -269,8 +387,8 @@ def test_model_overlap(model, test_dataloader, criterion, log_arr, overlap_thres
 
                 # print out.size()
                 # raw_input()
-
-            out = torch.nn.functional.softmax(out,dim = 1)
+            if second_thresh>=0:
+                out = torch.nn.functional.softmax(out,dim = 1)
 
             start_seq = np.array(range(0,out.shape[0]))*16./25.
             end_seq = np.array(range(1,out.shape[0]+1))*16./25.
@@ -282,18 +400,22 @@ def test_model_overlap(model, test_dataloader, criterion, log_arr, overlap_thres
 
 
             bin_not_keep = pmf<first_thresh
-            
+            # print np.min(pmf), np.max(pmf)
             for class_idx in range(pmf.size):
                 if bin_not_keep[class_idx]:
                     continue
 
                 det_conf = out[:,class_idx]
-                thresh = np.max(w)-(np.max(det_conf)-np.min(det_conf))*second_thresh
+                if second_thresh<0:
+                    thresh = 0
+                else:
+                    thresh = np.max(det_conf)-(np.max(det_conf)-np.min(det_conf))*second_thresh
                 bin_second_thresh = det_conf>thresh
+                # print thresh, np.sum(bin_second_thresh)
 
 
-                # det_conf, det_time_intervals = merge_detections(bin_second_thresh, det_conf, det_time_intervals_meta)
-                det_time_intervals = det_time_intervals_meta
+                det_conf, det_time_intervals = merge_detections(bin_second_thresh, det_conf, det_time_intervals_meta)
+                # det_time_intervals = det_time_intervals_meta
                 
                 det_vid_names.extend([det_vid_names_ac[idx_test]]*det_conf.shape[0])
                 det_events_class.extend([class_idx]*det_conf.shape[0])
@@ -324,9 +446,13 @@ def test_model(out_dir_train,
                 gpu_id = 0,
                 num_workers = 0,
                 post_pend = '',
-                trim_preds = None):
+                trim_preds = None,
+                first_thresh = 0,
+                second_thresh = 0.5, 
+                visualize = False,
+                det_class = -1):
     
-    out_dir_results = os.path.join(out_dir_train,'results_model_'+str(model_num)+post_pend)
+    out_dir_results = os.path.join(out_dir_train,'results_model_'+str(model_num)+post_pend+'_'+str(first_thresh)+'_'+str(second_thresh))
     util.mkdir(out_dir_results)
     model_file = os.path.join(out_dir_train,'model_'+str(model_num)+'.pt')
     log_file = os.path.join(out_dir_results,'log.txt')
@@ -359,10 +485,15 @@ def test_model(out_dir_train,
     else:
         bin_trim = None
         
-
-    aps = test_model_overlap(model, test_dataloader, criterion, log_arr, bin_trim = bin_trim)
-    np.save(out_file, aps)
-    util.writeFile(log_file, log_arr)
+    if not visualize:
+        aps = test_model_overlap(model, test_dataloader, criterion, log_arr ,first_thresh = first_thresh, second_thresh = second_thresh, bin_trim = bin_trim)
+        np.save(out_file, aps)
+        util.writeFile(log_file, log_arr)
+    else:
+        dir_viz = os.path.join(out_dir_results, '_'.join([str(val) for val in ['viz',det_class, first_thresh, second_thresh]]))
+        util.mkdir(dir_viz)
+        visualize_dets(model, test_dataloader,  dir_viz,first_thresh = first_thresh, second_thresh = second_thresh,bin_trim = bin_trim,det_class = det_class)
+        
             
 
 def train_model(out_dir_train,
@@ -451,12 +582,17 @@ def train_model(out_dir_train,
             samples = batch['features']
             labels = batch['label'].cuda()
 
-            preds = []
-            for idx_sample, sample in enumerate(samples):
-                # print labels[idx_sample]
-                out,pmf = model.forward(sample.cuda(),labels[idx_sample])
-                preds.append(pmf.unsqueeze(0))
-            preds = torch.cat(preds,0)        
+            if 'centerloss' in model_name:
+                preds,extra = model.forward(samples, labels)
+                labels = [labels]+extra
+
+            else:
+                preds = []
+                for idx_sample, sample in enumerate(samples):
+                    # print labels[idx_sample]
+                    out,pmf = model.forward(sample.cuda())
+                    preds.append(pmf.unsqueeze(0))
+                preds = torch.cat(preds,0)        
 
             loss = criterion(labels, preds)
             loss_iter = loss.data[0]
@@ -464,6 +600,10 @@ def train_model(out_dir_train,
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
+
+            # print criterion.__class__.__name__.lower()
+            # if 'centerloss' in criterion.__class__.__name__.lower():
+            #     criterion.backward()
             
             num_iter = num_epoch*len(train_dataloader)+num_iter_train
             

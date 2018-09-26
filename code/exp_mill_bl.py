@@ -1,6 +1,6 @@
 from train_test_mill import *
 import models
-from criterions import MultiCrossEntropy
+from criterions import *
 import os
 from helpers import util,visualize
 from dataset import *
@@ -24,11 +24,18 @@ def train_simple_mill_all_classes(model_name,
                                     test_mode = False,
                                     test_after = 1,
                                     all_classes = False,
-                                    just_primary = False):
+                                    just_primary = False,
+                                    model_nums = None,
+                                    retrain = False,
+                                    viz_mode = False,
+                                    det_class = -1,
+                                    second_thresh = 0.5):
 
     out_dir_meta = '../experiments/'+model_name+'_'+dataset
     util.mkdir(out_dir_meta)
     num_epochs = epoch_stuff[1]
+
+    test_mode = test_mode or viz_mode
 
     epoch_start = 0
     if exp:
@@ -82,6 +89,10 @@ def train_simple_mill_all_classes(model_name,
     criterion = MultiCrossEntropy(class_weights= class_weights_val)
     criterion_str = 'MultiCrossEntropy'
 
+    # criterion = MCE_CenterLoss_Combo(n_classes, feat_dim = 2048, bg = True, lambda_param = 0.0, alpha_param = 0.5, class_weights= class_weights_val)
+    # criterion_str = 'Multi_Center_Combo'
+
+
     init = False
 
     strs_append_list = ['all_classes',all_classes,'just_primary',just_primary,'deno',deno,'limit',limit,'cw',class_weights, criterion_str, num_epochs]+dec_after+lr
@@ -92,9 +103,9 @@ def train_simple_mill_all_classes(model_name,
     
 
 
-    if os.path.exists(final_model_file) and not test_mode:
+    if os.path.exists(final_model_file) and not test_mode and not retrain:
         print 'skipping',final_model_file
-        # return 
+        return 
     else:
         print 'not skipping', final_model_file
 
@@ -126,7 +137,8 @@ def train_simple_mill_all_classes(model_name,
     if not test_mode:
         train_model(**train_params)
     
-    model_nums = [num_epochs-1]
+    if model_nums is None :
+        model_nums = [num_epochs-1] 
     # print model_nums
     # model_nums = [0]+[i-1 for i in range(save_after,num_epochs,save_after)]
     # if model_nums[-1]!=(num_epochs-1):
@@ -143,7 +155,10 @@ def train_simple_mill_all_classes(model_name,
                 criterion = criterion,
                 gpu_id = gpu_id,
                 num_workers = 0,
-                trim_preds = trim_preds)
+                trim_preds = trim_preds,
+                visualize = viz_mode,
+                det_class = det_class,
+                second_thresh = second_thresh)
         test_model(**test_params)
 
 def super_simple_experiment():
@@ -155,10 +170,15 @@ def super_simple_experiment():
     deno = 8
     save_after = 25
     test_mode = False
+    retrain = True
     class_weights = True
     test_after = 10
     all_classes = False
     just_primary = True
+    model_nums = None
+    viz_mode = False
+    second_thresh =0.5
+    det_class = -1
     train_simple_mill_all_classes (model_name = model_name,
                         lr = lr,
                         dataset = dataset,
@@ -172,7 +192,12 @@ def super_simple_experiment():
                         class_weights = class_weights,
                         test_after = test_after,
                         all_classes = all_classes,
-                        just_primary = just_primary)
+                        just_primary = just_primary,
+                        model_nums = model_nums,
+                        retrain = retrain,
+                        viz_mode = viz_mode,
+                        second_thresh = second_thresh,
+                        det_class = det_class)
 
 
 def main():

@@ -300,7 +300,93 @@ def test_event_det_pr():
     print np.mean(diffs), np.min(diffs), np.max(diffs)
 
 
+def viz_overlap(out_dir_meta, det_vid_names, det_conf_all, det_time_intervals_all, det_events_class_all ,out_shapes):
+    
+    class_names = ['BaseballPitch', 'BasketballDunk', 'Billiards', 'CleanAndJerk', 'CliffDiving', 'CricketBowling', 'CricketShot', 'Diving', 'FrisbeeCatch', 'GolfSwing', 'HammerThrow', 'HighJump', 'JavelinThrow', 'LongJump', 'PoleVault', 'Shotput', 'SoccerPenalty', 'TennisSwing', 'ThrowDiscus', 'VolleyballSpiking']
+    class_names.sort()
 
+    aps = np.zeros((len(class_names)+1,5))
+    overlap_thresh_all = np.arange(0.1,0.6,0.1)
+    
+    for idx_class_name, class_name in enumerate(class_names):
+        # if idx_class_name<6:
+        #     continue
+        out_dir = os.path.join(out_dir_meta,class_name)
+        util.mkdir(out_dir)
+
+        mat_file = os.path.join('../TH14evalkit','mat_files', class_name+'_test.mat')
+
+        loaded = scipy.io.loadmat(mat_file)
+        
+        gt_vid_names_all = loaded['gtvideonames'][0]
+        gt_class_names = loaded['gt_events_class'][0]
+
+        gt_time_intervals = loaded['gt_time_intervals'][0]
+        
+        arr_meta = [gt_vid_names_all, gt_class_names]
+        arr_out = []
+        for arr_curr in arr_meta:
+            arr_curr = [str(a[0]) for a in arr_curr]
+            arr_out.append(arr_curr)
+
+        [gt_vid_names_all, gt_class_names] = arr_out
+        gt_time_intervals_all = np.array([a[0] for a in gt_time_intervals])
+
+        gt_vid_names = list( np.unique(np.array(gt_vid_names_all)[np.array(gt_class_names)==class_name]))
+        det_vid_names = np.array(det_vid_names)
+        # print len(det_vid_names)
+        # print np.unique(det_vid_names).shape
+        # print gt_vid_name
+        # print len(gt_vid_names)
+
+        for gt_vid_name in gt_vid_names:
+            bin_keep = det_vid_names == gt_vid_name
+            # if np.sum(bin_keep):
+            #    print idx_class_name, np.sum(bin_keep) 
+            # print gt_vid_name
+            # print np.sum(det_events_class_all==idx_class_name)
+            # raw_input()
+            bin_keep = np.logical_and(bin_keep, det_events_class_all==idx_class_name)
+            if np.sum(bin_keep)==0:
+                print 'Continuing'
+                continue
+            gt_time_intervals = gt_time_intervals_all[np.array(gt_vid_names_all)==gt_vid_name]
+            
+            det_conf = det_conf_all[bin_keep]
+            det_time_intervals = det_time_intervals_all [bin_keep,:]
+            
+            out_shape_curr = out_shapes[bin_keep]
+            assert len(np.unique(out_shape_curr))==1
+            out_shape_curr = np.unique(out_shape_curr)[0]
+            # print out_shape_curr
+
+            det_time_intervals_merged = det_time_intervals
+            
+            det_times = det_time_intervals[:,0]
+
+            det_times = np.array(range(0,out_shape_curr+1))*16./25.
+            
+            
+            gt_vals = np.zeros(det_times.shape)
+            # print gt_time_intervals.shape
+            # print det_times.shape
+
+            for gt_time_curr in gt_time_intervals:
+                idx_start = np.argmin(np.abs(det_times-gt_time_curr[0]))
+                idx_end = np.argmin(np.abs(det_times-gt_time_curr[1]))
+                gt_vals[idx_start:idx_end] = np.max(det_conf)
+
+            det_vals = np.zeros(det_times.shape)
+            for idx_det_time_curr, det_time_curr in enumerate(det_time_intervals_merged):
+                idx_start = np.argmin(np.abs(det_times-det_time_curr[0]))
+                idx_end = np.argmin(np.abs(det_times-det_time_curr[1]))
+                det_vals[idx_start:idx_end] = det_conf[idx_det_time_curr]
+            
+            out_file_curr = os.path.join(out_dir,'dets_'+gt_vid_name+'_merged.jpg')
+
+            visualize.plotSimple([(det_times,det_vals),(det_times,gt_vals)],out_file = out_file_curr,title = 'det conf over time',xlabel = 'time',ylabel = 'det conf',legend_entries=['Det','GT'])
+        
+        visualize.writeHTMLForFolder(out_dir)
 
 
 
