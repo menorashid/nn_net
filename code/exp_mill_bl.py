@@ -6,6 +6,7 @@ from helpers import util,visualize
 from dataset import *
 import numpy as np
 import torch
+from globals import * 
 
 def train_simple_mill_all_classes(model_name,
                                     lr,
@@ -29,13 +30,16 @@ def train_simple_mill_all_classes(model_name,
                                     retrain = False,
                                     viz_mode = False,
                                     det_class = -1,
-                                    second_thresh = 0.5):
+                                    second_thresh = 0.5,
+                                    post_pend = '',
+                                    viz_sim = False,
+                                    test_post_pend = ''):
 
     out_dir_meta = '../experiments/'+model_name+'_'+dataset
     util.mkdir(out_dir_meta)
     num_epochs = epoch_stuff[1]
 
-    test_mode = test_mode or viz_mode
+    test_mode = test_mode or viz_mode or viz_sim
 
     epoch_start = 0
     if exp:
@@ -96,6 +100,7 @@ def train_simple_mill_all_classes(model_name,
     init = False
 
     strs_append_list = ['all_classes',all_classes,'just_primary',just_primary,'deno',deno,'limit',limit,'cw',class_weights, criterion_str, num_epochs]+dec_after+lr
+    strs_append_list+=[post_pend] if len(post_pend)>0 else []
     strs_append = '_'.join([str(val) for val in strs_append_list])
 
     out_dir_train =  os.path.join(out_dir_meta,strs_append)
@@ -147,36 +152,53 @@ def train_simple_mill_all_classes(model_name,
     for model_num in model_nums:
 
         print 'MODEL NUM',model_num
-
-        test_params = dict(out_dir_train = out_dir_train,
-                model_num = model_num,
-                test_data = test_data,
-                batch_size_val = batch_size_val,
-                criterion = criterion,
-                gpu_id = gpu_id,
-                num_workers = 0,
-                trim_preds = trim_preds,
-                visualize = viz_mode,
-                det_class = det_class,
-                second_thresh = second_thresh)
-        test_model(**test_params)
+        if viz_sim:
+            test_params = dict(out_dir_train = out_dir_train,
+                    model_num = model_num,
+                    test_data = test_data,
+                    batch_size_val = batch_size_val,
+                    gpu_id = gpu_id,
+                    num_workers = 0,
+                    second_thresh = second_thresh)
+            visualize_sim_mat(**test_params)
+        else:
+            test_params = dict(out_dir_train = out_dir_train,
+                    model_num = model_num,
+                    test_data = test_data,
+                    batch_size_val = batch_size_val,
+                    criterion = criterion,
+                    gpu_id = gpu_id,
+                    num_workers = 0,
+                    trim_preds = trim_preds,
+                    visualize = viz_mode,
+                    det_class = det_class,
+                    second_thresh = second_thresh,
+                    post_pend=test_post_pend)
+            test_model(**test_params)
 
 def super_simple_experiment():
-    model_name = 'mill_bg_max'
+    model_name = 'just_mill_2_1024'
+    # model_name = 'graph_sim_mill'
     lr = [0.0001]
     epoch_stuff = [100,100]
     dataset = 'ucf'
     limit  = 500
     deno = 8
     save_after = 25
+    
     test_mode = False
     retrain = True
+    viz_mode = False
+    viz_sim = False
+    test_post_pend = ''
+    post_pend = ''
+
     class_weights = True
     test_after = 10
     all_classes = False
     just_primary = True
     model_nums = None
-    viz_mode = False
+    
     second_thresh =0.5
     det_class = -1
     train_simple_mill_all_classes (model_name = model_name,
@@ -197,29 +219,49 @@ def super_simple_experiment():
                         retrain = retrain,
                         viz_mode = viz_mode,
                         second_thresh = second_thresh,
-                        det_class = det_class)
+                        det_class = det_class,
+                        post_pend = post_pend,
+                        viz_sim = viz_sim,
+                        test_post_pend = test_post_pend)
+
+
+def create_comparative_viz(dirs, class_names, dir_strs, out_dir_html):
+
+    for class_name in class_names:
+        out_file_html = os.path.join(out_dir_html, class_name+'.html')
+        ims_html = []
+        captions_html = []
+
+        im_list = glob.glob(os.path.join(dirs[0],class_name, '*.jpg'))
+        im_list = [os.path.split(im_curr)[1] for im_curr in im_list]
+        for im in im_list:
+            row_curr = [util.getRelPath(os.path.join(dir_curr,class_name,im),dir_server) for dir_curr in dirs]
+            caption_curr = [dir_str+' '+im[:im.rindex('.')] for dir_str in dir_strs]
+            ims_html.append(row_curr)
+            captions_html.append(caption_curr)
+
+        visualize.writeHTML(out_file_html, ims_html, captions_html, height = 150, width = 200)
+
+
+
+
 
 
 def main():
 
-    # num_feat = 10
 
-    # arr = np.array(range(num_feat))[np.newaxis,:]
-    # arr = np.triu(np.concatenate([np.roll(arr,num) for num in range(num_feat)],0))
-    # arr = num_feat - (np.flipud(np.fliplr(arr))+arr)
-    # arr = arr.astype(float)/np.sum(arr,axis = 1, keepdims = True)
+    dir_meta= '../experiments/graph_sim_mill_ucf/all_classes_False_just_primary_True_deno_8_limit_500_cw_True_MultiCrossEntropy_100_step_100_0.1_0.0001_2048_2048_2048_orthoinit_noweight'
+    dir_meta = dir_meta.replace(str_replace[0],str_replace[1])
 
-    
+    dirs = ['results_model_99_0_0.5/viz_sim_mat', 'results_model_99_0_0.5/viz_-1_0_0.5']
 
-    # print arr.shape
-    # print arr
-    
+    out_dir_html = os.path.join(dir_meta,'comparative_htmls')
+    util.mkdir(out_dir_html)
 
+    dirs = [os.path.join(dir_meta, dir_curr) for dir_curr in dirs]
+    dir_strs = ['sim_i3d','sim_24','pred_24']
 
-    # dir_files = '../data/ucf101/train_test_files'
-    # train_file = os.path.join(dir_files,'train.txt')
-
-    # weights = util.get_class_weights_au(util.readLinesFromFile(train_file))
+    # create_comparative_viz(dirs, class_names, dir_strs, out_dir_html) 
 
     super_simple_experiment()
 

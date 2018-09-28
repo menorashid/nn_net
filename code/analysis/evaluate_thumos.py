@@ -382,7 +382,7 @@ def viz_overlap(out_dir_meta, det_vid_names, det_conf_all, det_time_intervals_al
                 idx_end = np.argmin(np.abs(det_times-det_time_curr[1]))
                 det_vals[idx_start:idx_end] = det_conf[idx_det_time_curr]
             
-            out_file_curr = os.path.join(out_dir,'dets_'+gt_vid_name+'_merged.jpg')
+            out_file_curr = os.path.join(out_dir,gt_vid_name+'.jpg')
 
             visualize.plotSimple([(det_times,det_vals),(det_times,gt_vals)],out_file = out_file_curr,title = 'det conf over time',xlabel = 'time',ylabel = 'det conf',legend_entries=['Det','GT'])
         

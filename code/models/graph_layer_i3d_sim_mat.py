@@ -2,6 +2,7 @@ from torchvision import models
 import torch.nn as nn
 import torch
 import torch.nn.functional as F
+import math
 
 class Graph_Layer(nn.Module):
     def __init__(self,in_size, n_out = None):
@@ -14,15 +15,27 @@ class Graph_Layer(nn.Module):
         # self.transformers = nn.ModuleList([nn.Linear(in_size,feature_size, bias = False),nn.Linear(in_size,feature_size, bias = False)])
         
         self.weight = nn.Parameter(torch.randn(in_size,self.n_out))
+        self.bias = None
+        # nn.Parameter(torch.zeros(1,in_size))
         # nn.init.xavier_normal(self.weight.data)
 
         self.Softmax = nn.Softmax(dim = 1)
 
-    def forward(self, x, i3d):
+        nn.init.kaiming_uniform_(self.weight, a=math.sqrt(5))
+        if self.bias is not None:
+            fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.weight)
+            bound = 1 / math.sqrt(fan_in)
+            nn.init.uniform_(self.bias, -bound, bound)
 
-        G = self.get_affinity(i3d)
+
+
+    def forward(self, x):
+
+        G = self.get_affinity(x)
         out = torch.mm(torch.mm(G,x),self.weight)
+        # +self.bias
         # print G.size(),out.size()
+        # print self.bias.size()
         # raw_input()
 
         # pmf = self.make_pmf(x)
@@ -33,7 +46,7 @@ class Graph_Layer(nn.Module):
         # out = [layer_curr(input) for layer_curr in  self.transformers]
         G = torch.mm(input,torch.t(input))
         G = self.Softmax(G)
-
+        # G = torch.eye(input.size(0)).cuda()
         return G
 
 

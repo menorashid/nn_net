@@ -54,7 +54,6 @@ class Mill_Centerloss(nn.Module):
         
         pmf = self.make_pmf(x)
         class_pred = F.softmax(x, dim = 1)
-        
         return pmf, class_pred, features
         
     def forward_single_test(self, input, ret_bg=False):
@@ -66,7 +65,7 @@ class Mill_Centerloss(nn.Module):
         x = x[:,:-1]
         # bg = bg.view(bg.size(0),1).expand(-1,x.size(1))
         # x = x-bg
-        
+
 
         
         return x, pmf

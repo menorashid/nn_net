@@ -2,7 +2,7 @@ from torchvision import models
 import torch.nn as nn
 import torch
 import torch.nn.functional as F
-from graph_layer import Graph_Layer
+from graph_layer_sim_feat_input import Graph_Layer
 
 class Graph_Sim_Mill(nn.Module):
     def __init__(self, n_classes, deno):
@@ -11,19 +11,26 @@ class Graph_Sim_Mill(nn.Module):
         self.num_classes = n_classes
         self.deno = deno
 
-        self.features = []
-        self.features.append(Graph_Layer(2048, 2048, 2048))
-        self.features.append(nn.ReLU())
-        # self.features.append(nn.BatchNorm1d(1024, affine = False, track_running_stats = False))
-        self.features.append(nn.Dropout(0.5))
+        self.features = nn.ModuleList()
+
+        self.feature = nn.Linear(2048,1024)
+        self.graph_layer = Graph_Layer(1024)
+        self.last_layer = nn.Linear(2048,n_classes)
         
-        self.features.append(nn.Linear(2048,n_classes)) 
-        self.features = nn.Sequential(*self.features)
+        self.features.append(feature)
+        self.features.append(graph_layer)
+        self.features.append(last_layer)
+
         
     def forward(self, input, ret_bg =False):
-        x = self.features(input)
-        
+        feature_out = self.feature(input)
+        graph_out = self.graph_layer(input, feature_out)
+        print feature_out.size(), graph_out.size()
+        cat_out = torch.cat([feature_out, graph_out],dim = 0)
+        print cat_out.size()
+        x = self.last_layer(cat_out)
         pmf = self.make_pmf(x)
+        print x.size(),pmf.size()
         
         if ret_bg:
             return x, pmf, None
@@ -46,24 +53,15 @@ class Graph_Sim_Mill(nn.Module):
         return pmf
 
     def get_similarity(self,input):
-        sim_mat = self.features[0].get_affinity(input)
+        feature_out = self.feature(input)
+        sim_mat = self.graph_layer.get_affinity(input, feature_out)
         return sim_mat
     
 
 class Network:
-    def __init__(self, n_classes, deno, init = False):
-        model = Graph_Sim_Mill(n_classes, deno)
-
-        if init:
-            for idx_m,m in enumerate(model.features):
-                if isinstance(m,nn.Linear):
-                    # print m,1
-                    nn.init.xavier_normal(m.weight.data)
-                    nn.init.constant(m.bias.data,0.)
-                
-        self.model = model
-
-
+    def __init__(self, n_classes, deno):
+        self.model = Graph_Sim_Mill(n_classes, deno)
+ 
     def get_lr_list(self, lr):
         lr_list= [{'params': [p for p in self.model.features.parameters() if p.requires_grad], 'lr': lr[0]}]
         return lr_list

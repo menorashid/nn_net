@@ -12,10 +12,10 @@ class Graph_Sim_Mill(nn.Module):
         self.deno = deno
 
 
-        self.features = []
-        self.features.append(nn.Linear(2048,2048))
-        self.features.append(nn.ReLU())
-        self.features.append(nn.Dropout(0.5))
+        # self.features = []
+        # self.features.append(nn.Linear(2048,2048))
+        # self.features.append(nn.ReLU())
+        # self.features.append(nn.Dropout(0.5))
         
         # self.graph_layer = []
         print 'NO GRAPH'
@@ -29,11 +29,13 @@ class Graph_Sim_Mill(nn.Module):
         # self.features.append(nn.ReLU())
         # self.features.append(nn.Dropout(0.5))
         self.final_layer = []
+        # self.final_layer.append(torch.nn.BatchNorm1d(2048, eps=1e-05, momentum=0.1, affine=False, track_running_stats=False))
         self.final_layer.append(nn.ReLU())
         self.final_layer.append(nn.Dropout(0.5))
-        self.final_layer.append(nn.Linear(2048,n_classes))
+        self.final_layer.append(nn.Linear(2048,n_classes)) 
+        # self.final_layer.append(nn.Sigmoid())
         # self.features.append(nn.Linear(2048,n_classes))
-        self.features = nn.Sequential(*self.features)
+        # self.features = nn.Sequential(*self.features)
         # self.graph_layer = nn.Sequential(*self.graph_layer)
         self.final_layer = nn.Sequential(*self.final_layer)
         
@@ -43,19 +45,21 @@ class Graph_Sim_Mill(nn.Module):
         # self.graph_layer = 
         # self.LogSoftmax = nn.LogSoftmax()
 
-    def forward(self, input):
+    def forward(self, input, ret_bg = False):
         # print input.size()
-        x = self.features(input)
+        # x = self.features(input)
         # print x.size()
-        x = self.graph_layer(x, input)
+        x = self.graph_layer(input)
         x = self.final_layer(x)
         # print x.size()
         # x = self.graph_layer(x)
 
         # return x
-
         pmf = self.make_pmf(x)
-        return x, pmf
+        if ret_bg:
+            return x, pmf, None
+        else:
+            return x, pmf
 
     def make_pmf(self,x):
         k = max(1,x.size(0)//self.deno)
@@ -88,9 +92,8 @@ class Network:
 
 
     def get_lr_list(self, lr):
-        lr_list= [{'params': self.model.features.parameters(), 'lr': lr[0]},
-        {'params': self.model.graph_layer.parameters(), 'lr': lr[1]},
-        {'params': self.model.final_layer.parameters(), 'lr': lr[2]}]
+        lr_list= [{'params': self.model.graph_layer.parameters(), 'lr': lr[0]},
+        {'params': self.model.final_layer.parameters(), 'lr': lr[0]}]
         return lr_list
 
 def main():

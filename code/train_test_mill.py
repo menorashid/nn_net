@@ -15,7 +15,7 @@ import itertools
 import glob
 import sklearn.metrics
 import analysis.evaluate_thumos as et
-
+import debugging_graph as dg
 
 class Exp_Lr_Scheduler:
     def __init__(self, optimizer,step_curr, init_lr, decay_rate, decay_steps, min_lr=1e-6):
@@ -40,70 +40,70 @@ class Exp_Lr_Scheduler:
             # print param_group['lr']
 
 def test_model_core(model, test_dataloader, criterion, log_arr):
-        model.eval()
+    model.eval()
 
-        preds = []
-        labels_all = []
+    preds = []
+    labels_all = []
 
-        for num_iter_test,batch in enumerate(test_dataloader):
-            samples = batch['features']
-            labels = batch['label'].cuda()
-            labels_all.append(labels)
-            # print model.__class__.__name__.lower()
-            # print 'centerloss' in model.__class__.__name__.lower()
-            # raw_input()
+    for num_iter_test,batch in enumerate(test_dataloader):
+        samples = batch['features']
+        labels = batch['label'].cuda()
+        labels_all.append(labels)
+        # print model.__class__.__name__.lower()
+        # print 'centerloss' in model.__class__.__name__.lower()
+        # raw_input()
 
-            if 'centerloss' in model.__class__.__name__.lower():
-                preds_mini,extra = model.forward(samples, labels)
-                preds.append(preds_mini)
-                labels = [labels]+extra
-            else:
-                preds_mini = []
-                for sample in samples:
-                    out,pmf = model.forward(sample.cuda())
-                    preds.append(pmf.unsqueeze(0))
-                    preds_mini.append(pmf.unsqueeze(0))
-                preds_mini = torch.cat(preds_mini,0)
-            
-            
-            loss = criterion(labels, preds_mini)
-            loss_iter = loss.data[0]
-            
-            str_display = 'val iter: %d, val loss: %.4f' %(num_iter_test,loss_iter)
-            log_arr.append(str_display)
-            print str_display
-            
-        preds = torch.cat(preds,0)
-        labels_all = torch.cat(labels_all,0)
+        if 'centerloss' in model.__class__.__name__.lower():
+            preds_mini,extra = model.forward(samples, labels)
+            preds.append(preds_mini)
+            labels = [labels]+extra
+        else:
+            preds_mini = []
+            for sample in samples:
+                out,pmf = model.forward(sample.cuda())
+                preds.append(pmf.unsqueeze(0))
+                preds_mini.append(pmf.unsqueeze(0))
+            preds_mini = torch.cat(preds_mini,0)
         
-        if 'centerloss' not in criterion.__class__.__name__.lower():    
-            loss = criterion(labels_all, preds)
-            loss_iter = loss.data[0]
-
-            str_display = 'val total loss: %.4f' %(loss_iter)
-            log_arr.append(str_display)
-            print str_display
         
-
-        preds = torch.nn.functional.softmax(preds).data.cpu().numpy()
-        labels_all = labels_all.data.cpu().numpy()
-        labels_all[labels_all>0]=1
-        assert len(np.unique(labels_all)==2)
-        # print labels_all.shape, np.min(labels_all), np.max(labels_all)
-        # print preds.shape, np.min(preds), np.max(preds)
-
-        accuracy = sklearn.metrics.average_precision_score(labels_all, preds)
+        loss = criterion(labels, preds_mini)
+        loss_iter = loss.data[0]
         
-        # print accuracy.shape
-        # print accuracy
-        
-        str_display = 'val accuracy: %.4f' %(accuracy)
+        str_display = 'val iter: %d, val loss: %.4f' %(num_iter_test,loss_iter)
         log_arr.append(str_display)
         print str_display
         
-        model.train(True)
+    preds = torch.cat(preds,0)
+    labels_all = torch.cat(labels_all,0)
+    
+    if 'centerloss' not in criterion.__class__.__name__.lower():    
+        loss = criterion(labels_all, preds)
+        loss_iter = loss.data[0]
 
-        return accuracy, loss_iter
+        str_display = 'val total loss: %.4f' %(loss_iter)
+        log_arr.append(str_display)
+        print str_display
+    
+
+    preds = torch.nn.functional.softmax(preds).data.cpu().numpy()
+    labels_all = labels_all.data.cpu().numpy()
+    labels_all[labels_all>0]=1
+    assert len(np.unique(labels_all)==2)
+    # print labels_all.shape, np.min(labels_all), np.max(labels_all)
+    # print preds.shape, np.min(preds), np.max(preds)
+
+    accuracy = sklearn.metrics.average_precision_score(labels_all, preds)
+    
+    # print accuracy.shape
+    # print accuracy
+    
+    str_display = 'val accuracy: %.4f' %(accuracy)
+    log_arr.append(str_display)
+    print str_display
+    
+    model.train(True)
+
+    return accuracy, loss_iter
 
 def test_model_overlap_old(model, test_dataloader, criterion, log_arr, overlap_thresh=0.1, bin_trim = None, first_thresh = 0, second_thresh = 0.5):
 
@@ -322,7 +322,6 @@ def visualize_dets(model, test_dataloader, dir_viz, first_thresh , second_thresh
             det_conf_all.append(det_conf)
             det_time_intervals_all.append(det_time_intervals)
 
-
             idx_test +=1
             
 
@@ -403,6 +402,7 @@ def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh ,
             # print np.min(pmf), np.max(pmf)
             for class_idx in range(pmf.size):
                 if bin_not_keep[class_idx]:
+                    print 'PROBLEM'
                     continue
 
                 det_conf = out[:,class_idx]
@@ -493,8 +493,85 @@ def test_model(out_dir_train,
         dir_viz = os.path.join(out_dir_results, '_'.join([str(val) for val in ['viz',det_class, first_thresh, second_thresh]]))
         util.mkdir(dir_viz)
         visualize_dets(model, test_dataloader,  dir_viz,first_thresh = first_thresh, second_thresh = second_thresh,bin_trim = bin_trim,det_class = det_class)
-        
+
+
+def visualize_sim_mat(out_dir_train,
+                model_num, 
+                test_data, 
+                batch_size_val = None,
+                gpu_id = 0,
+                num_workers = 0,
+                post_pend = '', first_thresh = 0, second_thresh = 0.5):
+    
+    out_dir_results = os.path.join(out_dir_train,'results_model_'+str(model_num)+post_pend+'_'+str(first_thresh)+'_'+str(second_thresh))
+    util.mkdir(out_dir_results)
+    model_file = os.path.join(out_dir_train,'model_'+str(model_num)+'.pt')
+    
+
+    model = torch.load(model_file)
+
+    if batch_size_val is None:
+        batch_size_val = len(test_data)
+
+    
+    test_dataloader = torch.utils.data.DataLoader(test_data, 
+                        batch_size = batch_size_val,
+                        collate_fn = test_data.collate_fn,
+                        shuffle = False, 
+                        num_workers = num_workers)
+    
+    torch.cuda.device(gpu_id)
+    
+    model = model.cuda()
+    
+    dir_viz = os.path.join(out_dir_results, '_'.join([str(val) for val in ['viz_sim_mat']]))
+    util.mkdir(dir_viz)
+
+
+    visualize_sim_mat_inner(model, test_dataloader,  dir_viz)
+     
             
+def visualize_sim_mat_inner(model, test_dataloader, dir_viz):
+
+    model.eval()
+
+    preds = []
+    labels_all = []
+
+    det_vid_names_ac = [os.path.split(line.split(' ')[0])[1][:-4] for line in test_dataloader.dataset.files]
+    
+    outs = []
+    min_all = None
+    max_all = None
+
+    det_events_class = []
+    det_time_intervals_all = []
+    det_conf_all = []
+    det_vid_names = []
+    out_shapes = []
+    idx_test = 0
+
+    threshes_all = []
+    for num_iter_test,batch in enumerate(test_dataloader):
+        samples = batch['features']
+        labels = batch['label']
+
+        preds_mini = []
+        for idx_sample, sample in enumerate(samples):
+            # print idx_test
+            vid_name = det_vid_names_ac[idx_test]
+            out_shape_curr = sample.size(0)
+
+            class_idx = np.where(labels[idx_sample].numpy())[0][0]
+
+            sim_mat = model.get_similarity(sample.cuda())
+            # print sim_mat.size()
+            sim_mat = sim_mat.data.cpu().numpy()
+            dg.save_sim_viz(vid_name, out_shape_curr, sim_mat, class_idx, dir_viz)
+
+            idx_test +=1
+    
+    dg.make_htmls(dir_viz)        
 
 def train_model(out_dir_train,
                 train_data,
@@ -560,7 +637,12 @@ def train_model(out_dir_train,
     
     model = model.cuda()
     model.train(True)
-    
+
+    # out_file = os.path.join(out_dir_train,'model_-1.pt')
+    # print 'saving',out_file
+    # torch.save(model,out_file)    
+    # return
+
     optimizer = torch.optim.Adam(network.get_lr_list(lr),weight_decay=weight_decay)
 
     if dec_after is not None:
