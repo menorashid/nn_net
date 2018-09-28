@@ -30,7 +30,7 @@ class Graph_Sim_Mill(nn.Module):
         # self.features.append(nn.Dropout(0.5))
         self.final_layer = []
         # self.final_layer.append(torch.nn.BatchNorm1d(2048, eps=1e-05, momentum=0.1, affine=False, track_running_stats=False))
-        self.final_layer.append(nn.ReLU())
+        self.final_layer.append(nn.Hardtanh())
         self.final_layer.append(nn.Dropout(0.5))
         self.final_layer.append(nn.Linear(2048,n_classes)) 
         # self.final_layer.append(nn.Sigmoid())

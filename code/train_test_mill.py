@@ -402,7 +402,7 @@ def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh ,
             # print np.min(pmf), np.max(pmf)
             for class_idx in range(pmf.size):
                 if bin_not_keep[class_idx]:
-                    print 'PROBLEM'
+                    # print 'PROBLEM'
                     continue
 
                 det_conf = out[:,class_idx]

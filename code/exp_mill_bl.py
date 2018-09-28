@@ -152,16 +152,21 @@ def train_simple_mill_all_classes(model_name,
     for model_num in model_nums:
 
         print 'MODEL NUM',model_num
-        if viz_sim:
-            test_params = dict(out_dir_train = out_dir_train,
-                    model_num = model_num,
-                    test_data = test_data,
-                    batch_size_val = batch_size_val,
-                    gpu_id = gpu_id,
-                    num_workers = 0,
-                    second_thresh = second_thresh)
-            visualize_sim_mat(**test_params)
-        else:
+
+        test_params = dict(out_dir_train = out_dir_train,
+                model_num = model_num,
+                test_data = test_data,
+                batch_size_val = batch_size_val,
+                criterion = criterion,
+                gpu_id = gpu_id,
+                num_workers = 0,
+                trim_preds = trim_preds,
+                visualize = False,
+                det_class = det_class,
+                second_thresh = second_thresh,
+                post_pend=test_post_pend)
+        test_model(**test_params)
+        if not viz_mode:
             test_params = dict(out_dir_train = out_dir_train,
                     model_num = model_num,
                     test_data = test_data,
@@ -170,15 +175,28 @@ def train_simple_mill_all_classes(model_name,
                     gpu_id = gpu_id,
                     num_workers = 0,
                     trim_preds = trim_preds,
-                    visualize = viz_mode,
+                    visualize = True,
                     det_class = det_class,
                     second_thresh = second_thresh,
                     post_pend=test_post_pend)
             test_model(**test_params)
+            test_params = dict(out_dir_train = out_dir_train,
+                    model_num = model_num,
+                    test_data = test_data,
+                    batch_size_val = batch_size_val,
+                    gpu_id = gpu_id,
+                    num_workers = 0,
+                    second_thresh = second_thresh)
+            visualize_sim_mat(**test_params)
 
 def super_simple_experiment():
-    model_name = 'just_mill_2_1024'
-    # model_name = 'graph_sim_mill'
+    # model_name = 'just_mill_2_1024'
+    # model_name = 'graph_sim_direct_mill_cosine'
+    model_name = 'graph_sim_direct_mill_cosine_do'
+    # epoch_stuff = [25,25]
+    # save_after = 5
+
+
     lr = [0.0001]
     epoch_stuff = [100,100]
     dataset = 'ucf'
@@ -187,7 +205,7 @@ def super_simple_experiment():
     save_after = 25
     
     test_mode = False
-    retrain = True
+    retrain = False
     viz_mode = False
     viz_sim = False
     test_post_pend = ''
@@ -244,25 +262,39 @@ def create_comparative_viz(dirs, class_names, dir_strs, out_dir_html):
 
 
 
+def scripts_comparative():
+    dir_meta= '../experiments/graph_sim_direct_mill_ucf/all_classes_False_just_primary_True_deno_8_limit_500_cw_True_MultiCrossEntropy_100_step_100_0.1_0.0001'
+    dir_meta = dir_meta.replace(str_replace[0],str_replace[1])
+
+    dirs = ['results_model_24_0_0.5/viz_sim_mat', 'results_model_24_0_0.5/viz_-1_0_0.5']
+    dirs = [os.path.join(dir_meta, dir_curr) for dir_curr in dirs]
+
+    dir_meta_new= '../experiments/just_mill_2_1024_ucf/all_classes_False_just_primary_True_deno_8_limit_500_cw_True_MultiCrossEntropy_100_step_100_0.1_0.0001'
+    dir_meta_new = dir_meta_new.replace(str_replace[0],str_replace[1])
+    dirs_new= ['results_model_99_0_0.5/viz_sim_mat', 'results_model_99_0_0.5/viz_-1_0_0.5']
+    dirs += [os.path.join(dir_meta_new, dir_curr) for dir_curr in dirs_new]
+
+
+    dir_meta_new= '../experiments/graph_sim_direct_mill_ucf/all_classes_False_just_primary_True_deno_8_limit_500_cw_True_MultiCrossEntropy_100_step_100_0.1_0.0001__noRelu'
+    dir_meta_new = dir_meta_new.replace(str_replace[0],str_replace[1])
+    dirs_new= ['results_model_24_0_0.5/viz_sim_mat', 'results_model_24_0_0.5/viz_-1_0_0.5']
+    dirs += [os.path.join(dir_meta_new, dir_curr) for dir_curr in dirs_new]
+
+
+    out_dir_html = os.path.join(dir_meta,'comparative_htmls')
+    util.mkdir(out_dir_html)
+
+    
+    dir_strs = ['graph_sim_24','graph_pred_24','mill_2_layer_sim_99', 'mill_2_layer_pred_99','graph_sim_24_nr','graph_pred_24_nr']
+
+    create_comparative_viz(dirs, class_names, dir_strs, out_dir_html) 
 
 
 
 def main():
 
-
-    dir_meta= '../experiments/graph_sim_mill_ucf/all_classes_False_just_primary_True_deno_8_limit_500_cw_True_MultiCrossEntropy_100_step_100_0.1_0.0001_2048_2048_2048_orthoinit_noweight'
-    dir_meta = dir_meta.replace(str_replace[0],str_replace[1])
-
-    dirs = ['results_model_99_0_0.5/viz_sim_mat', 'results_model_99_0_0.5/viz_-1_0_0.5']
-
-    out_dir_html = os.path.join(dir_meta,'comparative_htmls')
-    util.mkdir(out_dir_html)
-
-    dirs = [os.path.join(dir_meta, dir_curr) for dir_curr in dirs]
-    dir_strs = ['sim_i3d','sim_24','pred_24']
-
-    # create_comparative_viz(dirs, class_names, dir_strs, out_dir_html) 
-
+    # scripts_comparative()
+    
     super_simple_experiment()
 
 

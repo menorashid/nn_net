@@ -21,10 +21,13 @@ class Just_Mill(nn.Module):
         self.features = nn.Sequential(*self.features)
         # self.LogSoftmax = nn.LogSoftmax()
 
-    def forward(self, input):
+    def forward(self, input, ret_bg = False):
         x = self.features(input)
         pmf = self.make_pmf(x)
-        return x, pmf
+        if ret_bg:
+            return x, pmf, None
+        else:    
+            return x, pmf
 
     def make_pmf(self,x):
         k = max(1,x.size(0)//self.deno)
@@ -38,7 +41,20 @@ class Just_Mill(nn.Module):
         # print pmf.size()
         # pmf = pmf
         # print pmf.size()
-        return pmf
+        return pmf  
+
+    def get_affinity(self,input):
+        G = torch.mm(input,torch.t(input))
+        G = F.softmax(G, dim = 1)
+        return G
+
+    def get_similarity(self,input):
+        feature_out = self.features[0](input)
+        feature_out = self.features[1](feature_out)
+
+        sim_mat = self.get_affinity( feature_out)
+        return sim_mat
+    
 
     
 

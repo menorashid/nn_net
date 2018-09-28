@@ -2,7 +2,7 @@ from torchvision import models
 import torch.nn as nn
 import torch
 import torch.nn.functional as F
-from graph_layer_sim_feat_input import Graph_Layer
+from graph_layer_sim_feat_input_cosine import Graph_Layer
 
 class Graph_Sim_Mill(nn.Module):
     def __init__(self, n_classes, deno):
@@ -13,28 +13,40 @@ class Graph_Sim_Mill(nn.Module):
 
         self.features = nn.ModuleList()
 
-        feature = [nn.Linear(2048,1024)]
-        feature.append(nn.ReLU())
-        feature = nn.Sequential(*feature)
+        feature = nn.Linear(2048,1024)
 
+        side_channel = []
+        side_channel.append(nn.Hardtanh())
+        side_channel.append(nn.Dropout(0.5))
+        side_channel = nn.Sequential(*side_channel)
+
+        # graph_layer = []
+        # graph_layer.append(nn.ReLU())
         graph_layer = Graph_Layer(2048,1024)
+        # graph_layer = nn.Sequential(*graph_layer)
 
         last_layer = []
-        last_layer.append(nn.ReLU())
+        last_layer.append(nn.Hardtanh())
         last_layer.append(nn.Dropout(0.5))
         last_layer.append(nn.Linear(2048,n_classes))
         last_layer = nn.Sequential(*last_layer)
         
         self.features.append(feature)
+        self.features.append(side_channel)
         self.features.append(graph_layer)
         self.features.append(last_layer)
 
         
     def forward(self, input, ret_bg =False):
         feature_out = self.features[0](input)
-        graph_out = self.features[1](input, feature_out)
+        # if torch.min(feature_out)<0:
+        #     print 'neg feature_out'
+
+        
+        graph_out = self.features[2](input, self.features[1](feature_out))
+
         cat_out = torch.cat([feature_out, graph_out],dim = 1)
-        x = self.features[2](cat_out)
+        x = self.features[3](cat_out)
         pmf = self.make_pmf(x)
         
         if ret_bg:
@@ -53,7 +65,7 @@ class Graph_Sim_Mill(nn.Module):
 
     def get_similarity(self,input):
         feature_out = self.features[0](input)
-        sim_mat = self.features[1].get_affinity( feature_out)
+        sim_mat = self.features[2].get_affinity( self.features[1](feature_out))
         return sim_mat
     
 
@@ -84,4 +96,3 @@ def main():
 
 if __name__=='__main__':
     main()
-

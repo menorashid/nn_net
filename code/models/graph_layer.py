@@ -36,8 +36,11 @@ class Graph_Layer(nn.Module):
 
         # out = [layer_curr(input) for layer_curr in  self.transformers]
         out = self.transformers(input)
+        norms = torch.norm(out, dim = 1, keepdim = True)
+        out = out/norms
+        
         G = torch.mm(out,torch.t(out))
-        G = self.Softmax(G)
+        # G = self.Softmax(G)
 
         return G
 
