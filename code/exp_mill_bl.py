@@ -33,13 +33,16 @@ def train_simple_mill_all_classes(model_name,
                                     second_thresh = 0.5,
                                     post_pend = '',
                                     viz_sim = False,
-                                    test_post_pend = ''):
+                                    test_post_pend = '', 
+                                    multibranch = 1,
+                                    loss_weights = None,
+                                    branch_to_test = 0):
 
     out_dir_meta = '../experiments/'+model_name+'_'+dataset
     util.mkdir(out_dir_meta)
     num_epochs = epoch_stuff[1]
 
-    test_mode = test_mode or viz_mode or viz_sim
+    # test_mode = test_mode or viz_mode or viz_sim
 
     epoch_start = 0
     if exp:
@@ -90,8 +93,12 @@ def train_simple_mill_all_classes(model_name,
     else:
         class_weights_val = None
 
-    criterion = MultiCrossEntropy(class_weights= class_weights_val)
-    criterion_str = 'MultiCrossEntropy'
+    if multibranch>1:
+        criterion = MultiCrossEntropyMultiBranch(class_weights= class_weights_val, loss_weights = loss_weights, num_branches = multibranch)
+        criterion_str = 'MultiCrossEntropyMultiBranch'
+    else:
+        criterion = MultiCrossEntropy(class_weights= class_weights_val)
+        criterion_str = 'MultiCrossEntropy'
 
     # criterion = MCE_CenterLoss_Combo(n_classes, feat_dim = 2048, bg = True, lambda_param = 0.0, alpha_param = 0.5, class_weights= class_weights_val)
     # criterion_str = 'Multi_Center_Combo'
@@ -99,7 +106,7 @@ def train_simple_mill_all_classes(model_name,
 
     init = False
 
-    strs_append_list = ['all_classes',all_classes,'just_primary',just_primary,'deno',deno,'limit',limit,'cw',class_weights, criterion_str, num_epochs]+dec_after+lr
+    strs_append_list = ['all_classes',all_classes,'just_primary',just_primary,'deno',deno,'limit',limit,'cw',class_weights, criterion_str, num_epochs]+['lw']+loss_weights+dec_after+lr
     strs_append_list+=[post_pend] if len(post_pend)>0 else []
     strs_append = '_'.join([str(val) for val in strs_append_list])
 
@@ -137,7 +144,8 @@ def train_simple_mill_all_classes(model_name,
                 num_workers = 0,
                 model_file = model_file,
                 epoch_start = epoch_start,
-                network_params = network_params)
+                network_params = network_params, 
+                multibranch = multibranch)
 
     if not test_mode:
         train_model(**train_params)
@@ -164,7 +172,9 @@ def train_simple_mill_all_classes(model_name,
                 visualize = False,
                 det_class = det_class,
                 second_thresh = second_thresh,
-                post_pend=test_post_pend)
+                post_pend=test_post_pend,
+                multibranch = multibranch,
+                branch_to_test =branch_to_test)
         test_model(**test_params)
         if not viz_mode:
             test_params = dict(out_dir_train = out_dir_train,
@@ -178,7 +188,9 @@ def train_simple_mill_all_classes(model_name,
                     visualize = True,
                     det_class = det_class,
                     second_thresh = second_thresh,
-                    post_pend=test_post_pend)
+                    post_pend=test_post_pend,
+                    multibranch = multibranch,
+                    branch_to_test =branch_to_test)
             test_model(**test_params)
             test_params = dict(out_dir_train = out_dir_train,
                     model_num = model_num,
@@ -192,13 +204,16 @@ def train_simple_mill_all_classes(model_name,
 def super_simple_experiment():
     # model_name = 'just_mill_2_1024'
     # model_name = 'graph_sim_direct_mill_cosine'
-    model_name = 'graph_sim_direct_mill_cosine_do'
+    # model_name = 'graph_sim_i3d_sim_mat_mill'
+    # model_name = 'graph_sim_mill'
+    # model_name = 'graph_same_G_multi_cat'
+    model_name = 'graph_2_G_multi_cat'
     # epoch_stuff = [25,25]
     # save_after = 5
 
 
-    lr = [0.0001]
-    epoch_stuff = [100,100]
+    lr = [0.001]
+    epoch_stuff = [100,200]
     dataset = 'ucf'
     limit  = 500
     deno = 8
@@ -206,15 +221,15 @@ def super_simple_experiment():
     
     test_mode = False
     retrain = False
-    viz_mode = False
+    viz_mode = True
     viz_sim = False
     test_post_pend = ''
-    post_pend = ''
+    post_pend = 'ht_cosine'
 
     class_weights = True
     test_after = 10
     all_classes = False
-    just_primary = True
+    just_primary = False
     model_nums = None
     
     second_thresh =0.5
@@ -241,6 +256,70 @@ def super_simple_experiment():
                         post_pend = post_pend,
                         viz_sim = viz_sim,
                         test_post_pend = test_post_pend)
+
+def separate_supervision_experiment():
+    # model_name = 'just_mill_2_1024'
+    # model_name = 'graph_sim_direct_mill_cosine'
+    # model_name = 'graph_sim_i3d_sim_mat_mill'
+    # model_name = 'graph_sim_mill'
+    # model_name = 'graph_same_G_multi_cat'
+    model_name = 'graph_same_G_multi_cat_separate_supervision'
+    # epoch_stuff = [25,25]
+    # save_after = 5
+
+
+    lr = [0.0001]
+    epoch_stuff = [200,200]
+    dataset = 'ucf'
+    limit  = 500
+    deno = 8
+    save_after = 25
+    
+    loss_weights = [1,1]
+    multibranch = 2
+    branch_to_test = 0
+    test_mode = True
+
+    retrain = False
+    viz_mode = True
+    viz_sim = False
+    test_post_pend = ''
+    post_pend = 'ht_cosine'
+
+    class_weights = True
+    test_after = 10
+    all_classes = False
+    just_primary = False
+    model_nums = None
+    
+    second_thresh =0.5
+    det_class = -1
+    train_simple_mill_all_classes (model_name = model_name,
+                        lr = lr,
+                        dataset = dataset,
+                        deno = deno,
+                        limit = limit, 
+                        epoch_stuff= epoch_stuff,
+                        batch_size = 32,
+                        batch_size_val = 32,
+                        save_after = save_after,
+                        test_mode = test_mode,
+                        class_weights = class_weights,
+                        test_after = test_after,
+                        all_classes = all_classes,
+                        just_primary = just_primary,
+                        model_nums = model_nums,
+                        retrain = retrain,
+                        viz_mode = viz_mode,
+                        second_thresh = second_thresh,
+                        det_class = det_class,
+                        post_pend = post_pend,
+                        viz_sim = viz_sim,
+                        test_post_pend = test_post_pend, 
+                        loss_weights = loss_weights, 
+                        multibranch = multibranch,
+                        branch_to_test = branch_to_test)
+
 
 
 def create_comparative_viz(dirs, class_names, dir_strs, out_dir_html):
@@ -295,7 +374,7 @@ def main():
 
     # scripts_comparative()
     
-    super_simple_experiment()
+    separate_supervision_experiment()
 
 
 if __name__=='__main__':

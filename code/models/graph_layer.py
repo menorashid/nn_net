@@ -13,7 +13,7 @@ class Graph_Layer(nn.Module):
         self.n_out = self.in_size if n_out is None else n_out
 
         self.transformers = nn.Linear(in_size,feature_size, bias = False)
-
+        # print 'no ortho'
         nn.init.orthogonal_(self.transformers.weight)
         # self.transformers.weight.requires_grad=False
 

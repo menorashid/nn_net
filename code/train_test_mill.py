@@ -39,16 +39,17 @@ class Exp_Lr_Scheduler:
                 param_group['lr'] = new_lr
             # print param_group['lr']
 
-def test_model_core(model, test_dataloader, criterion, log_arr):
+def test_model_core(model, test_dataloader, criterion, log_arr, multibranch = 1):
     model.eval()
 
     preds = []
+    
     labels_all = []
-
+    loss_iter_total = 0.
     for num_iter_test,batch in enumerate(test_dataloader):
         samples = batch['features']
         labels = batch['label'].cuda()
-        labels_all.append(labels)
+        
         # print model.__class__.__name__.lower()
         # print 'centerloss' in model.__class__.__name__.lower()
         # raw_input()
@@ -58,35 +59,53 @@ def test_model_core(model, test_dataloader, criterion, log_arr):
             preds.append(preds_mini)
             labels = [labels]+extra
         else:
-            preds_mini = []
+            if multibranch>1:
+                preds_mini = [[] for i in range(multibranch)]
+
             for sample in samples:
                 out,pmf = model.forward(sample.cuda())
-                preds.append(pmf.unsqueeze(0))
-                preds_mini.append(pmf.unsqueeze(0))
-            preds_mini = torch.cat(preds_mini,0)
+
+                if multibranch>1:
+                    preds.append(torch.nn.functional.softmax(pmf[-1].unsqueeze(0)).data.cpu().numpy())
+                        
+                    for idx in range(len(pmf)):
+                        # print idx, pmf[idx].size(), len(preds_mini[idx])
+                        preds_mini[idx].append(pmf[idx].unsqueeze(0))
+                else:
+                    preds.append(torch.nn.functional.softmax(pmf.unsqueeze(0)).data.cpu().numpy())
+                    preds_mini.append(pmf.unsqueeze(0))
+
+            if multibranch>1:
+                # print 'hello;',len(preds_mini[0]), len(preds_mini[1])
+                preds_mini = [torch.cat(preds_curr,0) for preds_curr in preds_mini]
+                # print preds_mini[0].size(), preds_mini[1].size()
+
+            else:
+                preds_mini = torch.cat(preds_mini,0)
         
         
         loss = criterion(labels, preds_mini)
+        labels_all.append(labels.data.cpu().numpy())
         loss_iter = loss.data[0]
-        
+        loss_iter_total+=loss_iter    
         str_display = 'val iter: %d, val loss: %.4f' %(num_iter_test,loss_iter)
         log_arr.append(str_display)
         print str_display
         
-    preds = torch.cat(preds,0)
-    labels_all = torch.cat(labels_all,0)
+    preds = np.concatenate(preds,axis = 0)
+    labels_all = np.concatenate(labels_all,axis = 0)
     
-    if 'centerloss' not in criterion.__class__.__name__.lower():    
-        loss = criterion(labels_all, preds)
-        loss_iter = loss.data[0]
+    # if 'centerloss' not in criterion.__class__.__name__.lower():    
+    #     loss = criterion(labels_all, preds)
+    #     loss_iter = loss.data[0]
 
-        str_display = 'val total loss: %.4f' %(loss_iter)
-        log_arr.append(str_display)
-        print str_display
+    #     str_display = 'val total loss: %.4f' %(loss_iter)
+    #     log_arr.append(str_display)
+    #     print str_display
     
 
-    preds = torch.nn.functional.softmax(preds).data.cpu().numpy()
-    labels_all = labels_all.data.cpu().numpy()
+    # labels_all = labels_all.data.cpu().numpy()
+    loss_iter = loss_iter_total/len(test_dataloader)
     labels_all[labels_all>0]=1
     assert len(np.unique(labels_all)==2)
     # print labels_all.shape, np.min(labels_all), np.max(labels_all)
@@ -101,6 +120,9 @@ def test_model_core(model, test_dataloader, criterion, log_arr):
     log_arr.append(str_display)
     print str_display
     
+    del preds
+    torch.cuda.empty_cache()
+
     model.train(True)
 
     return accuracy, loss_iter
@@ -337,7 +359,7 @@ def visualize_dets(model, test_dataloader, dir_viz, first_thresh , second_thresh
 
 
 
-def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh , second_thresh , bin_trim = None ):
+def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh , second_thresh , bin_trim = None , multibranch =1, branch_to_test = 0):
 
     # print 'FIRST THRESH', first_thresh
     # print 'SECOND THRESH', second_thresh
@@ -370,8 +392,12 @@ def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh ,
             if 'centerloss' in model.__class__.__name__.lower():
                 out, pmf = model.forward_single_test(sample.cuda())
             else:    
-                out, pmf = model.forward(sample.cuda())
-
+                
+                if multibranch>1:
+                    out, pmf = model.forward(sample.cuda(), branch_to_test = branch_to_test)
+                else:
+                    out, pmf = model.forward(sample.cuda())
+                
 
             # print out.size(),torch.min(out), torch.max(out)
             # print pmf.size(),torch.min(pmf), torch.max(pmf)
@@ -450,13 +476,20 @@ def test_model(out_dir_train,
                 first_thresh = 0,
                 second_thresh = 0.5, 
                 visualize = False,
-                det_class = -1):
+                det_class = -1, 
+                multibranch = 1,
+                branch_to_test = 0):
     
     out_dir_results = os.path.join(out_dir_train,'results_model_'+str(model_num)+post_pend+'_'+str(first_thresh)+'_'+str(second_thresh))
     util.mkdir(out_dir_results)
     model_file = os.path.join(out_dir_train,'model_'+str(model_num)+'.pt')
-    log_file = os.path.join(out_dir_results,'log.txt')
-    out_file = os.path.join(out_dir_results,'aps.npy')
+    if multibranch>1:
+        append_name = '_'+str(branch_to_test)
+    else:
+        append_name = ''    
+
+    log_file = os.path.join(out_dir_results,'log'+append_name+'.txt')
+    out_file = os.path.join(out_dir_results,'aps'+append_name+'.npy')
     log_arr=[]
 
     model = torch.load(model_file)
@@ -486,7 +519,7 @@ def test_model(out_dir_train,
         bin_trim = None
         
     if not visualize:
-        aps = test_model_overlap(model, test_dataloader, criterion, log_arr ,first_thresh = first_thresh, second_thresh = second_thresh, bin_trim = bin_trim)
+        aps = test_model_overlap(model, test_dataloader, criterion, log_arr ,first_thresh = first_thresh, second_thresh = second_thresh, bin_trim = bin_trim, multibranch = multibranch, branch_to_test = branch_to_test)
         np.save(out_file, aps)
         util.writeFile(log_file, log_arr)
     else:
@@ -592,7 +625,8 @@ def train_model(out_dir_train,
                 model_file = None,
                 epoch_start = 0,
                 network_params = None,
-                weight_decay = 0):
+                weight_decay = 0, 
+                multibranch = 1):
 
     util.mkdir(out_dir_train)
     log_file = os.path.join(out_dir_train,'log.txt')
@@ -637,7 +671,7 @@ def train_model(out_dir_train,
     
     model = model.cuda()
     model.train(True)
-
+    print model
     # out_file = os.path.join(out_dir_train,'model_-1.pt')
     # print 'saving',out_file
     # torch.save(model,out_file)    
@@ -670,11 +704,21 @@ def train_model(out_dir_train,
 
             else:
                 preds = []
+                if multibranch>1:
+                    preds = [[] for i in range(multibranch)]
                 for idx_sample, sample in enumerate(samples):
                     # print labels[idx_sample]
                     out,pmf = model.forward(sample.cuda())
-                    preds.append(pmf.unsqueeze(0))
-                preds = torch.cat(preds,0)        
+                    if multibranch>1:
+                        for idx in range(len(pmf)):
+                            preds[idx].append(pmf[idx].unsqueeze(0))
+                    else:
+                        preds.append(pmf.unsqueeze(0))
+                
+                if multibranch>1:
+                    preds = [torch.cat(preds_curr,0) for preds_curr in preds]        
+                else:
+                    preds = torch.cat(preds,0)        
 
             loss = criterion(labels, preds)
             loss_iter = loss.data[0]
@@ -722,7 +766,7 @@ def train_model(out_dir_train,
 
         if (num_epoch+1) % test_after == 0 or num_epoch==0:
 
-            accuracy, loss_iter = test_model_core(model, test_dataloader, criterion, log_arr)
+            accuracy, loss_iter = test_model_core(model, test_dataloader, criterion, log_arr, multibranch  = multibranch)
             
             # num_iter = num_epoch*len(train_dataloader)+len(train_dataloader)
             

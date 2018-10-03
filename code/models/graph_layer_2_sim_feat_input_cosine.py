@@ -17,19 +17,22 @@ class Graph_Layer(nn.Module):
         self.Softmax = nn.Softmax(dim = 1)
 
         
-    def forward(self, x, sim_feat):
-        G = self.get_affinity(sim_feat)
+    def forward(self, x, sim_feat, sim_feat1):
+        G = self.get_affinity(sim_feat, sim_feat1)
         # if torch.min(G)<0:
         #     print 'NEG G'
         out = torch.mm(torch.mm(G,x),self.weight)
         
         return out
 
-    def get_affinity(self,input):
+    def get_affinity(self,input, input1):
         norms = torch.norm(input, dim = 1, keepdim = True)
         input = input/norms
         
-        G = torch.mm(input,torch.t(input))
+        norms = torch.norm(input1, dim = 1, keepdim = True)
+        input1 = input1/norms
+
+        G = torch.mm(input,torch.t(input1))
 
         # G = self.Softmax(G)
 
@@ -49,10 +52,11 @@ class Graph_Layer_Wrapper(nn.Module):
             error_message = str('non_lin %s not recognized', non_lin)
             raise ValueError(error_message)
     
-    def forward(self, x, sim_feat):
+    def forward(self, x, sim_feat, sim_feat1):
         sim_feat = self.non_linearity(sim_feat)
-        out = self.graph_layer(x, sim_feat)
+        sim_feat = self.non_linearity(sim_feat1)
+        out = self.graph_layer(x, sim_feat, sim_feat1)
         return out
 
-    def get_affinity(self,input):
-        return self.graph_layer.get_affinity(input)        
+    def get_affinity(self,input, input1):
+        return self.graph_layer.get_affinity(input, input1)        

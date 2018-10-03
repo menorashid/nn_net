@@ -28,6 +28,41 @@ class MultiCrossEntropy(nn.Module):
         return loss
 
 
+class MultiCrossEntropyMultiBranch(nn.Module):
+    def __init__(self,class_weights=None, loss_weights = None, num_branches = 2):
+        super(MultiCrossEntropyMultiBranch, self).__init__()
+        self.LogSoftmax = nn.LogSoftmax(dim = 1)
+        self.num_branches = num_branches
+
+        if class_weights is None:
+            self.class_weights = None
+        else: 
+            self.class_weights = nn.Parameter(torch.Tensor(class_weights[np.newaxis,:]), requires_grad = False)
+
+        if loss_weights is None:
+            self.loss_weights = [1 for i in range(self.num_branches)]
+        else:
+            self.loss_weights = loss_weights
+
+    def forward(self, gt, preds):
+        loss_all = 0
+        assert len(preds) == self.num_branches
+        for idx_pred, pred in enumerate(preds):
+            pred = self.LogSoftmax(pred)
+            # print pred.size()
+            if self.class_weights is not None:
+                assert self.class_weights.size(1)==pred.size(1)
+                loss = self.class_weights*-1*gt*pred
+            else:
+                loss = -1*gt* pred
+
+            loss = torch.sum(loss, dim = 1)
+            loss = torch.mean(loss)
+            loss_all += loss*self.loss_weights[idx_pred]
+        return loss_all
+
+
+
 class MCE_CenterLoss_Combo(nn.Module):
     def __init__(self, n_classes, feat_dim, bg, lambda_param, alpha_param, class_weights = None):
         super(MCE_CenterLoss_Combo, self).__init__()  

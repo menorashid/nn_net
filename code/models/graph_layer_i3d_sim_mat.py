@@ -44,11 +44,11 @@ class Graph_Layer(nn.Module):
     def get_affinity(self,input):
 
         # out = [layer_curr(input) for layer_curr in  self.transformers]
-        norms = torch.norm(input, dim = 1, keepdim = True)
-        input = input/norms
+        # norms = torch.norm(input, dim = 1, keepdim = True)
+        # input = input/norms
         
         G = torch.mm(input,torch.t(input))
-        # G = self.Softmax(G)
+        G = self.Softmax(G)
         # G = torch.eye(input.size(0)).cuda()
         return G
 
