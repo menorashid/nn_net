@@ -39,13 +39,13 @@ class Graph_Sim_Mill(nn.Module):
 
         self.last_layers = nn.ModuleList()
 
+        if non_lin=='rl':
+            self.non_lin = nn.ReLU()
+        else:
+            self.non_lin = nn.Hardtanh()
+        
         for i in range(2):
             last_layer = []
-            if non_lin=='rl':
-                last_layer.append(nn.ReLU())
-            else:
-                last_layer.append(nn.Hardtanh())
-
             last_layer.append(nn.Dropout(0.5))
             last_layer.append(nn.Linear(1024,n_classes))
             last_layer = nn.Sequential(*last_layer)
@@ -68,6 +68,9 @@ class Graph_Sim_Mill(nn.Module):
         xs=[]
         for idx, feature_curr in enumerate(features_out):
             # cat_out = torch.cat(features_out,dim = 1)
+            feature_curr = self.non_lin(feature_curr)
+            feature_curr = F.normalize(feature_curr)
+
             x = self.last_layers[idx](feature_curr)
             pmf = self.make_pmf(x)
             pmfs.append(pmf)
@@ -97,6 +100,7 @@ class Graph_Sim_Mill(nn.Module):
         return sim_mat
     
 
+
 class Network:
     def __init__(self, n_classes, deno):
         self.model = Graph_Sim_Mill(n_classes, deno)
@@ -106,6 +110,7 @@ class Network:
         modules = [self.model.linear_layer, self.model.graph_layers, self.model.last_layers]
         lr_list = []
         for lr_curr, module in zip(lr,modules):
+            print lr_curr
             lr_list+= [{'params': [p for p in module.parameters() if p.requires_grad], 'lr': lr_curr}]
         return lr_list
 

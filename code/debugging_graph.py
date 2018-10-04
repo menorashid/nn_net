@@ -39,6 +39,8 @@ def get_gt_vector(vid_name, out_shape_curr, class_idx):
     class_name = class_names[class_idx]
 
     mat_file = os.path.join('../TH14evalkit','mat_files', class_name+'_test.mat')
+    # mat_file = os.path.join('../TH14evalkit', class_name+'.mat')
+
     loaded = scipy.io.loadmat(mat_file)
     
     gt_vid_names_all = loaded['gtvideonames'][0]
@@ -60,6 +62,70 @@ def get_gt_vector(vid_name, out_shape_curr, class_idx):
 
 
 def save_sim_viz(vid_name, out_shape_curr, sim_mat, class_idx, out_dir):
+    gt_vals, det_times = get_gt_vector(vid_name, out_shape_curr, class_idx)
+    out_dir_curr = os.path.join(out_dir, class_names[class_idx])
+    util.mkdir(out_dir_curr)
+    pos_rows = sim_mat[gt_vals>0,:]
+    pos_rows = np.mean(pos_rows, axis = 0)
+
+    neg_rows = sim_mat[gt_vals<1,:]
+    
+    neg_rows = np.mean(neg_rows, axis = 0)
+    # for idx_pos_row, pos_row in enumerate(pos_rows):
+    max_val = max(np.max(pos_rows),np.max(neg_rows))
+    gt_vals_curr = gt_vals*max_val
+
+    arr_plot = [(det_times, curr_arr) for curr_arr in [gt_vals_curr,pos_rows,neg_rows]]
+    legend_entries = ['gt', 'pos', 'neg']
+    # idx_pos_row = str(idx_pos_row)
+    out_file_curr = os.path.join(out_dir_curr, vid_name+'.jpg')
+    title = vid_name
+    # +' '+idx_pos_row
+
+    visualize.plotSimple(arr_plot, out_file = out_file_curr, title = title, xlabel = 'time', ylabel = 'max sim', legend_entries = legend_entries)
+    print out_file_curr        
+    
+    # print gt_vals
+    # raw_input()
+
+    
+
+    # idx_pos = gt_vals>0
+    # idx_neg = gt_vals<1
+    # sim_pos_all = []
+    # sim_neg_all = []
+    # for idx_idx_curr, idx_curr in enumerate(np.where(idx_pos)[0]):
+    #     sim_pos = sim_mat[idx_curr, idx_pos]
+    #     sim_neg = sim_mat[idx_curr, idx_neg]
+    #     sim_pos_all.append(sim_pos[np.newaxis,:])
+    #     sim_neg_all.append(sim_neg[np.newaxis,:])
+
+    # sim_pos_all = np.concatenate(sim_pos_all, axis = 0)
+    # sim_neg_all = np.concatenate(sim_neg_all, axis = 0)
+
+    # sim_pos_mean = np.mean(sim_pos_all,axis = 0)
+    # sim_neg_mean = np.mean(sim_neg_all, axis = 0)
+
+    # pos_vals = np.zeros(gt_vals.shape)
+    # pos_vals[gt_vals>0]=sim_pos_mean
+    # neg_vals = np.zeros(gt_vals.shape)
+    # neg_vals[gt_vals<1]=sim_neg_mean
+
+    # max_val = max(np.max(pos_vals),np.max(neg_vals))
+    # gt_vals = gt_vals*max_val
+
+    # arr_plot = [(det_times, curr_arr) for curr_arr in [gt_vals,pos_vals,neg_vals]]
+    # legend_entries = ['gt', 'pos', 'neg']
+
+    # out_file_curr = os.path.join(out_dir_curr, vid_name+'.jpg')
+    # title = vid_name
+
+    # visualize.plotSimple(arr_plot, out_file = out_file_curr, title = title, xlabel = 'time', ylabel = 'max sim', legend_entries = legend_entries)
+    # print out_file_curr
+
+
+
+def save_sim_viz_mean(vid_name, out_shape_curr, sim_mat, class_idx, out_dir):
     gt_vals, det_times = get_gt_vector(vid_name, out_shape_curr, class_idx)
 
     out_dir_curr = os.path.join(out_dir, class_names[class_idx])

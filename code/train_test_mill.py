@@ -66,7 +66,7 @@ def test_model_core(model, test_dataloader, criterion, log_arr, multibranch = 1)
                 out,pmf = model.forward(sample.cuda())
 
                 if multibranch>1:
-                    preds.append(torch.nn.functional.softmax(pmf[-1].unsqueeze(0)).data.cpu().numpy())
+                    preds.append(torch.nn.functional.softmax(pmf[0].unsqueeze(0)).data.cpu().numpy())
                         
                     for idx in range(len(pmf)):
                         # print idx, pmf[idx].size(), len(preds_mini[idx])
@@ -258,7 +258,7 @@ def merge_detections(bin_keep, det_conf, det_time_intervals):
     # raw_input()
     return det_conf_new, det_time_intervals_new
 
-def visualize_dets(model, test_dataloader, dir_viz, first_thresh , second_thresh, bin_trim = None,  det_class = -1):
+def visualize_dets(model, test_dataloader, dir_viz, first_thresh , second_thresh, bin_trim = None,  det_class = -1, branch_to_test =-1):
 
     model.eval()
 
@@ -286,7 +286,10 @@ def visualize_dets(model, test_dataloader, dir_viz, first_thresh , second_thresh
         preds_mini = []
         for idx_sample, sample in enumerate(samples):
             # print idx_test
-            out, pmf, bg = model.forward(sample.cuda(), ret_bg = True)
+            if branch_to_test>-1:
+                out, pmf, bg = model.forward(sample.cuda(), ret_bg = True, branch_to_test = branch_to_test)
+            else:
+                out, pmf, bg = model.forward(sample.cuda(), ret_bg = True)
             # out = out-bg
             if bin_trim is not None:
                 out = out[:,np.where(bin_trim)[0]]
@@ -481,6 +484,10 @@ def test_model(out_dir_train,
                 branch_to_test = 0):
     
     out_dir_results = os.path.join(out_dir_train,'results_model_'+str(model_num)+post_pend+'_'+str(first_thresh)+'_'+str(second_thresh))
+    
+    if multibranch>1:
+        out_dir_results = out_dir_results +'_'+str(branch_to_test)
+
     util.mkdir(out_dir_results)
     model_file = os.path.join(out_dir_train,'model_'+str(model_num)+'.pt')
     if multibranch>1:
@@ -525,7 +532,11 @@ def test_model(out_dir_train,
     else:
         dir_viz = os.path.join(out_dir_results, '_'.join([str(val) for val in ['viz',det_class, first_thresh, second_thresh]]))
         util.mkdir(dir_viz)
-        visualize_dets(model, test_dataloader,  dir_viz,first_thresh = first_thresh, second_thresh = second_thresh,bin_trim = bin_trim,det_class = det_class)
+        if multibranch>1:
+            branch_to_test_pass = branch_to_test
+        else:
+            branch_to_test_pass = -1
+        visualize_dets(model, test_dataloader,  dir_viz,first_thresh = first_thresh, second_thresh = second_thresh,bin_trim = bin_trim,det_class = det_class, branch_to_test = branch_to_test_pass)
 
 
 def visualize_sim_mat(out_dir_train,
@@ -726,6 +737,9 @@ def train_model(out_dir_train,
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
+
+            grad_rel = model.graph_layers[0].graph_layer.weight.grad
+            print torch.min(grad_rel).data.cpu().numpy(), torch.max(grad_rel).data.cpu().numpy()
 
             # print criterion.__class__.__name__.lower()
             # if 'centerloss' in criterion.__class__.__name__.lower():

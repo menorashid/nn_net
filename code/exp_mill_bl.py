@@ -176,7 +176,7 @@ def train_simple_mill_all_classes(model_name,
                 multibranch = multibranch,
                 branch_to_test =branch_to_test)
         test_model(**test_params)
-        if not viz_mode:
+        if viz_mode:
             test_params = dict(out_dir_train = out_dir_train,
                     model_num = model_num,
                     test_data = test_data,
@@ -263,12 +263,12 @@ def separate_supervision_experiment():
     # model_name = 'graph_sim_i3d_sim_mat_mill'
     # model_name = 'graph_sim_mill'
     # model_name = 'graph_same_G_multi_cat'
-    model_name = 'graph_same_G_multi_cat_separate_supervision'
+    model_name = 'graph_same_G_multi_cat_separate_supervision_unit_norm'
     # epoch_stuff = [25,25]
     # save_after = 5
 
 
-    lr = [0.0001]
+    lr = [0.0001,0.01,0.01]
     epoch_stuff = [200,200]
     dataset = 'ucf'
     limit  = 500
@@ -277,14 +277,14 @@ def separate_supervision_experiment():
     
     loss_weights = [1,1]
     multibranch = 2
-    branch_to_test = 0
-    test_mode = True
+    branch_to_test = 1
+    test_mode = False
 
     retrain = False
     viz_mode = True
     viz_sim = False
     test_post_pend = ''
-    post_pend = 'ht_cosine'
+    post_pend = 'ht_cosine_normalizedG_retry'
 
     class_weights = True
     test_after = 10
@@ -342,29 +342,40 @@ def create_comparative_viz(dirs, class_names, dir_strs, out_dir_html):
 
 
 def scripts_comparative():
-    dir_meta= '../experiments/graph_sim_direct_mill_ucf/all_classes_False_just_primary_True_deno_8_limit_500_cw_True_MultiCrossEntropy_100_step_100_0.1_0.0001'
-    dir_meta = dir_meta.replace(str_replace[0],str_replace[1])
+    # dir_meta= '../experiments/graph_sim_direct_mill_ucf/all_classes_False_just_primary_True_deno_8_limit_500_cw_True_MultiCrossEntropy_100_step_100_0.1_0.0001'
+    # dir_meta = dir_meta.replace(str_replace[0],str_replace[1])
 
-    dirs = ['results_model_24_0_0.5/viz_sim_mat', 'results_model_24_0_0.5/viz_-1_0_0.5']
-    dirs = [os.path.join(dir_meta, dir_curr) for dir_curr in dirs]
+    # dirs = ['results_model_24_0_0.5/viz_sim_mat', 'results_model_24_0_0.5/viz_-1_0_0.5']
+    # dirs = [os.path.join(dir_meta, dir_curr) for dir_curr in dirs]
 
-    dir_meta_new= '../experiments/just_mill_2_1024_ucf/all_classes_False_just_primary_True_deno_8_limit_500_cw_True_MultiCrossEntropy_100_step_100_0.1_0.0001'
-    dir_meta_new = dir_meta_new.replace(str_replace[0],str_replace[1])
-    dirs_new= ['results_model_99_0_0.5/viz_sim_mat', 'results_model_99_0_0.5/viz_-1_0_0.5']
-    dirs += [os.path.join(dir_meta_new, dir_curr) for dir_curr in dirs_new]
-
-
-    dir_meta_new= '../experiments/graph_sim_direct_mill_ucf/all_classes_False_just_primary_True_deno_8_limit_500_cw_True_MultiCrossEntropy_100_step_100_0.1_0.0001__noRelu'
-    dir_meta_new = dir_meta_new.replace(str_replace[0],str_replace[1])
-    dirs_new= ['results_model_24_0_0.5/viz_sim_mat', 'results_model_24_0_0.5/viz_-1_0_0.5']
-    dirs += [os.path.join(dir_meta_new, dir_curr) for dir_curr in dirs_new]
+    # dir_meta_new= '../experiments/just_mill_2_1024_ucf/all_classes_False_just_primary_True_deno_8_limit_500_cw_True_MultiCrossEntropy_100_step_100_0.1_0.0001'
+    # dir_meta_new = dir_meta_new.replace(str_replace[0],str_replace[1])
+    # dirs_new= ['results_model_99_0_0.5/viz_sim_mat', 'results_model_99_0_0.5/viz_-1_0_0.5']
+    # dirs += [os.path.join(dir_meta_new, dir_curr) for dir_curr in dirs_new]
 
 
-    out_dir_html = os.path.join(dir_meta,'comparative_htmls')
-    util.mkdir(out_dir_html)
+    # dir_meta_new= '../experiments/graph_sim_direct_mill_ucf/all_classes_False_just_primary_True_deno_8_limit_500_cw_True_MultiCrossEntropy_100_step_100_0.1_0.0001__noRelu'
+    # dir_meta_new = dir_meta_new.replace(str_replace[0],str_replace[1])
+    # dirs_new= ['results_model_24_0_0.5/viz_sim_mat', 'results_model_24_0_0.5/viz_-1_0_0.5']
+    # dirs += [os.path.join(dir_meta_new, dir_curr) for dir_curr in dirs_new]
+
+
+    # out_dir_html = os.path.join(dir_meta,'comparative_htmls')
+    # util.mkdir(out_dir_html)
 
     
-    dir_strs = ['graph_sim_24','graph_pred_24','mill_2_layer_sim_99', 'mill_2_layer_pred_99','graph_sim_24_nr','graph_pred_24_nr']
+    # dir_strs = ['graph_sim_24','graph_pred_24','mill_2_layer_sim_99', 'mill_2_layer_pred_99','graph_sim_24_nr','graph_pred_24_nr']
+
+
+    dir_meta = '../experiments/graph_same_G_multi_cat_separate_supervision_unit_norm_ucf/all_classes_False_just_primary_False_deno_8_limit_500_cw_True_MultiCrossEntropyMultiBranch_200_lw_1_1_step_200_0.1_0.0001_ht_cosine_normalizedG'
+
+    dir_meta = dir_meta.replace(str_replace[0],str_replace[1])
+
+    dirs = ['results_model_199_0_0.5_0/viz_-1_0_0.5', 'results_model_199_0_0.5_1/viz_-1_0_0.5','results_model_199_0_0.5/viz_sim_mat']
+    dirs = [os.path.join(dir_meta, dir_curr) for dir_curr in dirs]
+    out_dir_html = os.path.join(dir_meta,'comparative_htmls')
+    util.mkdir(out_dir_html)
+    dir_strs = ['pred_0','pred_1','sim']
 
     create_comparative_viz(dirs, class_names, dir_strs, out_dir_html) 
 

@@ -21,15 +21,26 @@ class Graph_Layer(nn.Module):
         G = self.get_affinity(sim_feat)
         # if torch.min(G)<0:
         #     print 'NEG G'
-        out = torch.mm(torch.mm(G,x),self.weight)
+        # norms = torch.norm(G, dim = 1)
+        # print torch.min(norms).data.cpu().numpy(), torch.max(norms).data.cpu().numpy()
+        # x = F.normalize(x)
+        temp = torch.mm(G,x)
+        # norms = torch.norm(temp, dim = 1)
+        # print torch.min(norms).data.cpu().numpy(), torch.max(norms).data.cpu().numpy()
+        # print '__'
+        out = torch.mm(temp,self.weight)
         
         return out
 
     def get_affinity(self,input):
-        norms = torch.norm(input, dim = 1, keepdim = True)
-        input = input/norms
+        # norms = torch.norm(input, dim = 1, keepdim = True)
         
-        G = torch.mm(input,torch.t(input))
+        # print torch.min(norms).data.cpu().numpy(), torch.max(norms).data.cpu().numpy()
+        input = F.normalize(input)
+        
+        G = torch.mm(input,torch.t(input)) 
+
+        G = G/torch.sum(G,dim = 1, keepdim = True)
 
         # G = self.Softmax(G)
 
