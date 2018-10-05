@@ -61,6 +61,8 @@ def test_model_core(model, test_dataloader, criterion, log_arr, multibranch = 1)
         else:
             if multibranch>1:
                 preds_mini = [[] for i in range(multibranch)]
+            else:
+                preds_mini = []
 
             for sample in samples:
                 out,pmf = model.forward(sample.cuda())
@@ -362,11 +364,12 @@ def visualize_dets(model, test_dataloader, dir_viz, first_thresh , second_thresh
 
 
 
-def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh , second_thresh , bin_trim = None , multibranch =1, branch_to_test = 0):
+def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh , second_thresh , bin_trim = None , multibranch =1, branch_to_test = -1):
 
     # print 'FIRST THRESH', first_thresh
     # print 'SECOND THRESH', second_thresh
     # raw_input()
+
     model.eval()
 
     preds = []
@@ -481,16 +484,16 @@ def test_model(out_dir_train,
                 visualize = False,
                 det_class = -1, 
                 multibranch = 1,
-                branch_to_test = 0):
+                branch_to_test = -1):
     
     out_dir_results = os.path.join(out_dir_train,'results_model_'+str(model_num)+post_pend+'_'+str(first_thresh)+'_'+str(second_thresh))
     
-    if multibranch>1:
+    if branch_to_test>-1:
         out_dir_results = out_dir_results +'_'+str(branch_to_test)
 
     util.mkdir(out_dir_results)
     model_file = os.path.join(out_dir_train,'model_'+str(model_num)+'.pt')
-    if multibranch>1:
+    if branch_to_test>-1:
         append_name = '_'+str(branch_to_test)
     else:
         append_name = ''    
@@ -500,6 +503,9 @@ def test_model(out_dir_train,
     log_arr=[]
 
     model = torch.load(model_file)
+    if multibranch==1 and branch_to_test>-1:
+        model.focus = branch_to_test
+    
 
     if batch_size_val is None:
         batch_size_val = len(test_data)
@@ -719,7 +725,11 @@ def train_model(out_dir_train,
                     preds = [[] for i in range(multibranch)]
                 for idx_sample, sample in enumerate(samples):
                     # print labels[idx_sample]
-                    out,pmf = model.forward(sample.cuda())
+                    if 'alt_train' in model_name:
+                        out,pmf = model.forward(sample.cuda(), epoch_num=num_epoch)
+                    else:    
+                        out,pmf = model.forward(sample.cuda())
+
                     if multibranch>1:
                         for idx in range(len(pmf)):
                             preds[idx].append(pmf[idx].unsqueeze(0))
@@ -738,8 +748,9 @@ def train_model(out_dir_train,
             loss.backward()
             optimizer.step()
 
-            grad_rel = model.graph_layers[0].graph_layer.weight.grad
-            print torch.min(grad_rel).data.cpu().numpy(), torch.max(grad_rel).data.cpu().numpy()
+            # model.printGraphGrad()
+            # grad_rel = model.graph_layers[0].graph_layer.weight.grad
+            # print torch.min(grad_rel).data.cpu().numpy(), torch.max(grad_rel).data.cpu().numpy()
 
             # print criterion.__class__.__name__.lower()
             # if 'centerloss' in criterion.__class__.__name__.lower():

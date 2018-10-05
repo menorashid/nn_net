@@ -36,7 +36,8 @@ def train_simple_mill_all_classes(model_name,
                                     test_post_pend = '', 
                                     multibranch = 1,
                                     loss_weights = None,
-                                    branch_to_test = 0):
+                                    branch_to_test = 0,
+                                    num_switch = None):
 
     out_dir_meta = '../experiments/'+model_name+'_'+dataset
     util.mkdir(out_dir_meta)
@@ -106,7 +107,11 @@ def train_simple_mill_all_classes(model_name,
 
     init = False
 
-    strs_append_list = ['all_classes',all_classes,'just_primary',just_primary,'deno',deno,'limit',limit,'cw',class_weights, criterion_str, num_epochs]+['lw']+loss_weights+dec_after+lr
+    strs_append_list = ['all_classes',all_classes,'just_primary',just_primary,'deno',deno,'limit',limit,'cw',class_weights, criterion_str, num_epochs]+dec_after+lr
+    if loss_weights is not None:
+        strs_append_list += ['lw']+loss_weights
+    if num_switch is not None:
+        strs_append_list += ['num_switch',num_switch]
     strs_append_list+=[post_pend] if len(post_pend)>0 else []
     strs_append = '_'.join([str(val) for val in strs_append_list])
 
@@ -123,8 +128,10 @@ def train_simple_mill_all_classes(model_name,
 
 
     
-
-    network_params = dict(n_classes=n_classes,deno = deno)
+    if 'alt_train' in model_name:
+        network_params = dict(n_classes=n_classes,deno = deno, num_switch = num_switch)
+    else:
+        network_params = dict(n_classes=n_classes,deno = deno)
 
     train_params = dict(out_dir_train = out_dir_train,
                 train_data = train_data,
@@ -204,27 +211,27 @@ def train_simple_mill_all_classes(model_name,
 def super_simple_experiment():
     # model_name = 'just_mill_2_1024'
     # model_name = 'graph_sim_direct_mill_cosine'
-    # model_name = 'graph_sim_i3d_sim_mat_mill'
+    model_name = 'graph_sim_i3d_sim_mat_mill'
     # model_name = 'graph_sim_mill'
     # model_name = 'graph_same_G_multi_cat'
-    model_name = 'graph_2_G_multi_cat'
+    # model_name = 'graph_2_G_multi_cat'
     # epoch_stuff = [25,25]
     # save_after = 5
 
 
-    lr = [0.001]
-    epoch_stuff = [100,200]
+    lr = [0.0001]
+    epoch_stuff = [200,200]
     dataset = 'ucf'
     limit  = 500
     deno = 8
     save_after = 25
     
     test_mode = False
-    retrain = False
-    viz_mode = True
+    retrain = True
+    viz_mode = False
     viz_sim = False
     test_post_pend = ''
-    post_pend = 'ht_cosine'
+    post_pend = 'ht_cosine_DGD'
 
     class_weights = True
     test_after = 10
@@ -263,34 +270,36 @@ def separate_supervision_experiment():
     # model_name = 'graph_sim_i3d_sim_mat_mill'
     # model_name = 'graph_sim_mill'
     # model_name = 'graph_same_G_multi_cat'
-    model_name = 'graph_same_G_multi_cat_separate_supervision_unit_norm'
+    # model_name = 'graph_same_G_multi_cat_separate_supervision_unit_norm'
+    model_name = 'graph_same_G_sepsup_alt_train_2_layer'
     # epoch_stuff = [25,25]
     # save_after = 5
 
 
-    lr = [0.0001,0.01,0.01]
-    epoch_stuff = [200,200]
+    lr = [1e-4,1e-4,1e-4,1e-4]
+    epoch_stuff = [400,400]
     dataset = 'ucf'
     limit  = 500
     deno = 8
     save_after = 25
     
-    loss_weights = [1,1]
-    multibranch = 2
+    loss_weights = None
+    multibranch = 1
+    num_switch = 5
     branch_to_test = 1
-    test_mode = False
+    test_mode = True
 
     retrain = False
-    viz_mode = True
+    viz_mode = False
     viz_sim = False
     test_post_pend = ''
-    post_pend = 'ht_cosine_normalizedG_retry'
+    post_pend = '512_1024'
 
     class_weights = True
     test_after = 10
     all_classes = False
     just_primary = False
-    model_nums = None
+    model_nums = [374]
     
     second_thresh =0.5
     det_class = -1
@@ -318,7 +327,8 @@ def separate_supervision_experiment():
                         test_post_pend = test_post_pend, 
                         loss_weights = loss_weights, 
                         multibranch = multibranch,
-                        branch_to_test = branch_to_test)
+                        branch_to_test = branch_to_test,
+                        num_switch = num_switch)
 
 
 
@@ -386,6 +396,7 @@ def main():
     # scripts_comparative()
     
     separate_supervision_experiment()
+    # super_simple_experiment()
 
 
 if __name__=='__main__':

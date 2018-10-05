@@ -35,7 +35,7 @@ class Graph_Sim_Mill(nn.Module):
         self.graph_layers = nn.ModuleList()
         for num_layer in range(num_layers): 
             self.graph_layers.append(Graph_Layer_Wrapper(in_out[num_layer],in_out[num_layer+1], non_lin))
-            
+        
 
         self.last_layers = nn.ModuleList()
 
@@ -69,6 +69,7 @@ class Graph_Sim_Mill(nn.Module):
         for idx, feature_curr in enumerate(features_out):
             # cat_out = torch.cat(features_out,dim = 1)
             feature_curr = self.non_lin(feature_curr)
+            # if idx==0:
             feature_curr = F.normalize(feature_curr)
 
             x = self.last_layers[idx](feature_curr)
@@ -99,6 +100,9 @@ class Graph_Sim_Mill(nn.Module):
         sim_mat = self.graph_layers[0].get_affinity(feature_out)
         return sim_mat
     
+    def printGraphGrad(self):
+        grad_rel = self.graph_layers[0].graph_layer.weight.grad
+        print torch.min(grad_rel).data.cpu().numpy(), torch.max(grad_rel).data.cpu().numpy()
 
 
 class Network:
@@ -107,11 +111,18 @@ class Network:
  
     def get_lr_list(self, lr):
         
-        modules = [self.model.linear_layer, self.model.graph_layers, self.model.last_layers]
+        
         lr_list = []
-        for lr_curr, module in zip(lr,modules):
-            print lr_curr
-            lr_list+= [{'params': [p for p in module.parameters() if p.requires_grad], 'lr': lr_curr}]
+
+        lr_list+= [{'params': [p for p in self.model.linear_layer.parameters() if p.requires_grad], 'lr': lr[0]}]
+        lr_list+= [{'params': [p for p in self.model.graph_layers.parameters() if p.requires_grad], 'lr': lr[1]}]        
+        lr_list+= [{'params': [p for p in self.model.last_layers[0].parameters() if p.requires_grad], 'lr': lr[2]}]
+        lr_list+= [{'params': [p for p in self.model.last_layers[1].parameters() if p.requires_grad], 'lr': lr[3]}]
+
+
+        # for lr_curr, module in zip(lr,modules):
+        #     print lr_curr
+        #     lr_list+= [{'params': [p for p in module.parameters() if p.requires_grad], 'lr': lr_curr}]
         return lr_list
 
 def main():

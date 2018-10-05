@@ -36,9 +36,24 @@ class Graph_Layer(nn.Module):
         # norms = torch.norm(input, dim = 1, keepdim = True)
         
         # print torch.min(norms).data.cpu().numpy(), torch.max(norms).data.cpu().numpy()
+
+
         input = F.normalize(input)
         
         G = torch.mm(input,torch.t(input)) 
+
+
+        # is_cuda = next(self.parameters()).is_cuda
+
+        # eye_curr = torch.eye(G.size(0))
+        # if is_cuda:
+        #     eye_curr = eye_curr.cuda()
+        # G = G+eye_curr
+
+        # D = torch.diagflat(torch.rsqrt(torch.sum(G,dim = 1)))
+        # if is_cuda:
+        #     D = D.cuda()
+        # G = torch.mm(torch.mm(D,G),D)
 
         G = G/torch.sum(G,dim = 1, keepdim = True)
 

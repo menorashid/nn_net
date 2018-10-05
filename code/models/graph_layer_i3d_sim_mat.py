@@ -15,13 +15,15 @@ class Graph_Layer(nn.Module):
         # self.transformers = nn.ModuleList([nn.Linear(in_size,feature_size, bias = False),nn.Linear(in_size,feature_size, bias = False)])
         
         self.weight = nn.Parameter(torch.randn(in_size,self.n_out))
+        nn.init.kaiming_uniform_(self.weight, a=math.sqrt(5))
+
         self.bias = None
         # nn.Parameter(torch.zeros(1,in_size))
         # nn.init.xavier_normal(self.weight.data)
 
         self.Softmax = nn.Softmax(dim = 1)
 
-        nn.init.kaiming_uniform_(self.weight, a=math.sqrt(5))
+
         if self.bias is not None:
             fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.weight)
             bound = 1 / math.sqrt(fan_in)
@@ -46,10 +48,22 @@ class Graph_Layer(nn.Module):
         # out = [layer_curr(input) for layer_curr in  self.transformers]
         # norms = torch.norm(input, dim = 1, keepdim = True)
         # input = input/norms
+        is_cuda = next(self.parameters()).is_cuda
+
+        input = F.normalize(input)
         
-        G = torch.mm(input,torch.t(input))
-        G = self.Softmax(G)
-        # G = torch.eye(input.size(0)).cuda()
+        G = torch.mm(input,torch.t(input)) 
+
+        D = torch.diagflat(torch.rsqrt(torch.sum(G,dim = 1)))
+
+
+        if is_cuda:
+            D = D.cuda()
+
+        G = torch.mm(torch.mm(D,G),D)
+
+        
+        # G = self.Softmax(G)
         return G
 
 
