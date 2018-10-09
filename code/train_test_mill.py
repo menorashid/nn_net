@@ -688,7 +688,9 @@ def train_model(out_dir_train,
     
     model = model.cuda()
     model.train(True)
-    print model
+    model_str = str(model)
+    log_file_writer.write(model_str+'\n')
+    print model_str
     # out_file = os.path.join(out_dir_train,'model_-1.pt')
     # print 'saving',out_file
     # torch.save(model,out_file)    
@@ -748,7 +750,7 @@ def train_model(out_dir_train,
             loss.backward()
             optimizer.step()
 
-            # model.printGraphGrad()
+            model.printGraphGrad()
             # grad_rel = model.graph_layers[0].graph_layer.weight.grad
             # print torch.min(grad_rel).data.cpu().numpy(), torch.max(grad_rel).data.cpu().numpy()
 

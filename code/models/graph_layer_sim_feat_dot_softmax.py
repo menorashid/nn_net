@@ -38,7 +38,7 @@ class Graph_Layer(nn.Module):
         # print torch.min(norms).data.cpu().numpy(), torch.max(norms).data.cpu().numpy()
 
         # print torch.sum(input<0),torch.sum(input>0), torch.sum(input==0)
-        input = self.Softmax(input)
+        # input = F.normalize(input)
         # print torch.sum(input<0),torch.sum(input>0), torch.sum(input==0)
         G = torch.mm(input,torch.t(input)) 
 
@@ -59,11 +59,11 @@ class Graph_Layer(nn.Module):
         # if min_val<0:
         #     print 'minless!',min_val, max_val, min_val<0
 
-        G = G/torch.sum(G,dim = 1, keepdim = True)
+        # G = G/torch.sum(G,dim = 1, keepdim = True)
         # min_val = torch.min(G).data.cpu().numpy()
         # max_val = torch.max(G).data.cpu().numpy()
         # print min_val, max_val, min_val<0
-        # G = self.Softmax(G)
+        G = self.Softmax(G)
 
         return G
 

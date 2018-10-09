@@ -37,7 +37,8 @@ def train_simple_mill_all_classes(model_name,
                                     multibranch = 1,
                                     loss_weights = None,
                                     branch_to_test = 0,
-                                    num_switch = None):
+                                    num_switch = None,
+                                    in_out = None):
 
     out_dir_meta = '../experiments/'+model_name+'_'+dataset
     util.mkdir(out_dir_meta)
@@ -127,11 +128,15 @@ def train_simple_mill_all_classes(model_name,
         print 'not skipping', final_model_file
 
 
-    
+    network_params = dict(n_classes=n_classes,deno = deno)
+
     if 'alt_train' in model_name:
-        network_params = dict(n_classes=n_classes,deno = deno, num_switch = num_switch)
-    else:
-        network_params = dict(n_classes=n_classes,deno = deno)
+        network_params['num_switch'] = num_switch
+    if in_out is not None:
+        network_params['in_out'] = in_out
+    # print network_params
+    # raw_input()
+        
 
     train_params = dict(out_dir_train = out_dir_train,
                 train_data = train_data,
@@ -209,29 +214,37 @@ def train_simple_mill_all_classes(model_name,
             visualize_sim_mat(**test_params)
 
 def super_simple_experiment():
-    # model_name = 'just_mill_2_1024'
+    # model_name = 'just_mill_relu_unit_norm_no_bias'
+    # model_name = 'just_mill_one_layer'
+    model_name = 'graph_pretrained_classifier_F'
     # model_name = 'graph_sim_direct_mill_cosine'
-    model_name = 'graph_sim_i3d_sim_mat_mill'
+    # model_name = 'graph_sim_i3d_sim_mat_mill'
     # model_name = 'graph_sim_mill'
     # model_name = 'graph_same_G_multi_cat'
     # model_name = 'graph_2_G_multi_cat'
     # epoch_stuff = [25,25]
     # save_after = 5
 
-
-    lr = [0.0001]
-    epoch_stuff = [200,200]
+    # lr = [0.001]
+    lr = [0,0.001,0.001]
+    epoch_stuff = [25,25]
     dataset = 'ucf'
     limit  = 500
     deno = 8
     save_after = 25
     
     test_mode = False
-    retrain = True
-    viz_mode = False
+    retrain = False
+    viz_mode = True
     viz_sim = False
     test_post_pend = ''
-    post_pend = 'ht_cosine_DGD'
+
+    # post_pend = 'rl'
+    # in_out = None
+
+    in_out = [2048,128]
+    post_pend = '_'.join([str(val) for val in in_out])
+    post_pend += '_rl_softmax_dot_rowNorm'
 
     class_weights = True
     test_after = 10
@@ -262,7 +275,8 @@ def super_simple_experiment():
                         det_class = det_class,
                         post_pend = post_pend,
                         viz_sim = viz_sim,
-                        test_post_pend = test_post_pend)
+                        test_post_pend = test_post_pend,
+                        in_out = in_out)
 
 def separate_supervision_experiment():
     # model_name = 'just_mill_2_1024'
@@ -330,8 +344,6 @@ def separate_supervision_experiment():
                         branch_to_test = branch_to_test,
                         num_switch = num_switch)
 
-
-
 def create_comparative_viz(dirs, class_names, dir_strs, out_dir_html):
 
     for class_name in class_names:
@@ -348,8 +360,6 @@ def create_comparative_viz(dirs, class_names, dir_strs, out_dir_html):
             captions_html.append(caption_curr)
 
         visualize.writeHTML(out_file_html, ims_html, captions_html, height = 150, width = 200)
-
-
 
 def scripts_comparative():
     # dir_meta= '../experiments/graph_sim_direct_mill_ucf/all_classes_False_just_primary_True_deno_8_limit_500_cw_True_MultiCrossEntropy_100_step_100_0.1_0.0001'
@@ -389,14 +399,12 @@ def scripts_comparative():
 
     create_comparative_viz(dirs, class_names, dir_strs, out_dir_html) 
 
-
-
 def main():
 
     # scripts_comparative()
     
-    separate_supervision_experiment()
-    # super_simple_experiment()
+    # separate_supervision_experiment()
+    super_simple_experiment()
 
 
 if __name__=='__main__':
