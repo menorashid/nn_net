@@ -33,13 +33,14 @@ def get_similarity(features):
     
     return sim_mat
 
-def get_gt_vector(vid_name, out_shape_curr, class_idx):
+def get_gt_vector(vid_name, out_shape_curr, class_idx, test = True):
     
 
     class_name = class_names[class_idx]
-
-    mat_file = os.path.join('../TH14evalkit','mat_files', class_name+'_test.mat')
-    # mat_file = os.path.join('../TH14evalkit', class_name+'.mat')
+    if test:
+        mat_file = os.path.join('../TH14evalkit','mat_files', class_name+'_test.mat')
+    else:
+        mat_file = os.path.join('../TH14evalkit', class_name+'.mat')
 
     loaded = scipy.io.loadmat(mat_file)
     
@@ -169,9 +170,8 @@ def make_htmls(out_dir):
         out_dir_curr = os.path.join(out_dir, class_name)
         visualize.writeHTMLForFolder(out_dir_curr)
 
-    
 
-def main():
+def script_viewing_sim():
 
     dir_files = '../data/ucf101/train_test_files'
     n_classes = 20
@@ -259,13 +259,99 @@ def main():
         visualize.writeHTMLForFolder(out_dir_curr)
 
 
-    # print train_npy[0]
-    # get_similarity(train_npy[0])
+def readTrainTestFile(file_curr):
+    lines = util.readLinesFromFile(file_curr)
+    
+    anno_all = []
+    npy_files_all = []
+    for line in lines:
+        line = line.split(' ')
+        npy_file = line[0]
+        anno = [int(val) for val in line[1:]]
+        anno_all.append(anno)
+        npy_files_all.append(npy_file)
+
+    return npy_files_all, anno_all
+
+
+def script_make_gt_vecs():
+    dir_files = '../data/ucf101/train_test_files'
+    out_dir_gt_vec = '../data/ucf101/gt_vecs'
+    util.mkdir(out_dir_gt_vec)
+
+    n_classes = 20
+    just_primary = True
+    # if just_primary:
+    train_file = os.path.join(dir_files, 'train_just_primary.txt')
+    test_file = os.path.join(dir_files, 'test_just_primary.txt')
+    out_dir_curr = os.path.join(out_dir_gt_vec,'just_primary')
+
+    # else:
+    #     train_file = os.path.join(dir_files, 'train.txt')
+    #     test_file = os.path.join(dir_files, 'test.txt')
+    #     out_dir_curr = os.path.join(out_dir_gt_vec,'regular')
+
+
+    files = [train_file, test_file]
+    test_status = [False, True]
+    util.mkdir(out_dir_curr)
+    post_pend = '_gt_vec'
+
+    for file_curr, test_stat  in zip(files, test_status):
+        npy_files, annos = readTrainTestFile(file_curr)
+        for npy_file, anno_curr in zip(npy_files, annos):
+            vid_name = os.path.split(npy_file)[1]
+            vid_name = vid_name[:vid_name.rindex('.')]
+            out_file_curr = os.path.join(out_dir_curr,vid_name+'.npy')
+
+            if not os.path.exists(out_file_curr):
+                out_shape_curr = np.load(npy_file).shape[0]
+                class_idx = anno_curr.index(1)
+                gt_vec,_ = get_gt_vector(vid_name, out_shape_curr, class_idx, test = test_stat)
+                gt_vec = gt_vec*(class_idx+1)
+                assert np.max(gt_vec)>0
+                np.save(out_file_curr, gt_vec)
+        
+        new_file_curr = file_curr[:file_curr.rindex('.')]+post_pend+'.txt'
+        new_lines = []
+        for npy_file, anno_curr in zip(npy_files, annos):
+            vid_name = os.path.split(npy_file)[1]
+            vid_name = vid_name[:vid_name.rindex('.')]
+
+            out_file_curr = os.path.join(out_dir_curr,vid_name+'.npy')
+            new_line = [npy_file, out_file_curr]+[str(val) for val in anno_curr]
+            new_line = ' '.join(new_line)
+            new_lines.append(new_line)
+        # print len(new_lines), new_file_curr, new_lines[0]
+
+        util.writeFile(new_file_curr, new_lines)
+
+    
+
+def main():
+    # script_make_gt_vecs()
+    dir_gt_vecs = '../data/ucf101/gt_vecs/just_primary/'
+    npys = ['../data/ucf101/gt_vecs/just_primary/video_validation_0000666.npy']
+
+    # npys = glob.glob(os.path.join(dir_gt_vecs,'*.npy'))
+    for npy in npys:
+
+        np_curr = np.load(npy)
+        print np_curr.shape
+        print npy,np.min(np_curr),np.max(np_curr) 
+        assert np.min(np_curr)==0
+        assert np.max(np_curr)>0
+
+            
+            
+        
 
 
 
+    
 
-    print 'HELLO'
+
+
 
 if __name__=='__main__':
     main()

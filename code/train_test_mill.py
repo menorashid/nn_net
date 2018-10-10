@@ -46,6 +46,7 @@ def test_model_core(model, test_dataloader, criterion, log_arr, multibranch = 1)
     
     labels_all = []
     loss_iter_total = 0.
+    model_name = model.__class__.__name__.lower()
     for num_iter_test,batch in enumerate(test_dataloader):
         samples = batch['features']
         labels = batch['label'].cuda()
@@ -54,7 +55,7 @@ def test_model_core(model, test_dataloader, criterion, log_arr, multibranch = 1)
         # print 'centerloss' in model.__class__.__name__.lower()
         # raw_input()
 
-        if 'centerloss' in model.__class__.__name__.lower():
+        if 'centerloss' in model_name:
             preds_mini,extra = model.forward(samples, labels)
             preds.append(preds_mini)
             labels = [labels]+extra
@@ -64,8 +65,12 @@ def test_model_core(model, test_dataloader, criterion, log_arr, multibranch = 1)
             else:
                 preds_mini = []
 
-            for sample in samples:
-                out,pmf = model.forward(sample.cuda())
+            for idx_sample, sample in enumerate(samples):
+                if 'perfectg' in model_name:
+                    out,pmf = model.forward([sample.cuda(),batch['gt_vec'][idx_sample].cuda()])
+                else:
+                    out,pmf = model.forward(sample.cuda())
+            
 
                 if multibranch>1:
                     preds.append(torch.nn.functional.softmax(pmf[0].unsqueeze(0)).data.cpu().numpy())
@@ -263,6 +268,7 @@ def merge_detections(bin_keep, det_conf, det_time_intervals):
 def visualize_dets(model, test_dataloader, dir_viz, first_thresh , second_thresh, bin_trim = None,  det_class = -1, branch_to_test =-1):
 
     model.eval()
+    model_name = model.__class__.__name__.lower()
 
     preds = []
     labels_all = []
@@ -290,6 +296,9 @@ def visualize_dets(model, test_dataloader, dir_viz, first_thresh , second_thresh
             # print idx_test
             if branch_to_test>-1:
                 out, pmf, bg = model.forward(sample.cuda(), ret_bg = True, branch_to_test = branch_to_test)
+            elif 'perfectg' in model_name:
+                out, pmf, bg = model.forward([sample.cuda(),batch['gt_vec'][idx_sample].cuda()], ret_bg = True)
+                # out, pmf, bg = model.forward(sample.cuda(), ret_bg = True)
             else:
                 out, pmf, bg = model.forward(sample.cuda(), ret_bg = True)
             # out = out-bg
@@ -371,6 +380,7 @@ def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh ,
     # raw_input()
 
     model.eval()
+    model_name = model.__class__.__name__.lower()
 
     preds = []
     labels_all = []
@@ -393,16 +403,19 @@ def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh ,
         labels = batch['label'].cuda()
 
         preds_mini = []
-        for sample in samples:
+        for idx_sample, sample in enumerate(samples):
 
-            if 'centerloss' in model.__class__.__name__.lower():
+            if 'centerloss' in model_name:
                 out, pmf = model.forward_single_test(sample.cuda())
             else:    
                 
                 if multibranch>1:
                     out, pmf = model.forward(sample.cuda(), branch_to_test = branch_to_test)
                 else:
-                    out, pmf = model.forward(sample.cuda())
+                    if 'perfectg' in model_name:
+                        out,pmf = model.forward([sample.cuda(),batch['gt_vec'][idx_sample].cuda()])
+                    else:    
+                        out, pmf = model.forward(sample.cuda())
                 
 
             # print out.size(),torch.min(out), torch.max(out)
@@ -559,7 +572,7 @@ def visualize_sim_mat(out_dir_train,
     
 
     model = torch.load(model_file)
-
+    
     if batch_size_val is None:
         batch_size_val = len(test_data)
 
@@ -584,7 +597,7 @@ def visualize_sim_mat(out_dir_train,
 def visualize_sim_mat_inner(model, test_dataloader, dir_viz):
 
     model.eval()
-
+    model_name = model.__class__.__name__.lower()
     preds = []
     labels_all = []
 
@@ -614,7 +627,10 @@ def visualize_sim_mat_inner(model, test_dataloader, dir_viz):
 
             class_idx = np.where(labels[idx_sample].numpy())[0][0]
 
-            sim_mat = model.get_similarity(sample.cuda())
+            if 'perfectg' in model_name:
+                sim_mat = model.get_similarity(batch['gt_vec'][idx_sample].cuda())
+            else:
+                sim_mat = model.get_similarity(sample.cuda())
             # print sim_mat.size()
             sim_mat = sim_mat.data.cpu().numpy()
             dg.save_sim_viz(vid_name, out_shape_curr, sim_mat, class_idx, dir_viz)
@@ -729,6 +745,8 @@ def train_model(out_dir_train,
                     # print labels[idx_sample]
                     if 'alt_train' in model_name:
                         out,pmf = model.forward(sample.cuda(), epoch_num=num_epoch)
+                    elif 'perfectG' in model_name:
+                        out,pmf = model.forward([sample.cuda(),batch['gt_vec'][idx_sample].cuda()])
                     else:    
                         out,pmf = model.forward(sample.cuda())
 

@@ -8,6 +8,53 @@ import numpy as np
 import torch
 from globals import * 
 
+def get_data(dataset, limit, all_classes, just_primary, gt_vec):
+
+    if dataset =='ucf':
+        dir_files = '../data/ucf101/train_test_files'
+        
+
+
+    n_classes = 20
+    trim_preds = None
+    post_pends = ['','','']
+    train_file = os.path.join(dir_files, 'train')
+    test_train_file = os.path.join(dir_files, 'test')
+    test_file = os.path.join(dir_files, 'test')
+        
+    files = [train_file, test_train_file, test_file]
+
+    if all_classes:
+        n_classes = 101
+        post_pends = [pp+val for pp,val in zip(post_pends,['_all','_all',''])]
+        classes_all_list = util.readLinesFromFile(os.path.join(dir_files,'classes_all_list.txt'))
+        classes_rel_list = util.readLinesFromFile(os.path.join(dir_files,'classes_rel_list.txt'))
+        trim_preds = [classes_all_list,classes_rel_list]
+
+    if just_primary:
+        post_pends = [pp+val for pp,val in zip(post_pends,['_just_primary','_just_primary','_just_primary'])]
+    
+    if gt_vec:
+        post_pends = [pp+val for pp,val in zip(post_pends,['_gt_vec','_gt_vec','_gt_vec'])]
+
+    post_pends = [pp+'.txt' for pp in post_pends]
+    files = [file_curr+pp for file_curr,pp in zip(files,post_pends)]
+    
+    train_file, test_train_file, test_file = files
+    if gt_vec:
+        train_data = UCF_dataset_gt_vec(train_file, limit)
+        test_train_data = UCF_dataset_gt_vec(test_train_file, limit)
+        test_data = UCF_dataset_gt_vec(test_file, None)
+    else:
+        # all_classes
+        train_data = UCF_dataset(train_file, limit)
+        test_train_data = UCF_dataset(test_train_file, limit)
+        test_data = UCF_dataset(test_file, None)
+
+    return train_data, test_train_data, test_data, n_classes, trim_preds
+
+
+
 def train_simple_mill_all_classes(model_name,
                                     lr,
                                     dataset,
@@ -38,7 +85,8 @@ def train_simple_mill_all_classes(model_name,
                                     loss_weights = None,
                                     branch_to_test = 0,
                                     num_switch = None,
-                                    in_out = None):
+                                    in_out = None, 
+                                    gt_vec = False):
 
     out_dir_meta = '../experiments/'+model_name+'_'+dataset
     util.mkdir(out_dir_meta)
@@ -54,44 +102,16 @@ def train_simple_mill_all_classes(model_name,
 
     lr = lr
 
-    if dataset =='ucf' and all_classes:
-        dir_files = '../data/ucf101/train_test_files'
-        n_classes = 101
-        train_file = os.path.join(dir_files, 'train_all.txt')
-        test_train_file = os.path.join(dir_files, 'test_all.txt')
-        test_file = os.path.join(dir_files, 'test.txt')
-
-        if just_primary:
-            old_files = [train_file, test_train_file, test_file]
-            new_files = [file_curr[:file_curr.rindex('.')]+'_just_primary.txt' for file_curr in old_files]
-            train_file, test_train_file, test_file = new_files
-
-        classes_all_list = util.readLinesFromFile(os.path.join(dir_files,'classes_all_list.txt'))
-        classes_rel_list = util.readLinesFromFile(os.path.join(dir_files,'classes_rel_list.txt'))
-        train_data = UCF_dataset(train_file, limit)
-        test_train_data = UCF_dataset(test_train_file, limit)
-        test_data = UCF_dataset(test_file, None)
-        trim_preds = [classes_all_list,classes_rel_list]
-    else:
-        dir_files = '../data/ucf101/train_test_files'
-        n_classes = 20
-        train_file = os.path.join(dir_files, 'train.txt')
-        test_file = os.path.join(dir_files, 'test.txt')
-        if just_primary:
-            old_files = [train_file, test_file]
-            new_files = [file_curr[:file_curr.rindex('.')]+'_just_primary.txt' for file_curr in old_files]
-            train_file, test_file = new_files
-        train_data = UCF_dataset(train_file, limit)
-        test_train_data = UCF_dataset(test_file, limit)
-        test_data = UCF_dataset(test_file, None)
-        trim_preds = None
-
+    train_data, test_train_data, test_data, n_classes, trim_preds = get_data(dataset, limit, all_classes, just_primary, gt_vec)
+    
+    train_file = train_data.anno_file
+    
     print train_file
-    print test_file
-
+    print test_data.anno_file
     print class_weights
+
     if class_weights:
-        class_weights_val = util.get_class_weights_au(util.readLinesFromFile(train_file))
+        class_weights_val = util.get_class_weights_au(util.readLinesFromFile(train_file),n_classes)
     else:
         class_weights_val = None
 
@@ -215,8 +235,8 @@ def train_simple_mill_all_classes(model_name,
 
 def super_simple_experiment():
     # model_name = 'just_mill_relu_unit_norm_no_bias'
-    # model_name = 'just_mill_one_layer'
-    model_name = 'graph_pretrained_classifier_F'
+    model_name = 'graph_perfectG'
+    # model_name = 'graph_pretrained_classifier_F'
     # model_name = 'graph_sim_direct_mill_cosine'
     # model_name = 'graph_sim_i3d_sim_mat_mill'
     # model_name = 'graph_sim_mill'
@@ -227,7 +247,7 @@ def super_simple_experiment():
 
     # lr = [0.001]
     lr = [0,0.001,0.001]
-    epoch_stuff = [25,25]
+    epoch_stuff = [100,100]
     dataset = 'ucf'
     limit  = 500
     deno = 8
@@ -235,23 +255,27 @@ def super_simple_experiment():
     
     test_mode = False
     retrain = False
-    viz_mode = True
+    viz_mode = False
     viz_sim = False
     test_post_pend = ''
 
-    # post_pend = 'rl'
-    # in_out = None
+    post_pend = ''
+    in_out = None
 
     in_out = [2048,128]
     post_pend = '_'.join([str(val) for val in in_out])
-    post_pend += '_rl_softmax_dot_rowNorm'
+    post_pend += '_noadd_rowdiv_mod_data'
 
     class_weights = True
     test_after = 10
+    
     all_classes = False
-    just_primary = False
+    just_primary = True
+    gt_vec = True
+
     model_nums = None
     
+
     second_thresh =0.5
     det_class = -1
     train_simple_mill_all_classes (model_name = model_name,
@@ -276,7 +300,8 @@ def super_simple_experiment():
                         post_pend = post_pend,
                         viz_sim = viz_sim,
                         test_post_pend = test_post_pend,
-                        in_out = in_out)
+                        in_out = in_out,
+                        gt_vec = gt_vec)
 
 def separate_supervision_experiment():
     # model_name = 'just_mill_2_1024'

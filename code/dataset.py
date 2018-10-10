@@ -10,6 +10,7 @@ import random
 
 class UCF_dataset(Dataset):
     def __init__(self, text_file, feature_limit):
+        self.anno_file = text_file
         self.files = util.readLinesFromFile(text_file)
         self.feature_limit = feature_limit
 
@@ -46,6 +47,62 @@ class UCF_dataset(Dataset):
         target = [item['label'] for item in batch]
         target = torch.FloatTensor(target)
         return {'features':data, 'label':target}
+
+class UCF_dataset_gt_vec(Dataset):
+    def __init__(self, text_file, feature_limit):
+        self.anno_file = text_file
+        self.files = util.readLinesFromFile(text_file)
+        self.feature_limit = feature_limit
+
+        
+    def __len__(self):
+        return len(self.files)
+
+    def __getitem__(self, idx):
+        train_file_curr = self.files[idx]
+        anno = train_file_curr.split(' ')
+        label = anno[2:]
+        train_file_curr = anno[0]
+        gt_file_curr = anno[1]
+        # print gt_file_curr,label
+
+        label =np.array([int(label) for label in label]).astype(float)
+        label = label/np.sum(label)
+
+        sample = np.load(train_file_curr)
+        gt_vec = np.load(gt_file_curr)
+        assert sample.shape[0]==gt_vec.shape[0]
+
+        if sample.shape[0]>self.feature_limit and self.feature_limit is not None:
+            sample_big = sample
+            gt_vec_big = gt_vec
+
+            while True:
+                idx_start = sample_big.shape[0] - self.feature_limit
+                idx_start = np.random.randint(idx_start+1)
+                sample = sample_big[idx_start:idx_start+self.feature_limit]
+                gt_vec = gt_vec_big[idx_start:idx_start+self.feature_limit]
+                if np.sum(gt_vec)>0:
+                    break
+                assert sample.shape[0]==self.feature_limit
+        
+
+
+        # image = Image.open(train_file_curr)
+
+        sample = {'features': sample, 'label': label, 'gt_vec': gt_vec}
+        # if self.transform:
+        # sample['image'] = self.transform(sample['image'])
+
+        return sample
+
+    def collate_fn(self,batch):
+        data = [torch.FloatTensor(item['features']) for item in batch]
+        gt_vec = [torch.FloatTensor(item['gt_vec']) for item in batch]
+        target = [item['label'] for item in batch]
+        target = torch.FloatTensor(target)
+        return {'features':data, 'label':target, 'gt_vec':gt_vec}
+
 
 
 def main():
