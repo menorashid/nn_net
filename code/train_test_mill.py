@@ -68,6 +68,10 @@ def test_model_core(model, test_dataloader, criterion, log_arr, multibranch = 1)
             for idx_sample, sample in enumerate(samples):
                 if 'perfectg' in model_name:
                     out,pmf = model.forward([sample.cuda(),batch['gt_vec'][idx_sample].cuda()])
+                elif 'multi_video' in model_name:
+                    out,preds_mini = model.forward(samples)
+                    preds+=[torch.nn.functional.softmax(pmf).data.cpu().numpy() for pmf in preds_mini]
+                    break
                 else:
                     out,pmf = model.forward(sample.cuda())
             
@@ -330,7 +334,10 @@ def visualize_dets(model, test_dataloader, dir_viz, first_thresh , second_thresh
                 class_idx_gt = class_idx
 
             if det_class>=-1:
-                bin_not_keep = pmf<first_thresh
+                if first_thresh==-1:
+                    bin_not_keep = labels[idx_sample].data.cpu().numpy()==0
+                else:
+                    bin_not_keep = pmf<first_thresh
                 # print pmf
                 # print bin_not_keep
                 # print class_idx
@@ -442,12 +449,14 @@ def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh ,
             pmf = pmf.data.cpu().numpy()
             out = out.data.cpu().numpy()
 
-
-            bin_not_keep = pmf<first_thresh
+            if first_thresh==-1:
+                bin_not_keep = labels[idx_sample].data.cpu().numpy()==0
+            else:
+                bin_not_keep = pmf<first_thresh
+            
             # print np.min(pmf), np.max(pmf)
             for class_idx in range(pmf.size):
                 if bin_not_keep[class_idx]:
-                    # print 'PROBLEM'
                     continue
 
                 det_conf = out[:,class_idx]
@@ -572,7 +581,7 @@ def visualize_sim_mat(out_dir_train,
     
 
     model = torch.load(model_file)
-    
+
     if batch_size_val is None:
         batch_size_val = len(test_data)
 
@@ -747,6 +756,9 @@ def train_model(out_dir_train,
                         out,pmf = model.forward(sample.cuda(), epoch_num=num_epoch)
                     elif 'perfectG' in model_name:
                         out,pmf = model.forward([sample.cuda(),batch['gt_vec'][idx_sample].cuda()])
+                    elif 'multi_video' in model_name:
+                        out,preds = model.forward(samples)
+                        break
                     else:    
                         out,pmf = model.forward(sample.cuda())
 
@@ -768,7 +780,7 @@ def train_model(out_dir_train,
             loss.backward()
             optimizer.step()
 
-            model.printGraphGrad()
+            # model.printGraphGrad()
             # grad_rel = model.graph_layers[0].graph_layer.weight.grad
             # print torch.min(grad_rel).data.cpu().numpy(), torch.max(grad_rel).data.cpu().numpy()
 

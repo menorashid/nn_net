@@ -2,12 +2,9 @@ from torchvision import models
 import torch.nn as nn
 import torch
 import torch.nn.functional as F
-# from graph_layer_sim_feat_dot_softmax import Graph_Layer
-# from graph_layer_sim_feat_input_cosine import Graph_Layer
-# from graph_layer_sim_feat_input_cosine import Graph_Layer_Wrapper
-# from normalize import Normalize
-
 from graph_layer_input_f_cos_row_div_max_self_con import Graph_Layer
+from graph_layer_input_f_cos_row_div_max_self_con import Graph_Layer_Wrapper
+from normalize import Normalize
 
 class Graph_Sim_Mill(nn.Module):
     def __init__(self, n_classes, deno, in_out = None):
@@ -29,28 +26,21 @@ class Graph_Sim_Mill(nn.Module):
         print 'NUM LAYERS', num_layers, in_out
 
         
-        self.linear_layer = nn.Linear(2048, 20, bias = True)
-        
-        model_file = '../experiments/just_mill_one_layer_ucf/all_classes_False_just_primary_False_deno_8_limit_500_cw_True_MultiCrossEntropy_100_step_100_0.1_0.001/model_99.pt'
+        self.linear_layer = nn.Linear(2048, in_out[1], bias = False)
+        # for param in self.linear_layer.parameters():
+        #     param.requires_grad = False
+
+        # model_file = '../experiments/just_mill_ht_unit_norm_no_bias_ucf/all_classes_False_just_primary_False_deno_8_limit_500_cw_True_MultiCrossEntropy_100_step_100_0.1_0.001/model_99.pt'
+
+        model_file = '../experiments/just_mill_relu_unit_norm_no_bias_ucf/all_classes_False_just_primary_False_deno_8_limit_500_cw_True_MultiCrossEntropy_100_step_100_0.1_0.0001_128/model_99.pt'
 
         model_temp = torch.load(model_file)
-        # print self.linear_layer.weight.data.size()
-        # print self.linear_layer.bias.data.size()
-        # print model_temp.features[1].weight.data.size()
-        # print model_temp.features[1].bias.data.size()
-
-
-        self.linear_layer.weight.data = model_temp.features[1].weight.data
-        self.linear_layer.bias.data = model_temp.features[1].bias.data
-
-        # print self.linear_layer.weight.data.size()
-        # print self.linear_layer.bias.data.size()
+        self.linear_layer.weight.data = model_temp.linear.weight.data
         
-        # raw_input()
         
         self.graph_layers = nn.ModuleList()
         for num_layer in range(num_layers): 
-            self.graph_layers.append(Graph_Layer(in_out[num_layer],in_out[num_layer+1]))
+            self.graph_layers.append(Graph_Layer_Wrapper(in_out[num_layer],in_out[num_layer+1], non_lin))
         
         
         
@@ -81,8 +71,6 @@ class Graph_Sim_Mill(nn.Module):
         x = self.last_layer(input_graph)
         pmf = self.make_pmf(x)
         
-        # x = features_out
-        # pmf = self.make_pmf(x)
 
         if ret_bg:
             return x, pmf, None
@@ -104,7 +92,7 @@ class Graph_Sim_Mill(nn.Module):
         return sim_mat
     
     def printGraphGrad(self):
-        grad_rel = self.graph_layers[0].weight.grad
+        grad_rel = self.graph_layers[0].graph_layer.weight.grad
         print torch.min(grad_rel).data.cpu().numpy(), torch.max(grad_rel).data.cpu().numpy()
 
 

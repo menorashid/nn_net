@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch
 import torch.nn.functional as F
 import math
+import numpy as np
 
 class Graph_Layer(nn.Module):
     def __init__(self,in_size, n_out = None):
@@ -33,13 +34,21 @@ class Graph_Layer(nn.Module):
         return out
 
     def get_affinity(self,input):
+        # input = torch.Tensor(np.array([0,1,0,0,1])).cuda()
         input = input.view(input.size(0),1)   
-        # class_idx = torch.max(input).cpu().numpy()
-        # print torch.min(input), torch.max(input)
         input = input/max(1.,torch.max(input))
-        # print torch.min(input), torchvisionh.max(input)
         
         G = torch.mm(input,torch.t(input)) 
+        
+        # bg = (input+1)%2 
+        # G_bg = torch.mm(bg,torch.t(bg)) 
+        # G = G+G_bg
+
+        # G[bg[:,0]>0,:]=1
+
+        # G_bg = torch.eye(G.size(0)).cuda()
+        # G = torch.max(G_bg,G)
+
         # if torch.max(G)==0:
            # print class_idx 
            # G = G+  torch.eye(input.size(0)).cuda()
@@ -74,6 +83,14 @@ class Graph_Layer(nn.Module):
         sums[sums==0]=1.
         G = G/sums
         
+        # print input.data.cpu().numpy()
+        # print bg.data.cpu().numpy()
+        # print G
+
+        
+        # raw_input()
+
+
         return G
 
 

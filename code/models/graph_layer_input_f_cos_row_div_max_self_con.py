@@ -33,11 +33,24 @@ class Graph_Layer(nn.Module):
         return out
 
     def get_affinity(self,input):
-        
         input = F.normalize(input)
+        # input = input[:5]
+
         G = torch.mm(input,torch.t(input)) 
+        
+        # set diag to zero
+        eye_inv = (torch.eye(G.size(0)).cuda()+1) % 2
+        G = G*eye_inv
+        # print G
+
+        # set diag to max of every row
+        # G = G+torch.diagflat(torch.max(G,dim = 1)[0])
+        # print G
+
 
         G = G/torch.sum(G,dim = 1, keepdim = True)
+        # print G
+        # raw_input()
 
         return G
 

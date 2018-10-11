@@ -78,6 +78,7 @@ def train_simple_mill_all_classes(model_name,
                                     viz_mode = False,
                                     det_class = -1,
                                     second_thresh = 0.5,
+                                    first_thresh = 0,
                                     post_pend = '',
                                     viz_sim = False,
                                     test_post_pend = '', 
@@ -86,7 +87,8 @@ def train_simple_mill_all_classes(model_name,
                                     branch_to_test = 0,
                                     num_switch = None,
                                     in_out = None, 
-                                    gt_vec = False):
+                                    gt_vec = False,
+                                    graph_size = None):
 
     out_dir_meta = '../experiments/'+model_name+'_'+dataset
     util.mkdir(out_dir_meta)
@@ -154,6 +156,8 @@ def train_simple_mill_all_classes(model_name,
         network_params['num_switch'] = num_switch
     if in_out is not None:
         network_params['in_out'] = in_out
+    if graph_size is not None:
+        network_params['graph_size'] = graph_size
     # print network_params
     # raw_input()
         
@@ -204,6 +208,7 @@ def train_simple_mill_all_classes(model_name,
                 visualize = False,
                 det_class = det_class,
                 second_thresh = second_thresh,
+                first_thresh = first_thresh,
                 post_pend=test_post_pend,
                 multibranch = multibranch,
                 branch_to_test =branch_to_test)
@@ -220,6 +225,7 @@ def train_simple_mill_all_classes(model_name,
                     visualize = True,
                     det_class = det_class,
                     second_thresh = second_thresh,
+                    first_thresh = first_thresh,
                     post_pend=test_post_pend,
                     multibranch = multibranch,
                     branch_to_test =branch_to_test)
@@ -230,13 +236,16 @@ def train_simple_mill_all_classes(model_name,
                     batch_size_val = batch_size_val,
                     gpu_id = gpu_id,
                     num_workers = 0,
-                    second_thresh = second_thresh)
+                    second_thresh = second_thresh,
+                    first_thresh = first_thresh)
             visualize_sim_mat(**test_params)
 
 def super_simple_experiment():
     # model_name = 'just_mill_relu_unit_norm_no_bias'
-    model_name = 'graph_perfectG'
-    # model_name = 'graph_pretrained_classifier_F'
+    # model_name = 'graph_perfectG'
+    # model_name = 'graph_pretrained_F_max_selfcon'
+    # model_name = 'graph_multi_video_pretrained_F_zero_self'
+    model_name = 'graph_pretrained_F'
     # model_name = 'graph_sim_direct_mill_cosine'
     # model_name = 'graph_sim_i3d_sim_mat_mill'
     # model_name = 'graph_sim_mill'
@@ -247,7 +256,7 @@ def super_simple_experiment():
 
     # lr = [0.001]
     lr = [0,0.001,0.001]
-    epoch_stuff = [100,100]
+    epoch_stuff = [200,200]
     dataset = 'ucf'
     limit  = 500
     deno = 8
@@ -264,7 +273,13 @@ def super_simple_experiment():
 
     in_out = [2048,128]
     post_pend = '_'.join([str(val) for val in in_out])
-    post_pend += '_noadd_rowdiv_mod_data'
+    graph_size = None
+    post_pend += '_dotnotcos'
+
+    # graph_size = 1
+    # post_pend += '_bw_32_bs_'+str(graph_size)
+    first_thresh=0
+
 
     class_weights = True
     test_after = 10
@@ -275,7 +290,7 @@ def super_simple_experiment():
 
     model_nums = None
     
-
+    
     second_thresh =0.5
     det_class = -1
     train_simple_mill_all_classes (model_name = model_name,
@@ -296,12 +311,14 @@ def super_simple_experiment():
                         retrain = retrain,
                         viz_mode = viz_mode,
                         second_thresh = second_thresh,
+                        first_thresh = first_thresh,
                         det_class = det_class,
                         post_pend = post_pend,
                         viz_sim = viz_sim,
                         test_post_pend = test_post_pend,
                         in_out = in_out,
-                        gt_vec = gt_vec)
+                        gt_vec = gt_vec,
+                        graph_size = graph_size)
 
 def separate_supervision_experiment():
     # model_name = 'just_mill_2_1024'
