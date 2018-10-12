@@ -40,9 +40,12 @@ class Graph_Layer(nn.Module):
         
         G = torch.mm(input,torch.t(input)) 
         
-        # bg = (input+1)%2 
-        # G_bg = torch.mm(bg,torch.t(bg)) 
-        # G = G+G_bg
+        bg = (input+1)%2 
+        G_bg = torch.mm(bg,torch.t(bg)) 
+        G = G+G_bg
+
+        inv_eye = (torch.eye(G.size(0)).cuda()+1)%2
+        G = G*inv_eye
 
         # G[bg[:,0]>0,:]=1
 
@@ -85,7 +88,7 @@ class Graph_Layer(nn.Module):
         
         # print input.data.cpu().numpy()
         # print bg.data.cpu().numpy()
-        # print G
+        # print G[:5,:5]
 
         
         # raw_input()

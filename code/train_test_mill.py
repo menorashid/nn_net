@@ -525,6 +525,9 @@ def test_model(out_dir_train,
     log_arr=[]
 
     model = torch.load(model_file)
+    # print model
+    # print model.graph_layers[0].graph_layer
+    # return
     if multibranch==1 and branch_to_test>-1:
         model.focus = branch_to_test
     

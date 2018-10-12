@@ -33,10 +33,11 @@ class Graph_Layer(nn.Module):
         return out
 
     def get_affinity(self,input):
-        
+        # print 'hello'
+        # raw_input()
         input = F.normalize(input)
         G = torch.mm(input,torch.t(input)) 
-
+        # G = self.Softmax(G)
         G = G/torch.sum(G,dim = 1, keepdim = True)
 
         return G

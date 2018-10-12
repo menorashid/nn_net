@@ -21,33 +21,39 @@ class Graph_Sim_Mill(nn.Module):
             in_out = [2048,2048]
         # in_out = [2048,512,2048]
         num_layers = len(in_out)-1
-        non_lin = 'rl'
+        
 
         print 'NUM LAYERS', num_layers, in_out
 
         
-        self.linear_layer = nn.Linear(2048, in_out[1], bias = False)
+        self.linear_layer = nn.Linear(2048, 2048, bias = False)
         # for param in self.linear_layer.parameters():
         #     param.requires_grad = False
 
-        model_file = '../experiments/just_mill_ht_unit_norm_no_bias_ucf/all_classes_False_just_primary_False_deno_8_limit_500_cw_True_MultiCrossEntropy_100_step_100_0.1_0.001/model_99.pt'
+        # model_file = '../experiments/just_mill_ht_unit_norm_no_bias_ucf/all_classes_False_just_primary_False_deno_8_limit_500_cw_True_MultiCrossEntropy_100_step_100_0.1_0.001/model_99.pt'
+        model_file = '../experiments/just_mill_ht_unit_norm_no_bias_fix_ucf/all_classes_False_just_primary_False_deno_8_limit_500_cw_True_MultiCrossEntropy_100_step_100_0.1_0.001_0.001_0.001__retry/model_99.pt'
+        non_lin = 'HT'
 
         # model_file = '../experiments/just_mill_relu_unit_norm_no_bias_ucf/all_classes_False_just_primary_False_deno_8_limit_500_cw_True_MultiCrossEntropy_100_step_100_0.1_0.0001_128/model_99.pt'
+        # non_lin = 'rl'
 
         model_temp = torch.load(model_file)
+        # print model_temp.linear.weight.data.size()
+        # print self.linear_layer.weight.data.size()
+        # raw_input()
         self.linear_layer.weight.data = model_temp.linear.weight.data
-        
+        self.linear_layer.weight.require_grad = False
         
         self.graph_layers = nn.ModuleList()
         for num_layer in range(num_layers): 
             self.graph_layers.append(Graph_Layer_Wrapper(in_out[num_layer],in_out[num_layer+1], non_lin))
         
         
-        
+        # self.non_lin = nn.Hardtanh()
         last_layer = []
         
-        last_layer.append(nn.ReLU())
-        # last_layer.append(Normalize())
+        last_layer.append(nn.Hardtanh())
+        last_layer.append(Normalize())
         last_layer.append(nn.Dropout(0.5))
         last_layer.append(nn.Linear(in_out[-1],n_classes))
         last_layer = nn.Sequential(*last_layer)
@@ -64,9 +70,9 @@ class Graph_Sim_Mill(nn.Module):
         for idx_graph_layer,graph_layer in enumerate(self.graph_layers):
             input_graph = graph_layer(input_graph, features_out)
 
-        # feature_curr = self.non_lin(input_graph)
+        # input_graph = self.non_lin(input_graph)
         # # if idx==0:
-        # feature_curr = F.normalize(feature_curr)
+        # input_graph = F.normalize(input_graph)
 
         x = self.last_layer(input_graph)
         pmf = self.make_pmf(x)

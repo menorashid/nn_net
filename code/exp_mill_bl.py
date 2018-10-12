@@ -241,11 +241,12 @@ def train_simple_mill_all_classes(model_name,
             visualize_sim_mat(**test_params)
 
 def super_simple_experiment():
-    # model_name = 'just_mill_relu_unit_norm_no_bias'
+    # model_name = 'just_mill_ht_unit_norm_no_bias_fix'
     # model_name = 'graph_perfectG'
     # model_name = 'graph_pretrained_F_max_selfcon'
-    # model_name = 'graph_multi_video_pretrained_F_zero_self'
-    model_name = 'graph_pretrained_F'
+    model_name = 'graph_multi_video_pretrained_F_zero_self'
+    # model_name = 'graph_multi_video_pretrained_F'
+    # model_name = 'graph_pretrained_F'
     # model_name = 'graph_sim_direct_mill_cosine'
     # model_name = 'graph_sim_i3d_sim_mat_mill'
     # model_name = 'graph_sim_mill'
@@ -263,21 +264,21 @@ def super_simple_experiment():
     save_after = 25
     
     test_mode = False
-    retrain = False
+    retrain = True
     viz_mode = False
     viz_sim = False
     test_post_pend = ''
 
-    post_pend = ''
+    post_pend = '_retry'
     in_out = None
 
     in_out = [2048,128]
     post_pend = '_'.join([str(val) for val in in_out])
-    graph_size = None
-    post_pend += '_dotnotcos'
+    # graph_size = None
+    # post_pend += '_new_model_fix_ht_cos_norm'
 
-    # graph_size = 1
-    # post_pend += '_bw_32_bs_'+str(graph_size)
+    graph_size = 1
+    post_pend += '_bw_32_bs_'+str(graph_size)
     first_thresh=0
 
 
@@ -285,8 +286,8 @@ def super_simple_experiment():
     test_after = 10
     
     all_classes = False
-    just_primary = True
-    gt_vec = True
+    just_primary = False
+    gt_vec = False
 
     model_nums = None
     
