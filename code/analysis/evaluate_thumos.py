@@ -5,7 +5,7 @@ import numpy as np
 import scipy.io
 import glob
 from helpers import util, visualize
-
+import globals as globals
 
 def interval_single_overlap_val_seconds(i1, i2, norm_type = 0):
     i1 = [np.min(i1), np.max(i1)]
@@ -164,16 +164,68 @@ def event_det_pr(det_vid_names, det_time_intervals, det_class_names, det_conf, g
     ap = pr_ap(rec, prec)
     return rec, prec, ap
         
+def load_activitynet_gt(train):
+    dir_gt = '../data/activitynet/gt_npys'
+    if train:
+        anno_file = os.path.join(dir_gt, 'train.npz')
+    else:
+        anno_file = os.path.join(dir_gt, 'val.npz')
+
+    data = np.load(anno_file)
+    gt_class_names = data['gt_class_names']
+    gt_vid_names = data['gt_vid_names']
+    gt_time_intervals = data['gt_time_intervals']
+    gt_class_names = [str(val) for val in gt_class_names]
+    gt_vid_names = [str(val) for val in gt_vid_names]
+
+    print type(gt_class_names),type(gt_class_names[0]),len(gt_class_names),gt_class_names[0]
+    print type(gt_vid_names),type(gt_vid_names[0]),len(gt_vid_names),gt_vid_names[0]
+    print gt_time_intervals.shape,gt_time_intervals[0]
+    
+    return gt_vid_names, gt_class_names, gt_time_intervals
+
+def load_ucf_gt(train):
+    class_name = 'BaseballPitch'
+    if train:
+        mat_file = os.path.join('../TH14evalkit',class_name+'.mat')
+    else:
+        mat_file = os.path.join('../TH14evalkit','mat_files', class_name+'_test.mat')
+
+    loaded = scipy.io.loadmat(mat_file)
+    
+    gt_vid_names = loaded['gtvideonames'][0]
+    gt_class_names = loaded['gt_events_class'][0]
+    gt_time_intervals = loaded['gt_time_intervals'][0]
+    
+    arr_meta = [gt_vid_names, gt_class_names]
+
+    arr_out = []
+    for arr_curr in arr_meta:
+        arr_curr = [str(a[0]) for a in arr_curr]
+        arr_out.append(arr_curr)
+
+    [gt_vid_names, gt_class_names] = arr_out
+    gt_time_intervals = np.array([a[0] for a in gt_time_intervals])
+    return gt_vid_names, gt_class_names, gt_time_intervals
+
+def test_overlap(det_vid_names_all, det_conf_all, det_time_intervals_all, second_thresh, train=False, log_arr = [], dataset = 'ucf'):
+    
+    if dataset =='ucf':
+        # class_names = ['BaseballPitch', 'BasketballDunk', 'Billiards', 'CleanAndJerk', 'CliffDiving', 'CricketBowling', 'CricketShot', 'Diving', 'FrisbeeCatch', 'GolfSwing', 'HammerThrow', 'HighJump', 'JavelinThrow', 'LongJump', 'PoleVault', 'Shotput', 'SoccerPenalty', 'TennisSwing', 'ThrowDiscus', 'VolleyballSpiking']
+        # class_names.sort()
+        class_names = globals.class_names_ucf
+        gt_vid_names, gt_class_names, gt_time_intervals = load_ucf_gt(train)
+        aps = np.zeros((len(class_names)+1,5))
+        overlap_thresh_all = np.arange(0.1,0.6,0.1)
+    elif dataset =='activitynet':
+        class_names = globals.class_names_activitynet
+        gt_vid_names, gt_class_names, gt_time_intervals = load_activitynet_gt(train)
+        overlap_thresh_all = np.array([0.5,0.75,0.95])
+        aps = np.zeros((len(class_names)+1,overlap_thresh_all.size))
+    else:
+        Exception('Problem. '+dataset+' not valid')
 
 
-
-
-def test_overlap(det_vid_names_all, det_conf_all, det_time_intervals_all, second_thresh, train=False, log_arr = []):
-    class_names = ['BaseballPitch', 'BasketballDunk', 'Billiards', 'CleanAndJerk', 'CliffDiving', 'CricketBowling', 'CricketShot', 'Diving', 'FrisbeeCatch', 'GolfSwing', 'HammerThrow', 'HighJump', 'JavelinThrow', 'LongJump', 'PoleVault', 'Shotput', 'SoccerPenalty', 'TennisSwing', 'ThrowDiscus', 'VolleyballSpiking']
-    class_names.sort()
-
-    aps = np.zeros((len(class_names)+1,5))
-    overlap_thresh_all = np.arange(0.1,0.6,0.1)
     
     str_print = '\t'.join(['Overlap\t']+['%.1f' % ov for ov in overlap_thresh_all])
     print str_print
@@ -181,26 +233,6 @@ def test_overlap(det_vid_names_all, det_conf_all, det_time_intervals_all, second
         # if idx_class_name<6:
         #     continue
 
-        if train:
-            mat_file = os.path.join('../TH14evalkit',class_name+'.mat')
-        else:
-            mat_file = os.path.join('../TH14evalkit','mat_files', class_name+'_test.mat')
-
-        loaded = scipy.io.loadmat(mat_file)
-        
-        gt_vid_names = loaded['gtvideonames'][0]
-        gt_class_names = loaded['gt_events_class'][0]
-        gt_time_intervals = loaded['gt_time_intervals'][0]
-        
-        arr_meta = [gt_vid_names, gt_class_names]
-
-        arr_out = []
-        for arr_curr in arr_meta:
-            arr_curr = [str(a[0]) for a in arr_curr]
-            arr_out.append(arr_curr)
-
-        [gt_vid_names, gt_class_names] = arr_out
-        gt_time_intervals = np.array([a[0] for a in gt_time_intervals])
         
 
         bin_keep = second_thresh == idx_class_name
@@ -240,7 +272,7 @@ def test_overlap(det_vid_names_all, det_conf_all, det_time_intervals_all, second
     log_arr.append(str_print)
     # print log_arr[-1]
     for idx_class_name, class_name in enumerate(class_names):
-        if len(class_name)<8:
+        if len(class_name)<8 and dataset=='ucf':
             class_name +='\t'
         str_print = [class_name]+['%.2f' % ap_curr for ap_curr in aps[idx_class_name,:]]
         str_print = '\t'.join(str_print)
@@ -391,10 +423,56 @@ def viz_overlap(out_dir_meta, det_vid_names, det_conf_all, det_time_intervals_al
 
 
 
+def testing_gt_mat():
+    class_names = ['BaseballPitch', 'BasketballDunk', 'Billiards', 'CleanAndJerk', 'CliffDiving', 'CricketBowling', 'CricketShot', 'Diving', 'FrisbeeCatch', 'GolfSwing', 'HammerThrow', 'HighJump', 'JavelinThrow', 'LongJump', 'PoleVault', 'Shotput', 'SoccerPenalty', 'TennisSwing', 'ThrowDiscus', 'VolleyballSpiking']
+    class_names.sort()
+    train = False
+
+    for idx_class_name, class_name in enumerate(class_names):
+        
+        if train:
+            mat_file = os.path.join('../TH14evalkit',class_name+'.mat')
+        else:
+            mat_file = os.path.join('../TH14evalkit','mat_files', class_name+'_test.mat')
+        print 'TRAIN',train,mat_file
+
+        loaded = scipy.io.loadmat(mat_file)
+        
+        gt_vid_names = loaded['gtvideonames'][0]
+        gt_class_names = loaded['gt_events_class'][0]
+        gt_time_intervals = loaded['gt_time_intervals'][0]
+        
+        arr_meta = [gt_vid_names, gt_class_names]
+
+        arr_out = []
+        for arr_curr in arr_meta:
+            arr_curr = [str(a[0]) for a in arr_curr]
+            arr_out.append(arr_curr)
+
+        [gt_vid_names, gt_class_names] = arr_out
+        
+        gt_vid_names = np.array(gt_vid_names)
+        gt_class_names = np.array(gt_class_names)
+        gt_time_intervals = np.array([a[0] for a in gt_time_intervals])
+        if idx_class_name>0:
+            print np.all(gt_vid_names_old==gt_vid_names)
+            print np.all(gt_class_names_old==gt_class_names)
+            print np.all(gt_time_intervals_old==gt_time_intervals)
+
+        gt_vid_names_old = gt_vid_names
+        gt_time_intervals_old = gt_time_intervals
+        gt_class_names_old = gt_class_names
+
+
+
+
 def main():
     print 'hello'
     # test_ov()
-    test_event_det_pr()
+    # test_event_det_pr()
+    # testing_gt_mat()
+
+    # load_activitynet_gt(False)
 
 
 

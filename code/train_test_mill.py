@@ -380,7 +380,7 @@ def visualize_dets(model, test_dataloader, dir_viz, first_thresh , second_thresh
 
 
 
-def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh , second_thresh , bin_trim = None , multibranch =1, branch_to_test = -1):
+def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh , second_thresh , bin_trim = None , multibranch =1, branch_to_test = -1,dataset = 'ucf'):
 
     # print 'FIRST THRESH', first_thresh
     # print 'SECOND THRESH', second_thresh
@@ -487,7 +487,7 @@ def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh ,
     # np.savez('../scratch/debug_det_graph.npz', det_vid_names = det_vid_names, det_conf = det_conf, det_time_intervals = det_time_intervals, det_events_class = det_events_class)
     # raw_input()
 
-    aps = et.test_overlap(det_vid_names, det_conf, det_time_intervals,det_events_class,log_arr = log_arr)
+    aps = et.test_overlap(det_vid_names, det_conf, det_time_intervals,det_events_class,log_arr = log_arr, dataset = dataset)
     
     return aps
         
@@ -506,7 +506,8 @@ def test_model(out_dir_train,
                 visualize = False,
                 det_class = -1, 
                 multibranch = 1,
-                branch_to_test = -1):
+                branch_to_test = -1,
+                dataset = 'ucf'):
     
     out_dir_results = os.path.join(out_dir_train,'results_model_'+str(model_num)+post_pend+'_'+str(first_thresh)+'_'+str(second_thresh))
     
@@ -557,7 +558,7 @@ def test_model(out_dir_train,
         bin_trim = None
         
     if not visualize:
-        aps = test_model_overlap(model, test_dataloader, criterion, log_arr ,first_thresh = first_thresh, second_thresh = second_thresh, bin_trim = bin_trim, multibranch = multibranch, branch_to_test = branch_to_test)
+        aps = test_model_overlap(model, test_dataloader, criterion, log_arr ,first_thresh = first_thresh, second_thresh = second_thresh, bin_trim = bin_trim, multibranch = multibranch, branch_to_test = branch_to_test,dataset = dataset)
         np.save(out_file, aps)
         util.writeFile(log_file, log_arr)
     else:

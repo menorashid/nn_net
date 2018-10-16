@@ -12,41 +12,56 @@ def get_data(dataset, limit, all_classes, just_primary, gt_vec):
 
     if dataset =='ucf':
         dir_files = '../data/ucf101/train_test_files'
+        n_classes = 20
+        trim_preds = None
+        post_pends = ['','','']
+        train_file = os.path.join(dir_files, 'train')
+        test_train_file = os.path.join(dir_files, 'test')
+        test_file = os.path.join(dir_files, 'test')
+            
+        files = [train_file, test_train_file, test_file]
+
+        if all_classes:
+            n_classes = 101
+            post_pends = [pp+val for pp,val in zip(post_pends,['_all','_all',''])]
+            classes_all_list = util.readLinesFromFile(os.path.join(dir_files,'classes_all_list.txt'))
+            classes_rel_list = util.readLinesFromFile(os.path.join(dir_files,'classes_rel_list.txt'))
+            trim_preds = [classes_all_list,classes_rel_list]
+
+        if just_primary:
+            post_pends = [pp+val for pp,val in zip(post_pends,['_just_primary','_just_primary','_just_primary'])]
         
+        if gt_vec:
+            post_pends = [pp+val for pp,val in zip(post_pends,['_gt_vec','_gt_vec','_gt_vec'])]
 
-
-    n_classes = 20
-    trim_preds = None
-    post_pends = ['','','']
-    train_file = os.path.join(dir_files, 'train')
-    test_train_file = os.path.join(dir_files, 'test')
-    test_file = os.path.join(dir_files, 'test')
+        post_pends = [pp+'.txt' for pp in post_pends]
+        files = [file_curr+pp for file_curr,pp in zip(files,post_pends)]
         
-    files = [train_file, test_train_file, test_file]
+        train_file, test_train_file, test_file = files
+        if gt_vec:
+            train_data = UCF_dataset_gt_vec(train_file, limit)
+            test_train_data = UCF_dataset_gt_vec(test_train_file, limit)
+            test_data = UCF_dataset_gt_vec(test_file, None)
+        else:
+            # all_classes
+            train_data = UCF_dataset(train_file, limit)
+            test_train_data = UCF_dataset(test_train_file, limit)
+            test_data = UCF_dataset(test_file, None)
+    elif dataset =='activitynet':
+        dir_files = '../data/activitynet/train_test_files'
+        n_classes = 100
+        trim_preds = None
+        post_pends = ['','','']
+        train_file = os.path.join(dir_files, 'train')
+        test_train_file = os.path.join(dir_files, 'val')
+        test_file = os.path.join(dir_files, 'val')
+            
+        files = [train_file, test_train_file, test_file]
 
-    if all_classes:
-        n_classes = 101
-        post_pends = [pp+val for pp,val in zip(post_pends,['_all','_all',''])]
-        classes_all_list = util.readLinesFromFile(os.path.join(dir_files,'classes_all_list.txt'))
-        classes_rel_list = util.readLinesFromFile(os.path.join(dir_files,'classes_rel_list.txt'))
-        trim_preds = [classes_all_list,classes_rel_list]
-
-    if just_primary:
-        post_pends = [pp+val for pp,val in zip(post_pends,['_just_primary','_just_primary','_just_primary'])]
-    
-    if gt_vec:
-        post_pends = [pp+val for pp,val in zip(post_pends,['_gt_vec','_gt_vec','_gt_vec'])]
-
-    post_pends = [pp+'.txt' for pp in post_pends]
-    files = [file_curr+pp for file_curr,pp in zip(files,post_pends)]
-    
-    train_file, test_train_file, test_file = files
-    if gt_vec:
-        train_data = UCF_dataset_gt_vec(train_file, limit)
-        test_train_data = UCF_dataset_gt_vec(test_train_file, limit)
-        test_data = UCF_dataset_gt_vec(test_file, None)
-    else:
-        # all_classes
+        post_pends = [pp+'.txt' for pp in post_pends]
+        files = [file_curr+pp for file_curr,pp in zip(files,post_pends)]
+        
+        train_file, test_train_file, test_file = files
         train_data = UCF_dataset(train_file, limit)
         test_train_data = UCF_dataset(test_train_file, limit)
         test_data = UCF_dataset(test_file, None)
@@ -211,7 +226,8 @@ def train_simple_mill_all_classes(model_name,
                 first_thresh = first_thresh,
                 post_pend=test_post_pend,
                 multibranch = multibranch,
-                branch_to_test =branch_to_test)
+                branch_to_test =branch_to_test,
+                dataset = dataset)
         test_model(**test_params)
         if viz_mode:
             test_params = dict(out_dir_train = out_dir_train,
@@ -228,7 +244,8 @@ def train_simple_mill_all_classes(model_name,
                     first_thresh = first_thresh,
                     post_pend=test_post_pend,
                     multibranch = multibranch,
-                    branch_to_test =branch_to_test)
+                    branch_to_test =branch_to_test,
+                    dataset = dataset)
             test_model(**test_params)
             test_params = dict(out_dir_train = out_dir_train,
                     model_num = model_num,
@@ -241,10 +258,10 @@ def train_simple_mill_all_classes(model_name,
             visualize_sim_mat(**test_params)
 
 def super_simple_experiment():
-    # model_name = 'just_mill_ht_unit_norm_no_bias_fix'
+    model_name = 'just_mill_ht_unit_norm_no_bias_fix'
     # model_name = 'graph_perfectG'
     # model_name = 'graph_pretrained_F_max_selfcon'
-    model_name = 'graph_multi_video_pretrained_F_zero_self'
+    # model_name = 'graph_multi_video_pretrained_F_zero_self'
     # model_name = 'graph_multi_video_pretrained_F'
     # model_name = 'graph_pretrained_F'
     # model_name = 'graph_sim_direct_mill_cosine'
@@ -256,29 +273,29 @@ def super_simple_experiment():
     # save_after = 5
 
     # lr = [0.001]
-    lr = [0,0.001,0.001]
-    epoch_stuff = [200,200]
-    dataset = 'ucf'
+    lr = [0.001,0.001,0.001]
+    epoch_stuff = [50,50]
+    dataset = 'activitynet'
     limit  = 500
     deno = 8
     save_after = 25
     
     test_mode = False
-    retrain = True
+    retrain = False
     viz_mode = False
     viz_sim = False
     test_post_pend = ''
 
-    post_pend = '_retry'
+    post_pend = ''
     in_out = None
 
-    in_out = [2048,128]
-    post_pend = '_'.join([str(val) for val in in_out])
-    # graph_size = None
+    # in_out = [2048,128]
+    # post_pend = '_'.join([str(val) for val in in_out])
+    graph_size = None
     # post_pend += '_new_model_fix_ht_cos_norm'
 
-    graph_size = 1
-    post_pend += '_bw_32_bs_'+str(graph_size)
+    # graph_size = 1
+    # post_pend += '_bw_32_bs_'+str(graph_size)
     first_thresh=0
 
 
@@ -286,7 +303,7 @@ def super_simple_experiment():
     test_after = 10
     
     all_classes = False
-    just_primary = False
+    just_primary = True
     gt_vec = False
 
     model_nums = None
