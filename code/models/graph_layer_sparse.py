@@ -17,31 +17,32 @@ class Graph_Layer(nn.Module):
         self.Softmax = nn.Softmax(dim = 1)
 
         
-    def forward(self, x, sim_feat):
+    def forward(self, x, sim_feat, k):
         G = self.get_affinity(sim_feat)
-        # if torch.min(G)<0:
-        #     print 'NEG G'
-        # norms = torch.norm(G, dim = 1)
-        # print torch.min(norms).data.cpu().numpy(), torch.max(norms).data.cpu().numpy()
-        # x = F.normalize(x)
-        # print sim_feat.size()
-        # print G.size()
-        # print x.size()
         temp = torch.mm(G,x)
-        # norms = torch.norm(temp, dim = 1)
-        # print torch.min(norms).data.cpu().numpy(), torch.max(norms).data.cpu().numpy()
-        # print '__'
         out = torch.mm(temp,self.weight)
         
         return out
 
     def get_affinity(self,input):
-        # print 'hello'
-        # raw_input()
         input = F.normalize(input)
+        # input = input[:5]
+
         G = torch.mm(input,torch.t(input)) 
-        # G = self.Softmax(G)
+        
+        # set diag to zero
+        eye_inv = (torch.eye(G.size(0)).cuda()+1) % 2
+        G = G*eye_inv
+        # print G
+
+        # set diag to max of every row
+        # G = G+torch.diagflat(torch.max(G,dim = 1)[0])
+        # print G
+
+
         G = G/torch.sum(G,dim = 1, keepdim = True)
+        # print G
+        # raw_input()
 
         return G
 

@@ -258,10 +258,12 @@ def train_simple_mill_all_classes(model_name,
             visualize_sim_mat(**test_params)
 
 def super_simple_experiment():
-    model_name = 'just_mill_ht_unit_norm_no_bias_fix'
+    # model_name = 'just_mill_ht_unit_norm_no_bias_fix_64'
     # model_name = 'graph_perfectG'
-    # model_name = 'graph_pretrained_F_max_selfcon'
-    # model_name = 'graph_multi_video_pretrained_F_zero_self'
+    # model_name = 'graph_pretrained_F_random'
+    # model_name = 'graph_pretrained_F_ucf_64'
+    # model_name = 'graph_pretrained_F_activitynet'
+    model_name = 'graph_multi_video_pretrained_F_ucf_64_zero_self'
     # model_name = 'graph_multi_video_pretrained_F'
     # model_name = 'graph_pretrained_F'
     # model_name = 'graph_sim_direct_mill_cosine'
@@ -273,15 +275,18 @@ def super_simple_experiment():
     # save_after = 5
 
     # lr = [0.001]
-    lr = [0.001,0.001,0.001]
-    epoch_stuff = [50,50]
-    dataset = 'activitynet'
+    torch.backends.cudnn.deterministic = True
+    torch.manual_seed(999)
+
+    lr = [0.0001,0.001,0.001]
+    epoch_stuff = [200,200]
+    dataset = 'ucf'
     limit  = 500
     deno = 8
     save_after = 25
     
     test_mode = False
-    retrain = False
+    retrain = True
     viz_mode = False
     viz_sim = False
     test_post_pend = ''
@@ -289,13 +294,14 @@ def super_simple_experiment():
     post_pend = ''
     in_out = None
 
-    # in_out = [2048,128]
-    # post_pend = '_'.join([str(val) for val in in_out])
-    graph_size = None
+    in_out = [2048,64]
+    post_pend = '_'.join([str(val) for val in in_out])
+    # post_pend += '_seeded'
+    # graph_size = None
     # post_pend += '_new_model_fix_ht_cos_norm'
 
-    # graph_size = 1
-    # post_pend += '_bw_32_bs_'+str(graph_size)
+    graph_size = 32
+    post_pend += '_bw_32_bs_'+str(graph_size)
     first_thresh=0
 
 
@@ -303,7 +309,7 @@ def super_simple_experiment():
     test_after = 10
     
     all_classes = False
-    just_primary = True
+    just_primary = False
     gt_vec = False
 
     model_nums = None
@@ -460,7 +466,7 @@ def scripts_comparative():
     create_comparative_viz(dirs, class_names, dir_strs, out_dir_html) 
 
 def main():
-
+    # print 'hello hello baby'
     # scripts_comparative()
     
     # separate_supervision_experiment()
