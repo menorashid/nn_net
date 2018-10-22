@@ -73,7 +73,7 @@ def get_data(dataset, limit, all_classes, just_primary, gt_vec):
 def train_simple_mill_all_classes(model_name,
                                     lr,
                                     dataset,
-                                    deno,
+                                    network_params,
                                     limit,
                                     epoch_stuff=[30,60],
                                     res=False,
@@ -100,13 +100,8 @@ def train_simple_mill_all_classes(model_name,
                                     multibranch = 1,
                                     loss_weights = None,
                                     branch_to_test = 0,
-                                    num_switch = None,
-                                    in_out = None, 
-                                    gt_vec = False,
-                                    graph_size = None):
+                                    gt_vec = False):
 
-    out_dir_meta = '../experiments/'+model_name+'_'+dataset
-    util.mkdir(out_dir_meta)
     num_epochs = epoch_stuff[1]
 
     # test_mode = test_mode or viz_mode or viz_sim
@@ -121,6 +116,8 @@ def train_simple_mill_all_classes(model_name,
 
     train_data, test_train_data, test_data, n_classes, trim_preds = get_data(dataset, limit, all_classes, just_primary, gt_vec)
     
+    network_params['n_classes']=n_classes
+
     train_file = train_data.anno_file
     
     print train_file
@@ -144,12 +141,28 @@ def train_simple_mill_all_classes(model_name,
 
 
     init = False
+    
 
-    strs_append_list = ['all_classes',all_classes,'just_primary',just_primary,'deno',deno,'limit',limit,'cw',class_weights, criterion_str, num_epochs]+dec_after+lr
+    out_dir_meta_str = [model_name]
+    for k in network_params.keys():
+        out_dir_meta_str.append(k)
+        if type(network_params[k])==type([]):
+            out_dir_meta_str.extend(network_params[k])
+        else:
+            out_dir_meta_str.append(network_params[k])
+    out_dir_meta_str.append(dataset)
+    out_dir_meta_str = '_'.join([str(val) for val in out_dir_meta_str])
+    
+    out_dir_meta = os.path.join('../experiments',out_dir_meta_str)
+    util.mkdir(out_dir_meta)
+    
+
+
+    strs_append_list = ['all_classes',all_classes,'just_primary',just_primary,'limit',limit,'cw',class_weights, criterion_str, num_epochs]+dec_after+lr
+    
     if loss_weights is not None:
         strs_append_list += ['lw']+loss_weights
-    if num_switch is not None:
-        strs_append_list += ['num_switch',num_switch]
+    
     strs_append_list+=[post_pend] if len(post_pend)>0 else []
     strs_append = '_'.join([str(val) for val in strs_append_list])
 
@@ -165,14 +178,15 @@ def train_simple_mill_all_classes(model_name,
         print 'not skipping', final_model_file
 
 
-    network_params = dict(n_classes=n_classes,deno = deno)
+    # network_params = dict(n_classes=n_classes,deno = deno)
 
-    if 'alt_train' in model_name:
-        network_params['num_switch'] = num_switch
-    if in_out is not None:
-        network_params['in_out'] = in_out
-    if graph_size is not None:
-        network_params['graph_size'] = graph_size
+    # if 'alt_train' in model_name:
+    #     network_params['num_switch'] = num_switch
+    # if in_out is not None:
+    #     network_params['in_out'] = in_out
+    # if graph_size is not None:
+    #     network_params['graph_size'] = graph_size
+    
     # print network_params
     # raw_input()
         
@@ -257,14 +271,17 @@ def train_simple_mill_all_classes(model_name,
                     first_thresh = first_thresh)
             visualize_sim_mat(**test_params)
 
+
+
 def super_simple_experiment():
-    # model_name = 'just_mill_ht_unit_norm_no_bias_fix_64'
+    # model_name = 'just_mill_flexible'
     # model_name = 'graph_perfectG'
     # model_name = 'graph_pretrained_F_random'
     # model_name = 'graph_pretrained_F_ucf_64'
     # model_name = 'graph_pretrained_F_activitynet'
-    model_name = 'graph_multi_video_pretrained_F_ucf_64_zero_self'
-    # model_name = 'graph_multi_video_pretrained_F'
+    # model_name = 'graph_multi_video_pretrained_F_ucf_64_zero_self'
+    # model_name = 'graph_multi_video_pretrained_F_flexible'
+    model_name = 'graph_multi_video_pretrained_F_flexible_alt_train'
     # model_name = 'graph_pretrained_F'
     # model_name = 'graph_sim_direct_mill_cosine'
     # model_name = 'graph_sim_i3d_sim_mat_mill'
@@ -274,19 +291,19 @@ def super_simple_experiment():
     # epoch_stuff = [25,25]
     # save_after = 5
 
-    # lr = [0.001]
+    
     torch.backends.cudnn.deterministic = True
     torch.manual_seed(999)
 
+    # lr = [0.001,0.001]
     lr = [0.0001,0.001,0.001]
-    epoch_stuff = [200,200]
+    epoch_stuff = [500,500]
     dataset = 'ucf'
     limit  = 500
-    deno = 8
     save_after = 25
     
-    test_mode = False
-    retrain = True
+    test_mode = True
+    retrain = False
     viz_mode = False
     viz_sim = False
     test_post_pend = ''
@@ -294,19 +311,36 @@ def super_simple_experiment():
     post_pend = ''
     in_out = None
 
-    in_out = [2048,64]
-    post_pend = '_'.join([str(val) for val in in_out])
+    network_params = {}
+    network_params['deno'] = 8
+    network_params['pretrained'] = 'ucf'
+    network_params['in_out'] = [2048,64,2048,64]
+    network_params['graph_size'] = 32
+    graph_size = 1
+    network_params['method'] = 'cos'
+    network_params['num_switch'] = 5
+    network_params['focus'] = 1
+    network_params['sparsify'] = True
+    
+
+    loss_weights = None
+    multibranch = 1
+    branch_to_test = 0
+
+    # in_out = [2048,64]
+    # post_pend = '_'.join([str(val) for val in in_out])
     # post_pend += '_seeded'
     # graph_size = None
     # post_pend += '_new_model_fix_ht_cos_norm'
 
-    graph_size = 32
-    post_pend += '_bw_32_bs_'+str(graph_size)
+    # graph_size = 32
+    # post_pend += '_bw_32_bs_'+str(graph_size)
     first_thresh=0
 
+    
 
     class_weights = True
-    test_after = 10
+    test_after = 1
     
     all_classes = False
     just_primary = False
@@ -320,7 +354,7 @@ def super_simple_experiment():
     train_simple_mill_all_classes (model_name = model_name,
                         lr = lr,
                         dataset = dataset,
-                        deno = deno,
+                        network_params = network_params,
                         limit = limit, 
                         epoch_stuff= epoch_stuff,
                         batch_size = 32,
@@ -340,9 +374,10 @@ def super_simple_experiment():
                         post_pend = post_pend,
                         viz_sim = viz_sim,
                         test_post_pend = test_post_pend,
-                        in_out = in_out,
                         gt_vec = gt_vec,
-                        graph_size = graph_size)
+                        loss_weights = loss_weights,
+                        multibranch = multibranch,
+                        branch_to_test = branch_to_test)
 
 def separate_supervision_experiment():
     # model_name = 'just_mill_2_1024'

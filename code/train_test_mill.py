@@ -756,7 +756,10 @@ def train_model(out_dir_train,
                     preds = [[] for i in range(multibranch)]
                 for idx_sample, sample in enumerate(samples):
                     # print labels[idx_sample]
-                    if 'alt_train' in model_name:
+                    if 'alt_train' in model_name and 'multi_video' in model_name:
+                        out,preds = model.forward(samples, epoch_num = num_epoch)
+                        break
+                    elif 'alt_train' in model_name:
                         out,pmf = model.forward(sample.cuda(), epoch_num=num_epoch)
                     elif 'perfectG' in model_name:
                         out,pmf = model.forward([sample.cuda(),batch['gt_vec'][idx_sample].cuda()])
