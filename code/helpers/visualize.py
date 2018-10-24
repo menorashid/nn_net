@@ -104,9 +104,15 @@ def createScatterOfDiffsAndDistances(diffs,title,xlabel,ylabel,out_file,dists=No
 
 
 def saveMatAsImage(mat,out_file):
-    plt.figure();
-    plt.imshow(mat);
-    plt.savefig(out_file);
+    fig = plt.figure();
+    # print list(np.where(mat[0,:]))
+    # plt.imshow(mat)
+    
+        # ,interpolation = 'nearest');
+    # plt.savefig(out_file);
+    # fig.savefig(out_file, format='png')
+    # , dpi=fig.dpi)
+    scipy.misc.imsave(out_file,mat)
     plt.close();
 
 

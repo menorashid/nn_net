@@ -46,8 +46,7 @@ class Graph_Layer(nn.Module):
 
         if to_keep is not None:
             
-            
-            topk, indices = torch.topk(G, 2)    
+            topk, indices = torch.topk(G, k=to_keep, dim =1)    
             G = G*0
             G = G.scatter(1, indices, topk)
 
@@ -69,7 +68,7 @@ class Graph_Layer_Wrapper(nn.Module):
         self.graph_layer = Graph_Layer(in_size, n_out = n_out, method = method)
         if non_lin=='HT':
             self.non_linearity = nn.Hardtanh()
-        elif non_lin=='rl':
+        elif non_lin.lower()=='rl':
             self.non_linearity = nn.ReLU()
         else:
             error_message = str('non_lin %s not recognized', non_lin)
@@ -80,5 +79,6 @@ class Graph_Layer_Wrapper(nn.Module):
         out = self.graph_layer(x, sim_feat, to_keep = to_keep)
         return out
 
-    def get_affinity(self,input):
-        return self.graph_layer.get_affinity(input)        
+    def get_affinity(self,input,to_keep = None):
+        input = self.non_linearity(input)
+        return self.graph_layer.get_affinity(input, to_keep = to_keep)        

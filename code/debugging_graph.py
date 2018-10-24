@@ -5,6 +5,8 @@ import glob
 from helpers import util, visualize
 import sklearn.metrics
 from globals import class_names
+import torch
+import exp_mill_bl as emb
 
 def softmax(x, axis):
     """Compute softmax values for each sets of scores in x."""
@@ -326,9 +328,70 @@ def script_make_gt_vecs():
 
         util.writeFile(new_file_curr, new_lines)
 
-    
+
+def check_graph():
+    # model_file = '../experiments/graph_multi_video_pretrained_F_flexible_alt_temp_train_normalize_True_True_non_lin_HT_sparsify_True_num_switch_5_5_graph_size_32_focus_1_deno_8_n_classes_20_in_out_2048_64_2048_64_method_cos_pretrained_ucf_ucf/all_classes_False_just_primary_False_limit_500_cw_True_MultiCrossEntropy_500_step_500_0.1_0.0001_0.001_0.001_FIXED/model_199.pt'
+    model_file = '../experiments/graph_multi_video_pretrained_F_flexible_alt_train_temp_normalize_True_True_non_lin_HT_sparsify_True_num_switch_5_5_graph_size_32_focus_1_deno_8_n_classes_20_in_out_2048_64_2048_64_method_cos_pretrained_ucf_ucf/all_classes_False_just_primary_False_limit_500_cw_True_MultiCrossEntropy_500_step_500_0.1_0.0001_0.001_0.001_FIXED/model_299.pt'
+
+    model_file = '../experiments/graph_multi_video_pretrained_F_flexible_alt_train_temp_normalize_True_True_non_lin_HT_sparsify_True_num_switch_5_5_graph_size_2_focus_1_deno_8_n_classes_20_in_out_2048_64_2048_64_method_cos_pretrained_ucf_ucf/all_classes_False_just_primary_False_limit_500_cw_True_MultiCrossEntropy_500_step_500_0.1_0.0001_0.001_0.001_ABS/model_499.pt'
+    model = torch.load(model_file)
+    model.eval()
+
+    train_data, test_train_data, test_data, n_classes, trim_preds = emb.get_data('ucf', 500, False, False, False)
+
+    print train_data.feature_limit
+    print test_data.feature_limit
+    test_data.feature_limit = 500
+    print test_data.feature_limit
+    test_dataloader = torch.utils.data.DataLoader(test_data, 
+                        batch_size = 3,
+                        collate_fn = test_data.collate_fn,
+                        shuffle = False, 
+                        num_workers = 1)
+    model.sparsify = True
+    for data in test_dataloader:
+        print data['label'].cpu().data.numpy()
+        affinity = model.get_similarity(data['features'])
+
+        affinity = affinity.cpu().data.numpy()
+        # affinity = np.zeros(affinity.shape)
+        print np.min(affinity), np.max(affinity)
+        print np.sum(affinity!=0),affinity.shape[0]*affinity.shape[1]
+        print np.unique(np.sum(affinity!=0,1))
+            
+
+        # print affinity.shape
+        # raw_input()
+        sizes = [mat_curr.size(0) for mat_curr in data['features']]
+        print len(sizes)
+        max_val = np.max(affinity)
+        for idx in range(len(sizes)-1):
+            end_val= sum(sizes[:idx+1])
+            print idx,end_val
+            affinity[:,end_val]=max_val
+
+
+        # print affinity
+            # print affinity[0,end_val]
+            # print np.unique(affinity[:,end_val])
+
+        out_file = '../scratch/see_graphs_sparse_k_each_abs.png'
+        visualize.saveMatAsImage(affinity,out_file)
+
+
+        # print affinity.size()
+        # print torch.min(affinity), torch.max(affinity)
+
+        # print data.keys()
+        # print len(data['features']),data['features'][0].shape
+        raw_input()
+
+
 
 def main():
+
+    check_graph()
+    return
     # script_make_gt_vecs()
     dir_gt_vecs = '../data/ucf101/gt_vecs/just_primary/'
     npys = ['../data/ucf101/gt_vecs/just_primary/video_validation_0000666.npy']

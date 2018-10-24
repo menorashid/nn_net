@@ -2,8 +2,8 @@ from torchvision import models
 import torch.nn as nn
 import torch
 import torch.nn.functional as F
-from graph_layer_flexible import Graph_Layer
-from graph_layer_flexible import Graph_Layer_Wrapper
+from graph_layer_flexible_temp import Graph_Layer
+from graph_layer_flexible_temp import Graph_Layer_Wrapper
 from normalize import Normalize
 
 import numpy as np
@@ -39,9 +39,7 @@ class Graph_Multi_Video(nn.Module):
 
         
         self.linear_layer = nn.Linear(in_out[0], in_out[1], bias = False)
-        # for param in self.linear_layer.parameters():
-        #     param.requires_grad = False
-        # non_lin = 'HT'
+       
 
         if pretrained=='ucf':
             model_file = '../experiments/just_mill_flexible_deno_8_n_classes_20_layer_sizes_2048_64_ucf/all_classes_False_just_primary_False_limit_500_cw_True_MultiCrossEntropy_100_step_100_0.1_0.001_0.001/model_99.pt'
@@ -113,7 +111,7 @@ class Graph_Multi_Video(nn.Module):
 
     def get_to_keep(self,input_sizes):
         
-        k_all = [max(1,size_curr)//self.deno for idx_size_curr,size_curr in enumerate(input_sizes)]
+        k_all = [max(1,size_curr//self.deno) for idx_size_curr,size_curr in enumerate(input_sizes)]
         k_all = int(np.mean(k_all))
         # print k_all
         # raw_input()
@@ -140,7 +138,8 @@ class Graph_Multi_Video(nn.Module):
             input = torch.cat(input,0)
 
             if self.sparsify:
-                to_keep = self.get_to_keep(input_sizes)
+                to_keep = (self.get_to_keep(input_sizes),input_sizes)
+                # self.get_to_keep(input_sizes)
             else:
                 to_keep = None
 
@@ -239,10 +238,20 @@ class Graph_Multi_Video(nn.Module):
 
         if self.graph_size is None:
             graph_size = len(input)
+        elif self.graph_size=='rand':
+            import random
+            graph_size = random.randint(1,len(input))
         else:
             graph_size = min(self.graph_size, len(input))
 
         input_chunks = [input[i:i + graph_size] for i in xrange(0, len(input), graph_size)]
+
+        # print 'GRAPH SIZE',graph_size,len(input_chunks)
+        
+        # for i in input_chunks:
+        #     print len(i)
+        
+        # raw_input()
 
         if not self.focus:
             x, pmf = self.forward_linear(input_chunks)
@@ -275,15 +284,17 @@ class Graph_Multi_Video(nn.Module):
 
     def get_similarity(self,input):
         is_cuda = next(self.parameters()).is_cuda
-        
+
         input_sizes = [input_curr.size(0) for input_curr in input]
         input = torch.cat(input,0)
 
         if self.sparsify:
-            to_keep = self.get_to_keep(input_sizes)
+            to_keep = (self.get_to_keep(input_sizes),input_sizes)
         else:
             to_keep = None
-        print "TO KEEP",to_keep
+
+        print to_keep    
+        
         if is_cuda:
             input = input.cuda()
         
@@ -312,7 +323,8 @@ class Network:
                  normalize = [True,True]
                  ):
         self.model = Graph_Multi_Video(n_classes, deno,pretrained, in_out, graph_size, method, num_switch, focus, sparsify, non_lin, normalize)
- 
+        print self.model
+        raw_input()
     def get_lr_list(self, lr):
         
         

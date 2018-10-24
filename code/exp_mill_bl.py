@@ -123,6 +123,7 @@ def train_simple_mill_all_classes(model_name,
     print train_file
     print test_data.anno_file
     print class_weights
+    # raw_input()
 
     if class_weights:
         class_weights_val = util.get_class_weights_au(util.readLinesFromFile(train_file),n_classes)
@@ -281,7 +282,7 @@ def super_simple_experiment():
     # model_name = 'graph_pretrained_F_activitynet'
     # model_name = 'graph_multi_video_pretrained_F_ucf_64_zero_self'
     # model_name = 'graph_multi_video_pretrained_F_flexible'
-    model_name = 'graph_multi_video_pretrained_F_flexible_alt_train'
+    model_name = 'graph_multi_video_pretrained_F_flexible_alt_train_temp'
     # model_name = 'graph_pretrained_F'
     # model_name = 'graph_sim_direct_mill_cosine'
     # model_name = 'graph_sim_i3d_sim_mat_mill'
@@ -300,9 +301,9 @@ def super_simple_experiment():
     epoch_stuff = [500,500]
     dataset = 'ucf'
     limit  = 500
-    save_after = 25
+    save_after = 100
     
-    test_mode = True
+    test_mode = False
     retrain = False
     viz_mode = False
     viz_sim = False
@@ -313,19 +314,24 @@ def super_simple_experiment():
 
     network_params = {}
     network_params['deno'] = 8
+    # network_params['layer_sizes'] = [2048,64]
+    # ,2048,64]
     network_params['pretrained'] = 'ucf'
-    network_params['in_out'] = [2048,64,2048,64]
-    network_params['graph_size'] = 32
-    graph_size = 1
+    network_params['in_out'] = [2048,64,2048,64,64]
+    network_params['graph_size'] = 2
+    # network_params['k']
+    # graph_size = 1
     network_params['method'] = 'cos'
-    network_params['num_switch'] = 5
+    network_params['num_switch'] = [5,10]
     network_params['focus'] = 1
     network_params['sparsify'] = True
+    network_params['non_lin'] = 'HT'
+    network_params['normalize'] = [True, True]
     
-
+    post_pend = 'ABS'
     loss_weights = None
     multibranch = 1
-    branch_to_test = 0
+    branch_to_test = 1
 
     # in_out = [2048,64]
     # post_pend = '_'.join([str(val) for val in in_out])
@@ -340,7 +346,7 @@ def super_simple_experiment():
     
 
     class_weights = True
-    test_after = 1
+    test_after = 5
     
     all_classes = False
     just_primary = False
