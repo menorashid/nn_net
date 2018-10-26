@@ -12,8 +12,8 @@ class Graph_Multi_Video(nn.Module):
     def __init__(self,
                  n_classes,
                  deno,
-                 pretrained,
                  in_out = None,
+                 feat_dim = None,
                  graph_size = None,
                  method = 'cos',
                  num_switch = 1,
@@ -30,66 +30,81 @@ class Graph_Multi_Video(nn.Module):
         self.sparsify = sparsify
 
         if in_out is None:
-            in_out = [2048,64,2048,64]
+            in_out = [2048,64]
+        if feat_dim is None:
+            feat_dim = [2048,64]
 
-        num_layers = len(in_out)-3
+        num_layers = len(in_out)-1
         # non_lin = 'HT'
 
         print 'NUM LAYERS', num_layers, in_out
 
 
 
-        if pretrained=='ucf':
-            model_file = '../experiments/just_mill_flexible_deno_8_n_classes_20_layer_sizes_2048_64_ucf/all_classes_False_just_primary_False_limit_500_cw_True_MultiCrossEntropy_100_step_100_0.1_0.001_0.001/model_99.pt'
-        elif pretrained=='activitynet':
-            model_file = '../experiments/just_mill_flexible_deno_8_n_classes_100_layer_sizes_2048_64_activitynet/all_classes_False_just_primary_False_limit_500_cw_True_MultiCrossEntropy_50_step_50_0.1_0.001_0.001/model_49.pt'
-        elif pretrained=='random':
-            model_file = '../experiments/just_mill_flexible_deno_8_n_classes_20_layer_sizes_2048_64_ucf/all_classes_False_just_primary_False_limit_500_cw_True_MultiCrossEntropy_100_step_100_0.1_0_0.001/model_99.pt'
-        elif pretrained=='default':
-            model_file = None
-        else:
-            error_message = 'Similarity method %s not valid' % method
-            raise ValueError(error_message)
+        # if pretrained=='ucf':
+        #     model_file = '../experiments/just_mill_flexible_deno_8_n_classes_20_layer_sizes_2048_64_ucf/all_classes_False_just_primary_False_limit_500_cw_True_MultiCrossEntropy_100_step_100_0.1_0.001_0.001/model_99.pt'
+        # elif pretrained=='activitynet':
+        #     model_file = '../experiments/just_mill_flexible_deno_8_n_classes_100_layer_sizes_2048_64_activitynet/all_classes_False_just_primary_False_limit_500_cw_True_MultiCrossEntropy_50_step_50_0.1_0.001_0.001/model_49.pt'
+        # elif pretrained=='random':
+        #     model_file = '../experiments/just_mill_flexible_deno_8_n_classes_20_layer_sizes_2048_64_ucf/all_classes_False_just_primary_False_limit_500_cw_True_MultiCrossEntropy_100_step_100_0.1_0_0.001/model_99.pt'
+        # elif pretrained=='default':
+        #     model_file = None
+        # else:
+        #     error_message = 'Similarity method %s not valid' % method
+        #     raise ValueError(error_message)
 
-        if model_file is not None:
-            model_temp = torch.load(model_file)
-            # self.linear_layer.weight.data = model_temp.linear.weight.data
-        else:
-            print 'NO MODEL FILE AAAAAAAA'
+        # if model_file is not None:
+        #     model_temp = torch.load(model_file)
+        #     # self.linear_layer.weight.data = model_temp.linear.weight.data
+        # else:
+        #     print 'NO MODEL FILE AAAAAAAA'
         
 
         self.linear_layers = nn.ModuleList()
-        for layer_num in num_layers:
-            layer_curr = []
-            self.linear_layer = nn.Linear(in_out[0], in_out[1], bias = False)
-        
+        for idx_layer_num,layer_num in enumerate(range(num_layers)):
+
+            if non_lin =='HT':
+                non_lin_curr = nn.Hardtanh()
+            elif non_lin =='RL':
+                non_lin_curr = nn.ReLU()
+            else:
+                error_message = str('Non lin %s not valid', non_lin)
+                raise ValueError(error_message)
+
+
+            last_linear = []
+            idx_curr = idx_layer_num*2
+            last_linear.append(nn.Linear(feat_dim[idx_curr], feat_dim[idx_curr+1], bias = False))
+            last_linear.append(non_lin_curr)
+            if normalize[0]:
+                last_linear.append(Normalize())
+            last_linear.append(nn.Dropout(0.5))
+            last_linear.append(nn.Linear(feat_dim[idx_curr+1],n_classes))
+            last_linear = nn.Sequential(*last_linear)
+            self.linear_layers.append(last_linear)
 
 
         
         self.graph_layers = nn.ModuleList()
         for num_layer in range(num_layers): 
-            self.graph_layers.append(Graph_Layer_Wrapper(in_out[num_layer+2],n_out = in_out[num_layer+3], non_lin = non_lin, method = method))
+            self.graph_layers.append(Graph_Layer_Wrapper(in_out[num_layer],n_out = in_out[num_layer+1], non_lin = non_lin, method = method))
         
         
 
-        last_linear = []
-        if non_lin =='HT':
-            last_linear.append(nn.Hardtanh())
-        elif non_lin =='RL':
-            last_linear.append(nn.ReLU())
-        else:
-            error_message = str('Non lin %s not valid', non_lin)
-            raise ValueError(error_message)
+        # last_linear = []
+        # if non_lin =='HT':
+        #     last_linear.append(nn.Hardtanh())
+        # elif non_lin =='RL':
+        #     last_linear.append(nn.ReLU())
+        # else:
+        #     error_message = str('Non lin %s not valid', non_lin)
+        #     raise ValueError(error_message)
 
-        if normalize[0]:
-            last_linear.append(Normalize())
 
-        last_linear.append(nn.Dropout(0.5))
-        last_linear.append(nn.Linear(in_out[1],n_classes))
-        last_linear = nn.Sequential(*last_linear)
-        self.last_linear = last_linear
-        
-
+        # last_linear.append(nn.Dropout(0.5))
+        # last_linear.append(nn.Linear(in_out[1],n_classes))
+        # last_linear = nn.Sequential(*last_linear)
+        # self.last_linear = last_linear
 
         last_graph = []
         if non_lin =='HT':
@@ -102,21 +117,27 @@ class Graph_Multi_Video(nn.Module):
 
         if normalize[1]:
             last_graph.append(Normalize())
-        
-        # last_graph.append(nn.Hardtanh())
-        # last_graph.append(Normalize())
+
         last_graph.append(nn.Dropout(0.5))
         last_graph.append(nn.Linear(in_out[-1],n_classes))
         last_graph = nn.Sequential(*last_graph)
         self.last_graph = last_graph
 
+        self.num_branches = num_layers+1
+        
         if type(num_switch)==type(1):
-            num_switch = [num_switch for i in num_layers+1]
+            num_switch = [num_switch]*self.num_branches
 
         self.num_switch = num_switch
-        self.epoch_counters = [0]+[0 for i in num_layers]
+        self.epoch_counters = [0]* self.num_branches
         self.focus = focus
         self.epoch_last = 0
+        
+        print 'self.num_branches', self.num_branches
+        print 'self.num_switch', self.num_switch
+        print 'self.epoch_counters', self.epoch_counters
+        print 'self.focus', self.focus
+        print 'self.epoch_last', self.epoch_last
 
 
     def get_to_keep(self,input_sizes):
@@ -132,7 +153,37 @@ class Graph_Multi_Video(nn.Module):
 
         return k_all
         
+    def get_graph_out(self,input,input_sizes,graph_idx=None,printit=False):
+        is_cuda = next(self.parameters()).is_cuda
         
+        if self.sparsify:
+            to_keep = (self.get_to_keep(input_sizes),input_sizes)
+        else:
+            to_keep = None
+
+        if is_cuda:
+            input = input.cuda()
+        
+        if graph_idx is None:
+            graph_idx = len(self.graph_layers)-1
+
+        input_graph = input
+        for idx_graph_layer in range(graph_idx+1):
+            graph_layer = self.graph_layers[idx_graph_layer]
+            layer_curr = self.linear_layers[idx_graph_layer][0]
+
+            if printit:
+                print 'self.linear_layers[idx_graph_layer]',self.linear_layers[idx_graph_layer]
+                print 'layer_curr',layer_curr
+                print 'input_graph.size()',input_graph.size()
+
+            features_out = layer_curr(input_graph)    
+            input_graph = graph_layer(input_graph, features_out,to_keep = to_keep)
+
+        if printit:
+            print 'input_graph.size(),idx_graph_layer, graph_idx',input_graph.size(), graph_idx
+
+        return input_graph
         
     def forward_graph(self, input_chunks):
 
@@ -140,6 +191,7 @@ class Graph_Multi_Video(nn.Module):
         x_all = []
 
         is_cuda = next(self.parameters()).is_cuda
+        # print 'Graph branch'
 
         for input in input_chunks:
             input_sizes = [input_curr.size(0) for input_curr in input]
@@ -147,22 +199,10 @@ class Graph_Multi_Video(nn.Module):
             
             input = torch.cat(input,0)
 
-            if self.sparsify:
-                to_keep = (self.get_to_keep(input_sizes),input_sizes)
-                # self.get_to_keep(input_sizes)
-            else:
-                to_keep = None
+            out_graph = self.get_graph_out(input,input_sizes,printit=False)
+            # print out_graph.size()
 
-            if is_cuda:
-                input = input.cuda()
-            
-            features_out = self.linear_layer(input)
-            
-            input_graph = input
-            for idx_graph_layer,graph_layer in enumerate(self.graph_layers):
-                input_graph = graph_layer(input_graph, features_out,to_keep = to_keep)
-            
-            x = self.last_graph(input_graph)
+            x = self.last_graph(out_graph)
             x_all.append(x)
             
             for idx_sample in range(len(input_sizes)):
@@ -178,12 +218,13 @@ class Graph_Multi_Video(nn.Module):
         return x_all, pmf
 
 
-    def forward_linear(self, input_chunks):
+    def forward_linear(self, input_chunks, idx_linear):
         
         pmf = []
         x_all = []
         
         is_cuda = next(self.parameters()).is_cuda
+        # print 'Linear branch',idx_linear
 
         for input in input_chunks:
             input_sizes = [input_curr.size(0) for input_curr in input]
@@ -191,9 +232,11 @@ class Graph_Multi_Video(nn.Module):
             if is_cuda:
                 input = input.cuda()
 
-            features_out = self.linear_layer(input)
+            # print self.linear_layers[idx_linear]
+            
+            out_graph = self.get_graph_out(input,input_sizes,idx_linear-1)
 
-            x = self.last_linear(features_out)
+            x = self.linear_layers[idx_linear](out_graph)
             x_all.append(x)
             
             for idx_sample in range(len(input_sizes)):
@@ -210,36 +253,18 @@ class Graph_Multi_Video(nn.Module):
 
     def forward(self, input, epoch_num = None, ret_bg =False, branch_to_test = -1):
         
-        
-        # if epoch_num>epoch_last:
-        #     self.epoch_counters[focus]+=1
-
-        # if self.epoch_last>0 and epoch_num>self.epoch_last:
-        #     if epoch_num is not None and epoch_num%self.num_switch==0:
-        #         self.focus = (self.focus+1)%2
-        #         print 'FOCUS',epoch_num,self.focus, self.epoch_last
-        
         if epoch_num is not None:
             if epoch_num>self.epoch_last:
                 self.epoch_counters[self.focus]+=1
 
             if self.epoch_counters[self.focus]>0 and not self.epoch_counters[self.focus]%self.num_switch[self.focus]:
                 self.epoch_counters[self.focus]=0
-                self.focus = (self.focus+1)%2
+                self.focus = (self.focus+1)%self.num_branches
                 print 'FOCUS',epoch_num,self.focus, self.epoch_last,self.epoch_counters
-                
-
-            # if epoch_num is not None and epoch_num%self.num_switch==0:
-            #     self.focus = (self.focus+1)%2
-            #     print 'FOCUS',epoch_num,self.focus, self.epoch_last
-                
-                
 
         if branch_to_test>-1:
             self.focus = branch_to_test
 
-        # print 'FOCUS',epoch_num,self.focus
-        
 
         strip = False
         if type(input)!=type([]):
@@ -256,15 +281,8 @@ class Graph_Multi_Video(nn.Module):
 
         input_chunks = [input[i:i + graph_size] for i in xrange(0, len(input), graph_size)]
 
-        # print 'GRAPH SIZE',graph_size,len(input_chunks)
-        
-        # for i in input_chunks:
-        #     print len(i)
-        
-        # raw_input()
-
-        if not self.focus:
-            x, pmf = self.forward_linear(input_chunks)
+        if (self.focus+1)<self.num_branches:
+            x, pmf = self.forward_linear(input_chunks,self.focus)
         else:
             x, pmf = self.forward_graph(input_chunks)
 
@@ -276,6 +294,8 @@ class Graph_Multi_Video(nn.Module):
         
         if epoch_num is not None:
             self.epoch_last = epoch_num
+
+        # raw_input()
 
         if ret_bg:
             return x, pmf, None
@@ -292,9 +312,9 @@ class Graph_Multi_Video(nn.Module):
         pmf = torch.sum(pmf[:k,:], dim = 0)/k
         return pmf
 
-    def get_similarity(self,input):
-        is_cuda = next(self.parameters()).is_cuda
+    def get_similarity(self,input,idx_graph_layer = 0):
 
+        is_cuda = next(self.parameters()).is_cuda
         input_sizes = [input_curr.size(0) for input_curr in input]
         input = torch.cat(input,0)
 
@@ -308,9 +328,9 @@ class Graph_Multi_Video(nn.Module):
         if is_cuda:
             input = input.cuda()
         
-        feature_out = self.linear_layer(input)
-        # feature_out = self.linear_layer(input)
-        sim_mat = self.graph_layers[0].get_affinity(feature_out,to_keep = to_keep)
+        feature_out = self.linear_layers[idx_graph_layer][0](input)
+        sim_mat = self.graph_layers[idx_graph_layer].get_affinity(feature_out,to_keep = to_keep)
+        
         return sim_mat
     
     def printGraphGrad(self):
@@ -322,8 +342,8 @@ class Network:
     def __init__(self,
                  n_classes,
                  deno,
-                 pretrained,
                  in_out = None,
+                 feat_dim = None,
                  graph_size = None,
                  method = 'cos',
                  num_switch = 1,
@@ -332,18 +352,19 @@ class Network:
                  non_lin = 'HT',
                  normalize = [True,True]
                  ):
-        self.model = Graph_Multi_Video(n_classes, deno,pretrained, in_out, graph_size, method, num_switch, focus, sparsify, non_lin, normalize)
+        self.model = Graph_Multi_Video(n_classes, deno, in_out,feat_dim, graph_size, method, num_switch, focus, sparsify, non_lin, normalize)
         print self.model
         raw_input()
+
     def get_lr_list(self, lr):
         
         
         lr_list = []
 
-        lr_list+= [{'params': [p for p in self.model.linear_layer.parameters() if p.requires_grad], 'lr': lr[0]}]
+        lr_list+= [{'params': [p for p in self.model.linear_layers.parameters() if p.requires_grad], 'lr': lr[0]}]
         lr_list+= [{'params': [p for p in self.model.graph_layers.parameters() if p.requires_grad], 'lr': lr[1]}]        
-        lr_list+= [{'params': [p for p in self.model.last_linear.parameters() if p.requires_grad], 'lr': lr[2]}]
-        lr_list+= [{'params': [p for p in self.model.last_graph.parameters() if p.requires_grad], 'lr': lr[2]}]
+        # lr_list+= [{'params': [p for p in self.model.last_linear.parameters() if p.requires_grad], 'lr': lr[2]}]
+        lr_list+= [{'params': [p for p in self.model.last_graph.parameters() if p.requires_grad], 'lr': lr[1]}]
 
         return lr_list
 

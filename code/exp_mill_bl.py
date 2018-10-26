@@ -272,7 +272,90 @@ def train_simple_mill_all_classes(model_name,
                     first_thresh = first_thresh)
             visualize_sim_mat(**test_params)
 
+def testing_exp():
+    model_name = 'just_graph_multi_video_multi_F_joint_train'
+    
+    torch.backends.cudnn.deterministic = True
+    torch.manual_seed(999)
 
+    lr = [0.001,0.001]
+    epoch_stuff = [300,300]
+    dataset = 'ucf'
+    limit  = 500
+    save_after = 100
+    
+    test_mode = False
+    model_nums = None
+    retrain = False
+    viz_mode = False
+    viz_sim = False
+    test_post_pend = ''
+
+    post_pend = ''
+    
+    network_params = {}
+    network_params['deno'] = 8
+    # network_params['pretrained'] = 'ucf'
+    network_params['in_out'] = [2048,20]
+    network_params['feat_dim'] = [2048,64]
+    network_params['graph_size'] = 2
+    
+    network_params['method'] = 'cos'
+    # network_params['num_switch'] = [5,5]
+    # network_params['focus'] = 0
+    network_params['sparsify'] = True
+    network_params['non_lin'] = 'HT'
+    network_params['normalize'] = [True, True]
+    
+    post_pend = 'ABS'
+    # loss_weights = None
+    multibranch = 2
+    loss_weights = [1,1]
+    branch_to_test = 2
+
+    first_thresh=0
+
+    
+
+    class_weights = True
+    test_after = 5
+    
+    all_classes = False
+    just_primary = False
+    gt_vec = False
+
+    
+    
+    
+    second_thresh =0.5
+    det_class = -1
+    train_simple_mill_all_classes (model_name = model_name,
+                        lr = lr,
+                        dataset = dataset,
+                        network_params = network_params,
+                        limit = limit, 
+                        epoch_stuff= epoch_stuff,
+                        batch_size = 32,
+                        batch_size_val = 32,
+                        save_after = save_after,
+                        test_mode = test_mode,
+                        class_weights = class_weights,
+                        test_after = test_after,
+                        all_classes = all_classes,
+                        just_primary = just_primary,
+                        model_nums = model_nums,
+                        retrain = retrain,
+                        viz_mode = viz_mode,
+                        second_thresh = second_thresh,
+                        first_thresh = first_thresh,
+                        det_class = det_class,
+                        post_pend = post_pend,
+                        viz_sim = viz_sim,
+                        test_post_pend = test_post_pend,
+                        gt_vec = gt_vec,
+                        loss_weights = loss_weights,
+                        multibranch = multibranch,
+                        branch_to_test = branch_to_test)
 
 def super_simple_experiment():
     # model_name = 'just_mill_flexible'
@@ -297,13 +380,13 @@ def super_simple_experiment():
     torch.manual_seed(999)
 
     # lr = [0.001,0.001]
-    lr = [0.0001,0.001,0.001]
+    lr = [0.001,0.001]
     epoch_stuff = [500,500]
     dataset = 'ucf'
     limit  = 500
     save_after = 100
     
-    test_mode = False
+    test_mode = True
     retrain = False
     viz_mode = False
     viz_sim = False
@@ -316,19 +399,19 @@ def super_simple_experiment():
     network_params['deno'] = 8
     # network_params['layer_sizes'] = [2048,64]
     # ,2048,64]
-    network_params['pretrained'] = 'ucf'
-    network_params['in_out'] = [2048,64,2048,64,64]
+    network_params['pretrained'] = 'default'
+    network_params['in_out'] = [2048,64,2048,64]
     network_params['graph_size'] = 2
     # network_params['k']
     # graph_size = 1
     network_params['method'] = 'cos'
-    network_params['num_switch'] = [5,10]
-    network_params['focus'] = 1
+    network_params['num_switch'] = [5,5]
+    network_params['focus'] = 0
     network_params['sparsify'] = True
     network_params['non_lin'] = 'HT'
     network_params['normalize'] = [True, True]
     
-    post_pend = 'ABS'
+    post_pend = 'ABS_EASYLR'
     loss_weights = None
     multibranch = 1
     branch_to_test = 1
@@ -352,7 +435,7 @@ def super_simple_experiment():
     just_primary = False
     gt_vec = False
 
-    model_nums = None
+    model_nums = [99]
     
     
     second_thresh =0.5
@@ -511,7 +594,8 @@ def main():
     # scripts_comparative()
     
     # separate_supervision_experiment()
-    super_simple_experiment()
+    # super_simple_experiment()
+    testing_exp()
 
 
 if __name__=='__main__':

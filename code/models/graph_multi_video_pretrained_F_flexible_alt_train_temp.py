@@ -324,7 +324,7 @@ class Network:
                  ):
         self.model = Graph_Multi_Video(n_classes, deno,pretrained, in_out, graph_size, method, num_switch, focus, sparsify, non_lin, normalize)
         print self.model
-        raw_input()
+        
     def get_lr_list(self, lr):
         
         
@@ -332,8 +332,8 @@ class Network:
 
         lr_list+= [{'params': [p for p in self.model.linear_layer.parameters() if p.requires_grad], 'lr': lr[0]}]
         lr_list+= [{'params': [p for p in self.model.graph_layers.parameters() if p.requires_grad], 'lr': lr[1]}]        
-        lr_list+= [{'params': [p for p in self.model.last_linear.parameters() if p.requires_grad], 'lr': lr[2]}]
-        lr_list+= [{'params': [p for p in self.model.last_graph.parameters() if p.requires_grad], 'lr': lr[2]}]
+        lr_list+= [{'params': [p for p in self.model.last_linear.parameters() if p.requires_grad], 'lr': lr[0]}]
+        lr_list+= [{'params': [p for p in self.model.last_graph.parameters() if p.requires_grad], 'lr': lr[1]}]
 
         return lr_list
 

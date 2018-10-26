@@ -42,7 +42,10 @@ class Exp_Lr_Scheduler:
 def test_model_core(model, test_dataloader, criterion, log_arr, multibranch = 1):
     model.eval()
 
-    preds = []
+    if multibranch>1:
+        preds = [[] for i in range(multibranch)]
+    else:
+        preds = []
     
     labels_all = []
     loss_iter_total = 0.
@@ -70,7 +73,11 @@ def test_model_core(model, test_dataloader, criterion, log_arr, multibranch = 1)
                     out,pmf = model.forward([sample.cuda(),batch['gt_vec'][idx_sample].cuda()])
                 elif 'multi_video' in model_name:
                     out,preds_mini = model.forward(samples)
-                    preds+=[torch.nn.functional.softmax(pmf).data.cpu().numpy() for pmf in preds_mini]
+                    if multibranch>1:
+                        for idx_preds_curr,preds_curr in enumerate(preds_mini):
+                            preds[idx_preds_curr]+=[torch.nn.functional.softmax(pmf).data.cpu().numpy() for pmf in preds_curr]    
+                    else:
+                        preds+=[torch.nn.functional.softmax(pmf).data.cpu().numpy() for pmf_mini in preds_mini]
                     break
                 else:
                     out,pmf = model.forward(sample.cuda())
@@ -103,7 +110,7 @@ def test_model_core(model, test_dataloader, criterion, log_arr, multibranch = 1)
         log_arr.append(str_display)
         print str_display
         
-    preds = np.concatenate(preds,axis = 0)
+    
     labels_all = np.concatenate(labels_all,axis = 0)
     
     # if 'centerloss' not in criterion.__class__.__name__.lower():    
@@ -121,17 +128,23 @@ def test_model_core(model, test_dataloader, criterion, log_arr, multibranch = 1)
     assert len(np.unique(labels_all)==2)
     # print labels_all.shape, np.min(labels_all), np.max(labels_all)
     # print preds.shape, np.min(preds), np.max(preds)
-
-    accuracy = sklearn.metrics.average_precision_score(labels_all, preds)
-    
-    # print accuracy.shape
-    # print accuracy
-    
-    str_display = 'val accuracy: %.4f' %(accuracy)
-    log_arr.append(str_display)
-    print str_display
-    
-    del preds
+    if multibranch==1:
+        preds_all = [preds]
+    else:
+        preds_all = preds
+        
+    for preds in preds_all:
+        preds = np.concatenate(preds,axis = 0)
+        accuracy = sklearn.metrics.average_precision_score(labels_all, preds)
+        
+        # print accuracy.shape
+        # print accuracy
+        
+        str_display = 'val accuracy: %.4f' %(accuracy)
+        log_arr.append(str_display)
+        print str_display
+        
+    del preds_all
     torch.cuda.empty_cache()
 
     model.train(True)
