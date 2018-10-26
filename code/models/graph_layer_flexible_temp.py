@@ -137,6 +137,7 @@ class Graph_Layer_Wrapper(nn.Module):
     def __init__(self,in_size, n_out = None, non_lin = 'HT', method = 'cos'):
         super(Graph_Layer_Wrapper, self).__init__()
         self.graph_layer = Graph_Layer(in_size, n_out = n_out, method = method)
+        # self.do = nn.Dropout(0.5)
         if non_lin=='HT':
             self.non_linearity = nn.Hardtanh()
         elif non_lin.lower()=='rl':
@@ -147,9 +148,11 @@ class Graph_Layer_Wrapper(nn.Module):
     
     def forward(self, x, sim_feat, to_keep = None):
         sim_feat = self.non_linearity(sim_feat)
+        # sim_feat = self.do(sim_feat)
         out = self.graph_layer(x, sim_feat, to_keep = to_keep)
         return out
 
     def get_affinity(self,input,to_keep = None):
         input = self.non_linearity(input)
+        # sim_feat = self.do(sim_feat)
         return self.graph_layer.get_affinity(input, to_keep = to_keep)        

@@ -35,7 +35,7 @@ def get_similarity(features):
     
     return sim_mat
 
-def get_gt_vector(vid_name, out_shape_curr, class_idx, test = True):
+def get_gt_vector(vid_name, out_shape_curr, class_idx, test = True,gt_return = False):
     
 
     class_name = class_names[class_idx]
@@ -51,8 +51,21 @@ def get_gt_vector(vid_name, out_shape_curr, class_idx, test = True):
     gt_time_intervals = loaded['gt_time_intervals'][0]
     gt_time_intervals = np.array([a[0] for a in gt_time_intervals])
     
+    # print class_name
     bin_keep = np.array(gt_vid_names_all) == vid_name
+    # print np.where(bin_keep)[0]
+    print 'bef',gt_time_intervals[bin_keep]
+    bin_keep = np.logical_and(bin_keep,gt_class_names==class_name)
+    
+    print np.where(bin_keep)[0]
+    print 'aft',gt_time_intervals[bin_keep]
+
     gt_time_intervals = gt_time_intervals[bin_keep]
+    # print gt_time_intervals
+    # print gt_class_names[bin_keep]
+    # print np.sum(gt_class_names==class_name)
+
+
     det_times = np.array(range(0,out_shape_curr))*16./25.
     
     gt_vals = np.zeros(det_times.shape)
@@ -61,7 +74,10 @@ def get_gt_vector(vid_name, out_shape_curr, class_idx, test = True):
         idx_end = np.argmin(np.abs(det_times-gt_time_curr[1]))
         gt_vals[idx_start:idx_end] = 1
 
-    return gt_vals, det_times
+    if gt_return:
+        return gt_vals, det_times,gt_time_intervals
+    else:
+        return gt_vals, det_times
 
 
 def save_sim_viz(vid_name, out_shape_curr, sim_mat, class_idx, out_dir):
@@ -300,6 +316,8 @@ def script_make_gt_vecs():
     post_pend = '_gt_vec'
 
     for file_curr, test_stat  in zip(files, test_status):
+        if not test_stat:
+            continue
         npy_files, annos = readTrainTestFile(file_curr)
         for npy_file, anno_curr in zip(npy_files, annos):
             vid_name = os.path.split(npy_file)[1]
@@ -388,9 +406,72 @@ def check_graph():
 
 
 
+def debugging_eval():
+    # class_idx = 0
+    # class_name = class_names[class_idx]
+    # if test:
+    #     mat_file = os.path.join('../TH14evalkit','mat_files', class_name+'_test.mat')
+    # else:
+    #     mat_file = os.path.join('../TH14evalkit', class_name+'.mat')
+
+
+    dir_files = '../data/ucf101/train_test_files'
+    out_dir_gt_vec = '../data/ucf101/gt_vecs'
+    util.mkdir(out_dir_gt_vec)
+
+    n_classes = 20
+    just_primary = True
+    train_file = os.path.join(dir_files, 'train.txt')
+    test_file = os.path.join(dir_files, 'test.txt')
+    out_dir_curr = os.path.join(out_dir_gt_vec,'just_primary')
+
+    files = [train_file, test_file]
+    test_status = [False, True]
+
+
+    # loaded = scipy.io.loadmat(mat_file)
+    
+    # gt_vid_names_all = loaded['gtvideonames'][0]
+    # gt_class_names = loaded['gt_events_class'][0]
+    # gt_time_intervals = loaded['gt_time_intervals'][0]
+    # gt_time_intervals = np.array([a[0] for a in gt_time_intervals])
+    
+    # bin_keep = np.array(gt_vid_names_all) == vid_name
+    # gt_time_intervals = gt_time_intervals[bin_keep]
+
+
+
+    for file_curr, test_stat  in zip(files, test_status):
+        npy_files, annos = readTrainTestFile(file_curr)
+        for npy_file, anno_curr in zip(npy_files, annos):
+            vid_name = os.path.split(npy_file)[1]
+            vid_name = vid_name[:vid_name.rindex('.')]
+
+            gt_file_curr = os.path.join(out_dir_curr,vid_name+'.npy')
+
+            gt_vec = np.load(gt_file_curr)
+            # print gt_vec
+            all_gt = np.where(anno_curr)[0]
+            
+            for class_idx in all_gt:
+                gt_vec_class ,det_times_class,gt_time_intervals = get_gt_vector(vid_name, len(gt_vec), class_idx, test = test_stat,gt_return = True)            
+                
+                if  len(all_gt)>1:
+                    print list(gt_vec)
+                    print list(gt_vec_class)
+
+                    print class_idx
+                    print gt_time_intervals
+
+                    raw_input()
+    
+
+
 def main():
 
-    check_graph()
+    debugging_eval()
+
+    # check_graph()
     return
     # script_make_gt_vecs()
     dir_gt_vecs = '../data/ucf101/gt_vecs/just_primary/'

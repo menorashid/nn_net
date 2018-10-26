@@ -285,8 +285,9 @@ def testing_exp():
     save_after = 100
     
     test_mode = False
+
     model_nums = None
-    retrain = False
+    retrain = True
     viz_mode = False
     viz_sim = False
     test_post_pend = ''
@@ -298,7 +299,7 @@ def testing_exp():
     # network_params['pretrained'] = 'ucf'
     network_params['in_out'] = [2048,20]
     network_params['feat_dim'] = [2048,64]
-    network_params['graph_size'] = 2
+    network_params['graph_size'] = 32
     
     network_params['method'] = 'cos'
     # network_params['num_switch'] = [5,5]
@@ -307,11 +308,11 @@ def testing_exp():
     network_params['non_lin'] = 'HT'
     network_params['normalize'] = [True, True]
     
-    post_pend = 'ABS'
+    post_pend = 'ABS_MEANK'
     # loss_weights = None
     multibranch = 2
     loss_weights = [1,1]
-    branch_to_test = 2
+    branch_to_test = 1
 
     first_thresh=0
 
