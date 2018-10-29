@@ -54,11 +54,11 @@ def get_gt_vector(vid_name, out_shape_curr, class_idx, test = True,gt_return = F
     # print class_name
     bin_keep = np.array(gt_vid_names_all) == vid_name
     # print np.where(bin_keep)[0]
-    print 'bef',gt_time_intervals[bin_keep]
+    # print 'bef',gt_time_intervals[bin_keep]
     bin_keep = np.logical_and(bin_keep,gt_class_names==class_name)
     
-    print np.where(bin_keep)[0]
-    print 'aft',gt_time_intervals[bin_keep]
+    # print np.where(bin_keep)[0]
+    # print 'aft',gt_time_intervals[bin_keep]
 
     gt_time_intervals = gt_time_intervals[bin_keep]
     # print gt_time_intervals
@@ -444,6 +444,11 @@ def debugging_eval():
     for file_curr, test_stat  in zip(files, test_status):
         npy_files, annos = readTrainTestFile(file_curr)
         for npy_file, anno_curr in zip(npy_files, annos):
+            all_gt = np.where(anno_curr)[0]
+            
+            if  len(all_gt)==1:
+                continue
+            
             vid_name = os.path.split(npy_file)[1]
             vid_name = vid_name[:vid_name.rindex('.')]
 
@@ -451,19 +456,31 @@ def debugging_eval():
 
             gt_vec = np.load(gt_file_curr)
             # print gt_vec
-            all_gt = np.where(anno_curr)[0]
-            
-            for class_idx in all_gt:
+            gt_vec_all = []
+            for idx_class_idx,class_idx in enumerate(all_gt):
                 gt_vec_class ,det_times_class,gt_time_intervals = get_gt_vector(vid_name, len(gt_vec), class_idx, test = test_stat,gt_return = True)            
                 
-                if  len(all_gt)>1:
-                    print list(gt_vec)
-                    print list(gt_vec_class)
+                gt_vec_all.append(gt_vec_class)
 
-                    print class_idx
-                    print gt_time_intervals
+                if idx_class_idx==0:
+                    gt_vec_sum = gt_vec_class
+                else:
+                    gt_vec_sum = gt_vec_sum+gt_vec_class
 
-                    raw_input()
+            if len(np.unique(gt_vec_sum))>2:
+                for class_idx in all_gt:
+                    print class_names[class_idx],
+                    # print gt_vec_all[idx_class_idx]
+                print ''
+                print '___'
+
+            # print list(gt_vec)
+            # print list(gt_vec_class)
+
+            # print class_idx
+            # print gt_time_intervals
+
+            #     
     
 
 
