@@ -31,6 +31,9 @@ def get_data(dataset, limit, all_classes, just_primary, gt_vec):
         if just_primary:
             post_pends = [pp+val for pp,val in zip(post_pends,['_just_primary','_just_primary','_just_primary'])]
         
+        post_pends = [pp+val for pp,val in zip(post_pends,['_corrected','_corrected','_corrected'])]
+        
+
         if gt_vec:
             post_pends = [pp+val for pp,val in zip(post_pends,['_gt_vec','_gt_vec','_gt_vec'])]
 
@@ -274,7 +277,9 @@ def train_simple_mill_all_classes(model_name,
 
 def testing_exp():
     model_name = 'just_graph_multi_video_multi_F_joint_train'
-    
+    gt_vec = False
+    just_primary = False
+
     torch.backends.cudnn.deterministic = True
     torch.manual_seed(999)
 
@@ -299,7 +304,7 @@ def testing_exp():
     # network_params['pretrained'] = 'ucf'
     network_params['in_out'] = [2048,20]
     network_params['feat_dim'] = [2048,64]
-    network_params['graph_size'] = 32
+    network_params['graph_size'] = 2
     
     network_params['method'] = 'cos'
     # network_params['num_switch'] = [5,5]
@@ -307,8 +312,9 @@ def testing_exp():
     network_params['sparsify'] = True
     network_params['non_lin'] = 'HT'
     network_params['normalize'] = [True, True]
-    
-    post_pend = 'ABS_MEANK'
+    # network_params['attention'] = False
+
+    post_pend = 'ABS'
     # loss_weights = None
     multibranch = 2
     loss_weights = [1,1]
@@ -322,8 +328,8 @@ def testing_exp():
     test_after = 5
     
     all_classes = False
-    just_primary = False
-    gt_vec = False
+    # just_primary = False
+    # gt_vec = False
 
     
     

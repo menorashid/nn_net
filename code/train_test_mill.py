@@ -69,16 +69,24 @@ def test_model_core(model, test_dataloader, criterion, log_arr, multibranch = 1)
                 preds_mini = []
 
             for idx_sample, sample in enumerate(samples):
-                if 'perfectg' in model_name:
-                    out,pmf = model.forward([sample.cuda(),batch['gt_vec'][idx_sample].cuda()])
-                elif 'multi_video' in model_name:
-                    out,preds_mini = model.forward(samples)
+                if 'multi_video' in model_name:
+                    if 'perfectg' in model_name:
+                        # print 'hello'
+                        out,preds_mini = model.forward([samples,batch['gt_vec']])
+                        # print len(preds_mini)
+                    else:
+                        out,preds_mini = model.forward(samples)
+                    
                     if multibranch>1:
+
                         for idx_preds_curr,preds_curr in enumerate(preds_mini):
                             preds[idx_preds_curr]+=[torch.nn.functional.softmax(pmf).data.cpu().numpy() for pmf in preds_curr]    
                     else:
                         preds+=[torch.nn.functional.softmax(pmf).data.cpu().numpy() for pmf_mini in preds_mini]
+                    
                     break
+                elif 'perfectg' in model_name:
+                    out,pmf = model.forward([sample.cuda(),batch['gt_vec'][idx_sample].cuda()])
                 else:
                     out,pmf = model.forward(sample.cuda())
             
@@ -132,7 +140,7 @@ def test_model_core(model, test_dataloader, criterion, log_arr, multibranch = 1)
         preds_all = [preds]
     else:
         preds_all = preds
-        
+
     for preds in preds_all:
         preds = np.concatenate(preds,axis = 0)
         accuracy = sklearn.metrics.average_precision_score(labels_all, preds)
@@ -430,7 +438,10 @@ def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh ,
             else:    
                 
                 if multibranch>1:
-                    out, pmf = model.forward(sample.cuda(), branch_to_test = branch_to_test)
+                    if 'perfectg' in model_name:
+                        out, pmf = model.forward([sample.cuda(),batch['gt_vec'][idx_sample].cuda()], branch_to_test = branch_to_test)
+                    else:
+                        out, pmf = model.forward(sample.cuda(), branch_to_test = branch_to_test)
                 else:
                     if 'perfectg' in model_name:
                         out,pmf = model.forward([sample.cuda(),batch['gt_vec'][idx_sample].cuda()])
@@ -771,6 +782,9 @@ def train_model(out_dir_train,
                     # print labels[idx_sample]
                     if 'alt_train' in model_name and 'multi_video' in model_name:
                         out,preds = model.forward(samples, epoch_num = num_epoch)
+                        break
+                    elif 'perfectG' in model_name and 'multi_video' in model_name:
+                        out,preds = model.forward([samples,batch['gt_vec']])
                         break
                     elif 'alt_train' in model_name:
                         out,pmf = model.forward(sample.cuda(), epoch_num=num_epoch)

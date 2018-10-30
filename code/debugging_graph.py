@@ -53,8 +53,10 @@ def get_gt_vector(vid_name, out_shape_curr, class_idx, test = True,gt_return = F
     
     # print class_name
     bin_keep = np.array(gt_vid_names_all) == vid_name
-    # print np.where(bin_keep)[0]
+    print np.where(bin_keep)[0]
+    print gt_vid_names_all[bin_keep]
     # print 'bef',gt_time_intervals[bin_keep]
+    print gt_class_names[bin_keep], class_name
     bin_keep = np.logical_and(bin_keep,gt_class_names==class_name)
     
     # print np.where(bin_keep)[0]
@@ -300,9 +302,9 @@ def script_make_gt_vecs():
     n_classes = 20
     just_primary = True
     # if just_primary:
-    train_file = os.path.join(dir_files, 'train_just_primary.txt')
-    test_file = os.path.join(dir_files, 'test_just_primary.txt')
-    out_dir_curr = os.path.join(out_dir_gt_vec,'just_primary')
+    train_file = os.path.join(dir_files, 'train_just_primary_corrected.txt')
+    test_file = os.path.join(dir_files, 'test_just_primary_corrected.txt')
+    out_dir_curr = os.path.join(out_dir_gt_vec,'just_primary_corrected')
 
     # else:
     #     train_file = os.path.join(dir_files, 'train.txt')
@@ -316,8 +318,8 @@ def script_make_gt_vecs():
     post_pend = '_gt_vec'
 
     for file_curr, test_stat  in zip(files, test_status):
-        if not test_stat:
-            continue
+        # if not test_stat:
+        #     continue
         npy_files, annos = readTrainTestFile(file_curr)
         for npy_file, anno_curr in zip(npy_files, annos):
             vid_name = os.path.split(npy_file)[1]
@@ -327,8 +329,15 @@ def script_make_gt_vecs():
             if not os.path.exists(out_file_curr):
                 out_shape_curr = np.load(npy_file).shape[0]
                 class_idx = anno_curr.index(1)
-                gt_vec,_ = get_gt_vector(vid_name, out_shape_curr, class_idx, test = test_stat)
+                gt_vec,det_times = get_gt_vector(vid_name, out_shape_curr, class_idx, test = test_stat)
                 gt_vec = gt_vec*(class_idx+1)
+                if np.max(gt_vec)<=0:
+                    print test_stat,vid_name
+                    print vid_name, class_idx
+                    # print gt_vec, vid_name, class_idx
+                    # print det_times
+                    continue
+
                 assert np.max(gt_vec)>0
                 np.save(out_file_curr, gt_vec)
         
@@ -481,12 +490,41 @@ def debugging_eval():
             # print gt_time_intervals
 
             #     
-    
+
+def correct_problem_test():
+    dir_files = '../data/ucf101/train_test_files'
+    in_files = ['test','test_just_primary']
+    out_file_post = 'corrected'
+
+    new_anno = ['BaseballPitch', 'BasketballDunk', 'Billiards', 'CleanAndJerk', 'CliffDiving', 'CricketBowling', 'CricketShot', 'Diving', 'FrisbeeCatch', 'GolfSwing', 'HammerThrow', 'HighJump', 'JavelinThrow', 'LongJump', 'PoleVault', 'Shotput', 'SoccerPenalty', 'TennisSwing', 'ThrowDiscus', 'VolleyballSpiking']
+    new_anno = [1 if class_names[idx]=='CricketShot' else 0 for idx in range(len(class_names))]
+    print new_anno
+
+    for in_file in in_files:
+        in_file_curr = os.path.join(dir_files,in_file+'.txt')
+        out_file_curr = os.path.join(dir_files,in_file+'_'+out_file_post+'.txt')
+        
+        lines = util.readLinesFromFile(in_file_curr)
+        lines_out = []
+        for line in lines:
+            if '0001496' in line:
+                line = line.split(' ')
+                print line
+                line = line[:-len(class_names)]+[str(val) for val in new_anno]
+                print line
+                line = ' '.join(line)
+
+            lines_out.append(line)
+
+        util.writeFile(out_file_curr,lines_out)
+
 
 
 def main():
+    # correct_problem_test()
+    script_make_gt_vecs()
 
-    debugging_eval()
+    # debugging_eval()
 
     # check_graph()
     return

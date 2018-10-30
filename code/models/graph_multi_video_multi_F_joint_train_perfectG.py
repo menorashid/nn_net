@@ -8,7 +8,7 @@ from normalize import Normalize
 
 import numpy as np
 
-class Graph_Multi_Video(nn.Module):
+class Graph_Multi_Video_PerfectG(nn.Module):
     def __init__(self,
                  n_classes,
                  deno,
@@ -21,7 +21,7 @@ class Graph_Multi_Video(nn.Module):
                  normalize = [True,True],
                  attention = False
                  ):
-        super(Graph_Multi_Video, self).__init__()
+        super(Graph_Multi_Video_PerfectG, self).__init__()
         
         self.num_classes = n_classes
         self.deno = deno
@@ -100,9 +100,15 @@ class Graph_Multi_Video(nn.Module):
     
     def forward(self, input, epoch_num = None, ret_bg =False, branch_to_test = -1):
         
+        
+        gt_vec = input[1]
+        input = input[0]
+        assert len(input)==len(gt_vec)
+
         strip = False
         if type(input)!=type([]):
             input = [input]
+            gt_vec = [gt_vec]
             strip = True
 
         if self.graph_size is None:
@@ -114,6 +120,7 @@ class Graph_Multi_Video(nn.Module):
             graph_size = min(self.graph_size, len(input))
 
         input_chunks = [input[i:i + graph_size] for i in xrange(0, len(input), graph_size)]
+        gt_vec_chunks = [gt_vec[i:i + graph_size] for i in xrange(0, len(input), graph_size)]
 
         is_cuda = next(self.parameters()).is_cuda
         # print 'Graph branch'
@@ -121,8 +128,21 @@ class Graph_Multi_Video(nn.Module):
         pmf_all = [[] for i in range(self.num_branches)]
         x_all_all = [[] for i in range(self.num_branches)]
         
-        for input in input_chunks:
+        for idx_input,input in enumerate(input_chunks):
+            gt_vec = gt_vec_chunks[idx_input]
             input_sizes = [input_curr.size(0) for input_curr in input]
+                    
+            # print len(gt_vec)
+            # for gt_vec_curr in gt_vec:
+            #     print type(gt_vec_curr)
+            #     print gt_vec_curr.size()
+            gt_vec = torch.cat(gt_vec,0)
+            # print gt_vec.size()
+            gt_vec[gt_vec>0]=1
+            # print torch.min(gt_vec), torch.max(gt_vec)
+
+            # raw_input()
+
             input = torch.cat(input,0)
 
             if self.sparsify:
@@ -132,6 +152,7 @@ class Graph_Multi_Video(nn.Module):
 
             if is_cuda:
                 input = input.cuda()
+                gt_vec = gt_vec.cuda()
             
             assert len(self.graph_layers)==(self.num_branches-1)
             
@@ -145,8 +166,12 @@ class Graph_Multi_Video(nn.Module):
                 out_col = self.linear_layers_after[col_num](feature_out)
 
                 if self.attention:
-                    alpha = F.softmax(out_col,dim = 1)
-                    alpha,_ = torch.max(alpha,dim =1)
+                    # alpha = F.softmax(out_col,dim = 1)
+                    # alpha,_ = torch.max(alpha,dim =1)
+                    # print alpha
+                    # print alpha/torch.sum(alpha)
+                    # raw_input()
+                    alpha = gt_vec
                 else:
                     alpha = None
 
@@ -239,7 +264,7 @@ class Network:
                  normalize = [True,True],
                  attention = False
                  ):
-        self.model = Graph_Multi_Video(n_classes, deno, in_out,feat_dim, graph_size, method, sparsify, non_lin, normalize, attention)
+        self.model = Graph_Multi_Video_PerfectG(n_classes, deno, in_out,feat_dim, graph_size, method, sparsify, non_lin, normalize, attention)
         
     def get_lr_list(self, lr):
         
