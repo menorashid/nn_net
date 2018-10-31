@@ -104,16 +104,23 @@ def createScatterOfDiffsAndDistances(diffs,title,xlabel,ylabel,out_file,dists=No
 
 
 def saveMatAsImage(mat,out_file):
-    fig = plt.figure();
+    fig = plt.figure()    
+    ax = fig.add_subplot(111)
+    cax = ax.matshow(mat, interpolation='nearest')
+    fig.colorbar(cax)
+
+
     # print list(np.where(mat[0,:]))
     # plt.imshow(mat)
-    
-        # ,interpolation = 'nearest');
-    # plt.savefig(out_file);
+
+    # cax = plt.matshow(mat)
+    #     # ,interpolation = 'nearest');
+    # fig.colorbar(cax)  
+    plt.savefig(out_file);
     # fig.savefig(out_file, format='png')
     # , dpi=fig.dpi)
-    scipy.misc.imsave(out_file,mat)
-    plt.close();
+    # scipy.misc.imsave(out_file,mat)
+    plt.close()
 
 
 def createImageAndCaptionGrid(img_paths,gt_labels,indices,text_labels):

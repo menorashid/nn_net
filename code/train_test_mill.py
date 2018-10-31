@@ -479,6 +479,11 @@ def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh ,
                 bin_not_keep = pmf<first_thresh
             
             # print np.min(pmf), np.max(pmf)
+            # print bin_not_keep
+            # print labels[idx_sample]
+            # print pmf
+            # print first_thresh
+
             for class_idx in range(pmf.size):
                 if bin_not_keep[class_idx]:
                     continue
@@ -493,12 +498,16 @@ def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh ,
 
 
                 det_conf, det_time_intervals = merge_detections(bin_second_thresh, det_conf, det_time_intervals_meta)
+                # print class_idx, labels[idx_sample][class_idx],np.min(det_conf), np.max(det_conf),len(det_time_intervals)
+
                 # det_time_intervals = det_time_intervals_meta
                 
                 det_vid_names.extend([det_vid_names_ac[idx_test]]*det_conf.shape[0])
                 det_events_class.extend([class_idx]*det_conf.shape[0])
                 det_conf_all.append(det_conf)
                 det_time_intervals_all.append(det_time_intervals)
+            
+            # raw_input()
 
             idx_test +=1
 

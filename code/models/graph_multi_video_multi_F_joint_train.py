@@ -200,26 +200,49 @@ class Graph_Multi_Video(nn.Module):
         pmf = torch.sum(pmf[:k,:], dim = 0)/k
         return pmf
 
-    # def get_similarity(self,input,idx_graph_layer = 0):
+    def get_similarity(self,input,idx_graph_layer = 0,sparsify = None):
 
-    #     is_cuda = next(self.parameters()).is_cuda
-    #     input_sizes = [input_curr.size(0) for input_curr in input]
-    #     input = torch.cat(input,0)
+        if sparsify is None:
+            sparsify = self.sparsify
 
-    #     if self.sparsify:
-    #         to_keep = (self.get_to_keep(input_sizes),input_sizes)
-    #     else:
-    #         to_keep = None
+        is_cuda = next(self.parameters()).is_cuda
 
-    #     print to_keep    
+        input_sizes = [input_curr.size(0) for input_curr in input]
+        input = torch.cat(input,0)
+
+        if sparsify:
+            to_keep = (self.get_to_keep(input_sizes),input_sizes)
+        else:
+            to_keep = None
+
+        # print 'to_keep',to_keep
+
+        if is_cuda:
+            input = input.cuda()
         
-    #     if is_cuda:
-    #         input = input.cuda()
+        assert len(self.graph_layers)==(self.num_branches-1)
+        assert idx_graph_layer<len(self.graph_layers)
+
+        input_graph = input
+        for col_num in range(idx_graph_layer+1):
+            graph_layer = self.graph_layers[col_num]
+            linear_layer = self.linear_layers[col_num]
+            linear_layer_after = self.linear_layers_after[col_num]
         
-    #     feature_out = self.linear_layers[idx_graph_layer][0](input)
-    #     sim_mat = self.graph_layers[idx_graph_layer].get_affinity(feature_out,to_keep = to_keep)
+            feature_out = self.linear_layers[col_num](input_graph)
+            out_col = self.linear_layers_after[col_num](feature_out)
+
+            if self.attention:
+                alpha = F.softmax(out_col,dim = 1)
+                alpha,_ = torch.max(alpha,dim =1)
+            else:
+                alpha = None
+            if col_num ==idx_graph_layer:
+                sim_mat = self.graph_layers[col_num].get_affinity(input_graph, to_keep = to_keep, alpha = alpha)
+            else:
+                input_graph = self.graph_layers[col_num](input_graph, feature_out, to_keep = to_keep, alpha = alpha)
         
-    #     return sim_mat
+        return sim_mat
     
     def printGraphGrad(self):
         grad_rel = self.graph_layers[0].graph_layer.weight.grad

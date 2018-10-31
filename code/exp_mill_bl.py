@@ -276,7 +276,7 @@ def train_simple_mill_all_classes(model_name,
             visualize_sim_mat(**test_params)
 
 def testing_exp():
-    model_name = 'just_graph_multi_video_multi_F_joint_train'
+    model_name = 'graph_multi_video_multi_F_joint_train'
     gt_vec = False
     just_primary = False
 
@@ -289,10 +289,10 @@ def testing_exp():
     limit  = 500
     save_after = 100
     
-    test_mode = False
+    test_mode = True
 
     model_nums = None
-    retrain = True
+    retrain = False
     viz_mode = False
     viz_sim = False
     test_post_pend = ''
@@ -302,7 +302,7 @@ def testing_exp():
     network_params = {}
     network_params['deno'] = 8
     # network_params['pretrained'] = 'ucf'
-    network_params['in_out'] = [2048,20]
+    network_params['in_out'] = [2048,64]
     network_params['feat_dim'] = [2048,64]
     network_params['graph_size'] = 2
     
@@ -317,7 +317,7 @@ def testing_exp():
     post_pend = 'ABS'
     # loss_weights = None
     multibranch = 2
-    loss_weights = [1,1]
+    loss_weights = [0.5,0.5]
     branch_to_test = 1
 
     first_thresh=0
@@ -432,6 +432,7 @@ def super_simple_experiment():
     # graph_size = 32
     # post_pend += '_bw_32_bs_'+str(graph_size)
     first_thresh=0
+
 
     
 
