@@ -20,7 +20,8 @@ class Graph_Multi_Video(nn.Module):
                  non_lin = 'HT',
                  normalize = [True,True],
                  attention = False,
-                 gk = 8
+                 gk = 8,
+                 aft_nonlin = None,
                  ):
         super(Graph_Multi_Video, self).__init__()
         
@@ -37,6 +38,10 @@ class Graph_Multi_Video(nn.Module):
         num_layers = len(in_out)-1
         
         print 'NUM LAYERS', num_layers, in_out
+        
+        self.bn =None
+        # nn.BatchNorm1d(2048, affine = False)
+
 
         self.linear_layers = nn.ModuleList()
         self.linear_layers_after = nn.ModuleList()
@@ -52,7 +57,7 @@ class Graph_Multi_Video(nn.Module):
 
             idx_curr = idx_layer_num*2
 
-            self.linear_layers.append(nn.Linear(feat_dim[idx_curr], feat_dim[idx_curr+1], bias = False))
+            self.linear_layers.append(nn.Linear(feat_dim[idx_curr], feat_dim[idx_curr+1], bias = True))
             
             last_linear = []
             last_linear.append(non_lin_curr)
@@ -67,19 +72,21 @@ class Graph_Multi_Video(nn.Module):
         
         self.graph_layers = nn.ModuleList()
         for num_layer in range(num_layers): 
-            self.graph_layers.append(Graph_Layer_Wrapper(in_out[num_layer],n_out = in_out[num_layer+1], non_lin = non_lin, method = method))
+            self.graph_layers.append(Graph_Layer_Wrapper(in_out[num_layer],n_out = in_out[num_layer+1], non_lin = non_lin, method = method, aft_nonlin = aft_nonlin))
         
-        last_graph = []
-        if non_lin =='HT':
-            last_graph.append(nn.Hardtanh())
-        elif non_lin =='RL':
-            last_graph.append(nn.ReLU())
-        else:
-            error_message = str('Non lin %s not valid', non_lin)
-            raise ValueError(error_message)
 
-        if normalize[1]:
-            last_graph.append(Normalize())
+        last_graph = []
+        if aft_nonlin is None:
+            if non_lin =='HT':
+                last_graph.append(nn.Hardtanh())
+            elif non_lin =='RL':
+                last_graph.append(nn.ReLU())
+            else:
+                error_message = str('Non lin %s not valid', non_lin)
+                raise ValueError(error_message)
+
+            if normalize[1]:
+                last_graph.append(Normalize())
 
         last_graph.append(nn.Dropout(0.5))
         last_graph.append(nn.Linear(in_out[-1],n_classes))
@@ -128,7 +135,9 @@ class Graph_Multi_Video(nn.Module):
             input_sizes = [input_curr.size(0) for input_curr in input]
             input = torch.cat(input,0)
 
-            if self.sparsify:
+            if type(self.sparsify)==float:
+                to_keep = self.sparsify
+            elif self.sparsify==True:
                 to_keep = (self.get_to_keep(input_sizes),input_sizes)
             else:
                 to_keep = None
@@ -138,6 +147,9 @@ class Graph_Multi_Video(nn.Module):
             
             assert len(self.graph_layers)==(self.num_branches-1)
             
+            # if self.bn is not None:
+            #     input = self.bn(input)
+
             input_graph = input
             for col_num in range(len(self.graph_layers)):
                 graph_layer = self.graph_layers[col_num]
@@ -226,6 +238,9 @@ class Graph_Multi_Video(nn.Module):
         assert len(self.graph_layers)==(self.num_branches-1)
         assert idx_graph_layer<len(self.graph_layers)
 
+        # if self.bn is not None:
+        #     input = self.bn(input)
+
         input_graph = input
         for col_num in range(idx_graph_layer+1):
             graph_layer = self.graph_layers[col_num]
@@ -264,9 +279,10 @@ class Network:
                  non_lin = 'HT',
                  normalize = [True,True],
                  attention = False,
-                 gk = 8
+                 gk = 8,
+                 aft_nonlin = None
                  ):
-        self.model = Graph_Multi_Video(n_classes, deno, in_out,feat_dim, graph_size, method, sparsify, non_lin, normalize, attention,gk)
+        self.model = Graph_Multi_Video(n_classes, deno, in_out,feat_dim, graph_size, method, sparsify, non_lin, normalize, attention,gk, aft_nonlin)
         
     def get_lr_list(self, lr):
         

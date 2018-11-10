@@ -70,7 +70,8 @@ def test_model_core(model, test_dataloader, criterion, log_arr, multibranch = 1)
 
             for idx_sample, sample in enumerate(samples):
                 if 'multi_video' in model_name:
-                    if 'perfectg' in model_name:
+                    # print model_name
+                    if 'perfectg' in model_name or 'cooc' in model_name:
                         # print 'hello'
                         out,preds_mini = model.forward([samples,batch['gt_vec']])
                         # print len(preds_mini)
@@ -82,7 +83,7 @@ def test_model_core(model, test_dataloader, criterion, log_arr, multibranch = 1)
                         for idx_preds_curr,preds_curr in enumerate(preds_mini):
                             preds[idx_preds_curr]+=[torch.nn.functional.softmax(pmf).data.cpu().numpy() for pmf in preds_curr]    
                     else:
-                        preds+=[torch.nn.functional.softmax(pmf).data.cpu().numpy() for pmf_mini in preds_mini]
+                        preds+=[torch.nn.functional.softmax(pmf_mini).data.cpu().numpy() for pmf_mini in preds_mini]
                     
                     break
                 elif 'perfectg' in model_name:
@@ -408,6 +409,7 @@ def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh ,
     # raw_input()
 
     model.eval()
+    model = model.cuda()
     model_name = model.__class__.__name__.lower()
 
     preds = []
@@ -438,12 +440,12 @@ def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh ,
             else:    
                 
                 if multibranch>1:
-                    if 'perfectg' in model_name:
+                    if 'perfectg' in model_name or 'cooc' in model_name:
                         out, pmf = model.forward([sample.cuda(),batch['gt_vec'][idx_sample].cuda()], branch_to_test = branch_to_test)
                     else:
                         out, pmf = model.forward(sample.cuda(), branch_to_test = branch_to_test)
                 else:
-                    if 'perfectg' in model_name:
+                    if 'perfectg' in model_name or 'cooc' in model_name:
                         out,pmf = model.forward([sample.cuda(),batch['gt_vec'][idx_sample].cuda()])
                     else:    
                         out, pmf = model.forward(sample.cuda())
@@ -787,12 +789,13 @@ def train_model(out_dir_train,
                 preds = []
                 if multibranch>1:
                     preds = [[] for i in range(multibranch)]
+                
                 for idx_sample, sample in enumerate(samples):
-                    # print labels[idx_sample]
+
                     if 'alt_train' in model_name and 'multi_video' in model_name:
                         out,preds = model.forward(samples, epoch_num = num_epoch)
                         break
-                    elif 'perfectG' in model_name and 'multi_video' in model_name:
+                    elif ('cooc' in model_name or 'perfectG' in model_name) and 'multi_video' in model_name:
                         out,preds = model.forward([samples,batch['gt_vec']])
                         break
                     elif 'alt_train' in model_name:

@@ -90,6 +90,7 @@ def event_det_pr(det_vid_names, det_time_intervals, det_class_names, det_conf, g
 
     video_names = np.unique(det_vid_names+gt_vid_names)
     num_pos = gt_class_names.count(class_name)
+    # print class_name,num_pos
     assert num_pos>0
 
     gt_class_names = np.array(gt_class_names)
@@ -265,13 +266,14 @@ def test_overlap(det_vid_names_all, det_conf_all, det_time_intervals_all, second
         print str_print
     
     aps[-1,:]= np.mean(aps[:len(class_names),:],0)
-    class_names.append('Average')
+    # class_names_curr = class_names[:]
+    # class_names_curr.append('Average')
     
     # print aps
     str_print = '\t'.join(['%.1f' % ov for ov in overlap_thresh_all])
     log_arr.append(str_print)
     # print log_arr[-1]
-    for idx_class_name, class_name in enumerate(class_names):
+    for idx_class_name, class_name in enumerate(class_names+['Average']):
         if len(class_name)<8 and dataset=='ucf':
             class_name +='\t'
         str_print = [class_name]+['%.2f' % ap_curr for ap_curr in aps[idx_class_name,:]]

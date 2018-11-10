@@ -279,7 +279,7 @@ def script_viewing_sim():
         visualize.writeHTMLForFolder(out_dir_curr)
 
 
-def readTrainTestFile(file_curr):
+def readTrainTestFile(file_curr,k_vec = None):
     lines = util.readLinesFromFile(file_curr)
     
     anno_all = []
@@ -287,7 +287,10 @@ def readTrainTestFile(file_curr):
     for line in lines:
         line = line.split(' ')
         npy_file = line[0]
-        anno = [int(val) for val in line[1:]]
+        if k_vec is None:
+            anno = [int(val) for val in line[1:]]
+        else:
+            anno = [int(val) for val in line[2:]]
         anno_all.append(anno)
         npy_files_all.append(npy_file)
 
@@ -368,22 +371,16 @@ def check_graph():
     model = torch.load(model_file).cuda()
     model.eval()
 
-    # print model
-
-    # model.sparsify = True
-
     train_data, test_train_data, test_data, n_classes, trim_preds = emb.get_data('ucf', 500, False, just_primary = False, gt_vec = False)
 
-    test_data = train_data
-    test_bool = False
+    # test_data = train_data
+    # test_bool = False
+    # test_data.feature_limit = None
 
-    # print train_data.anno_file
-    # print train_data.feature_limit
-    print test_data.feature_limit
-    test_data.feature_limit = None
-    print test_data.feature_limit
     batch_size = 1
-    branch_to_test = 0
+    branch_to_test = 1
+    test_bool = True
+
     out_dir_meta = model_file[:model_file.rindex('.')]
     out_dir_meta = out_dir_meta+'_visualizing_'+str(branch_to_test)
     util.mkdir(out_dir_meta)
@@ -391,7 +388,6 @@ def check_graph():
 
     anno_file = test_data.anno_file
 
-    # annos = util.readLinesFromFile(anno_file)
     vid_names, annos = readTrainTestFile(anno_file)
 
     test_dataloader = torch.utils.data.DataLoader(test_data, 
@@ -405,33 +401,22 @@ def check_graph():
     labels = []
 
     for idx_data, data in enumerate(test_dataloader):
-        # anno_curr = annos[idx_data].split(' ')
         gt_classes = np.where(annos[idx_data])[0]
         vid_name = os.path.split(vid_names[idx_data])[1]
         vid_name = vid_name[:vid_name.rindex('.')]
-        # print vid_name , gt_classes
-        # if '448' not in vid_name:
-        #     continue
-
+        
         out_dir_curr = os.path.join(out_dir_meta,vid_name)
         util.mkdir(out_dir_curr)
 
-        # print data.keys()
         label = data['label'].cpu().data.numpy()
-        # print label
-        # gt_vec = data['gt_vec'][0].cpu().data.numpy()
-        # print gt_vec.shape
-
         affinity = model.get_similarity(data['features'],sparsify = True)
 
         x_all, pmf = model(data['features'], branch_to_test = branch_to_test)
         assert len(pmf)==1
 
         x_all = torch.cat([x_all_curr.unsqueeze(0) for x_all_curr in x_all],0)
-        # print x_all.size()
-        x_all = F.softmax(x_all, dim = 1)
-        # print x_all.size()
 
+        x_all = F.softmax(x_all, dim = 1)
         x_all = x_all.data.cpu().numpy()
         affinity = affinity.data.cpu().numpy()
 
@@ -440,27 +425,22 @@ def check_graph():
         for gt_class in gt_classes:
             affinity_copy = np.array(affinity)
             x_rel = x_all[:,gt_class]
+
             thresh = np.max(x_rel) - (np.max(x_rel)-np.min(x_rel))*0.5
             gt_vec,_ = get_gt_vector(vid_name, x_rel.shape[0], gt_class, test = test_bool)
+
             if np.sum(gt_vec)==0:
                 'we got an anno problem', vid_name
                 continue
-
-            # gt_vec_border = gt_vec - np.roll(gt_vec,1)
 
             bin_keep = gt_vec.astype(int)
             bin_keep_rot = np.roll(bin_keep, 1)
             bin_keep_rot[0] = 0
             diff = bin_keep - bin_keep_rot
-            # diff[-3]=1
             idx_start_all = list(np.where(diff==1)[0])
             idx_end_all = list(np.where(diff==-1)[0])
             idx_borders = np.array(idx_start_all+idx_end_all)
 
-
-
-            # print idx_borders
-            # raw_input()
             affinity_copy[:,idx_borders]=np.max(affinity_copy)
             affinity_copy[idx_borders,:]=np.max(affinity_copy)
 
@@ -478,81 +458,143 @@ def check_graph():
             visualize.saveMatAsImage(affinity_copy, out_file_mat)
 
         preds.append(F.softmax(pmf[0]).data.cpu().numpy())
-        # pred_curr = pmf[0].data.cpu().numpy()
-        # max_idx = np.argmax(pred_curr)
-        # pred_curr = pred_curr*0
-        # pred_curr[0,max_idx]=1
-
-        # pred_curr[pred_curr<0]=0
-        # pred_curr[pred_curr>0]=1
-        # div = max(1,np.sum(pred_curr))
-        # pred_curr = pred_curr/div
-        # preds.append(pred_curr)
 
         labels.append(label)
         visualize.writeHTMLForFolder(out_dir_curr)
-        # print out_dir_curr
-        # raw_input()
+        print out_dir_curr
+        raw_input()
+        
+    labels = np.concatenate(labels,axis = 0)
+    preds = np.concatenate(preds, axis = 0)
+    labels[labels>0]=1
+  
+    accuracy = sklearn.metrics.average_precision_score(labels, preds)
+    print accuracy
+
+
+
+def visualizing_attention():
+    
+    model_file = '../experiments/graph_multi_video_multi_F_joint_train_normalize_True_True_non_lin_HT_sparsify_True_graph_size_2_deno_8_n_classes_20_in_out_2048_64_feat_dim_2048_64_method_cos_ucf/all_classes_False_just_primary_False_limit_500_cw_True_MultiCrossEntropyMultiBranch_300_step_300_0.1_0.001_0.001_lw_0.5_0.5_ABS/model_299.pt'
+
+    model = torch.load(model_file).cuda()
+    model.eval()
+
+    train_data, test_train_data, test_data, n_classes, trim_preds = emb.get_data('ucf', 500, False, just_primary = False, gt_vec = False)
+
+    # test_data = train_data
+    # test_bool = False
+    # test_data.feature_limit = None
+
+    batch_size = 1
+    branch_to_test = 0
+    out_dir_meta = model_file[:model_file.rindex('.')]
+    out_dir_meta = out_dir_meta+'_visualizing_attention_max'+str(branch_to_test)
+    util.mkdir(out_dir_meta)
+    print out_dir_meta
+
+    anno_file = test_data.anno_file
+
+    vid_names, annos = readTrainTestFile(anno_file)
+
+    test_dataloader = torch.utils.data.DataLoader(test_data, 
+                        batch_size = batch_size,
+                        collate_fn = test_data.collate_fn,
+                        shuffle = False, 
+                        num_workers = 1)
+
+    import torch.nn.functional as F
+    preds = []
+    labels = []
+
+    for idx_data, data in enumerate(test_dataloader):
+        
+        gt_classes = np.where(annos[idx_data])[0]
+        vid_name = os.path.split(vid_names[idx_data])[1]
+        vid_name = vid_name[:vid_name.rindex('.')]
+        
+        # out_dir_curr = os.path.join(out_dir_meta,vid_name)
+        # util.mkdir(out_dir_curr)
+
+        label = data['label'].cpu().data.numpy()
+        
+        # affinity = model.get_similarity(data['features'],sparsify = True)
+
+        x_all, pmf = model(data['features'], branch_to_test = branch_to_test)
+        assert len(pmf)==1
+
+        x_all = torch.cat([x_all_curr.unsqueeze(0) for x_all_curr in x_all],0)
+        x_all = F.softmax(x_all, dim = 1)
+        x_all = x_all.data.cpu().numpy()
+        # affinity = affinity.data.cpu().numpy()
+        test_bool = True
+        max_all = np.max(x_all, axis = 1)
+
+
+        # 
+
+
+
+        for gt_class in gt_classes:
+            class_name_curr = class_names[gt_class]
+            print class_name_curr
+            out_dir_curr = os.path.join(out_dir_meta, class_name_curr)
+            util.mkdir(out_dir_curr)
+
+
+            # affinity_copy = np.array(affinity)
+            x_rel = x_all[:,gt_class]
+            thresh = np.max(x_rel) - (np.max(x_rel)-np.min(x_rel))*0.5
+            gt_vec,_ = get_gt_vector(vid_name, x_rel.shape[0], gt_class, test = test_bool)
+            if np.sum(gt_vec)==0:
+                print 'we got an anno problem', vid_name
+                continue
+
+            out_file_curr = os.path.join(out_dir_curr, vid_name+'.jpg')
+
+
+
+            # bin_keep = gt_vec.astype(int)
+            # bin_keep_rot = np.roll(bin_keep, 1)
+            # bin_keep_rot[0] = 0
+            # diff = bin_keep - bin_keep_rot
+            # # diff[-3]=1
+            # idx_start_all = list(np.where(diff==1)[0])
+            # idx_end_all = list(np.where(diff==-1)[0])
+            # idx_borders = np.array(idx_start_all+idx_end_all)
+
+
+
+            # # print idx_borders
+            # # raw_input()
+            # affinity_copy[:,idx_borders]=np.max(affinity_copy)
+            # affinity_copy[idx_borders,:]=np.max(affinity_copy)
+
+            gt_vec = gt_vec *np.max(x_rel)
+            x_axis = range(x_rel.size)
+            
+            thresh = thresh * np.ones(x_rel.shape)
+
+            # out_file_curr = os.path.join(out_dir_curr,'det_confs_'+class_names[gt_class]+'.jpg')
+
+            visualize.plotSimple([(x_axis,x_rel),(x_axis,gt_vec), (x_axis, thresh), (x_axis, max_all)],out_file = out_file_curr,title = class_names[gt_class],xlabel = 'time',ylabel = 'det conf',legend_entries=['Det','GT','Thresh', 'Attn'])
+        
+
+            # out_file_mat = os.path.join(out_dir_curr,'mat_'+class_names[gt_class]+'.jpg')
+            # visualize.saveMatAsImage(affinity_copy, out_file_mat)
+
+        preds.append(F.softmax(pmf[0]).data.cpu().numpy())
+
+        labels.append(label)
+        visualize.writeHTMLForFolder(out_dir_curr)
 
     labels = np.concatenate(labels,axis = 0)
     preds = np.concatenate(preds, axis = 0)
     labels[labels>0]=1
-    # print labels.shape
-    # print preds.shape
 
     accuracy = sklearn.metrics.average_precision_score(labels, preds)
     print accuracy
 
-        # pmf = np.array(pmf)[0]
-        # print pmf.shape
-        # pmf[pmf<0]=0
-        # pmf[pmf>0]=1
-        # # pmf = pmf/np.sum(pmf, axis =1, keepdims=True)
-        # print pmf
-        # print label
-
-        # print affinity.size()
-        # print pmf[0].size()
-        # print x_all[0].size()
-        # print x_all[0]
-        # print data['label'].cpu().data.numpy()
-        # print F.softmax(x_all[0])
-
-        
-
-
-        # affinity = affinity.cpu().data.numpy()
-        # # affinity = np.zeros(affinity.shape)
-        # print np.min(affinity), np.max(affinity)
-        # print np.sum(affinity!=0),affinity.shape[0]*affinity.shape[1]
-        # print np.unique(np.sum(affinity!=0,1))
-            
-
-        # # print affinity.shape
-        # # raw_input()
-        # sizes = [mat_curr.size(0) for mat_curr in data['features']]
-        # print len(sizes)
-        # max_val = np.max(affinity)
-        # for idx in range(len(sizes)-1):
-        #     end_val= sum(sizes[:idx+1])
-        #     print idx,end_val
-        #     affinity[:,end_val]=max_val
-
-
-        # # print affinity
-        #     # print affinity[0,end_val]
-        #     # print np.unique(affinity[:,end_val])
-
-        # out_file = '../scratch/see_graphs_sparse_k_each_abs.png'
-        # visualize.saveMatAsImage(affinity,out_file)
-
-
-        # print affinity.size()
-        # print torch.min(affinity), torch.max(affinity)
-
-        # print data.keys()
-        # print len(data['features']),data['features'][0].shape
-        # raw_input()
 
 
 
@@ -660,14 +702,14 @@ def correct_problem_test():
         util.writeFile(out_file_curr,lines_out)
 
 
-
 def main():
+    visualizing_attention()
     # correct_problem_test()
     # script_make_gt_vecs()
 
     # debugging_eval()
 
-    check_graph()
+    # check_graph()
     return
     # script_make_gt_vecs()
     dir_gt_vecs = '../data/ucf101/gt_vecs/just_primary/'

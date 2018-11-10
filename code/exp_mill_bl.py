@@ -8,7 +8,7 @@ import numpy as np
 import torch
 from globals import * 
 
-def get_data(dataset, limit, all_classes, just_primary, gt_vec):
+def get_data(dataset, limit, all_classes, just_primary, gt_vec, k_vec):
 
     if dataset =='ucf':
         dir_files = '../data/ucf101/train_test_files'
@@ -31,17 +31,23 @@ def get_data(dataset, limit, all_classes, just_primary, gt_vec):
         if just_primary:
             post_pends = [pp+val for pp,val in zip(post_pends,['_just_primary','_just_primary','_just_primary'])]
         
-        post_pends = [pp+val for pp,val in zip(post_pends,['_corrected','_corrected','_corrected'])]
-        
+        # post_pends = [pp+val for pp,val in zip(post_pends,['_corrected','_corrected','_corrected'])]
+        # post_pends = [pp+val for pp,val in zip(post_pends,['_ultra_correct','_ultra_correct','_ultra_correct'])]
+                
 
         if gt_vec:
             post_pends = [pp+val for pp,val in zip(post_pends,['_gt_vec','_gt_vec','_gt_vec'])]
+
+        if k_vec is not None:
+            # print 
+            post_pends = [pp+val for pp,val in zip(post_pends,['_'+k_vec]*3)]
+
 
         post_pends = [pp+'.txt' for pp in post_pends]
         files = [file_curr+pp for file_curr,pp in zip(files,post_pends)]
         
         train_file, test_train_file, test_file = files
-        if gt_vec:
+        if gt_vec or (k_vec is not None):
             train_data = UCF_dataset_gt_vec(train_file, limit)
             test_train_data = UCF_dataset_gt_vec(test_train_file, limit)
             test_data = UCF_dataset_gt_vec(test_file, None)
@@ -103,7 +109,8 @@ def train_simple_mill_all_classes(model_name,
                                     multibranch = 1,
                                     loss_weights = None,
                                     branch_to_test = 0,
-                                    gt_vec = False):
+                                    gt_vec = False,
+                                    k_vec = None):
 
     num_epochs = epoch_stuff[1]
 
@@ -117,7 +124,7 @@ def train_simple_mill_all_classes(model_name,
 
     lr = lr
 
-    train_data, test_train_data, test_data, n_classes, trim_preds = get_data(dataset, limit, all_classes, just_primary, gt_vec)
+    train_data, test_train_data, test_data, n_classes, trim_preds = get_data(dataset, limit, all_classes, just_primary, gt_vec, k_vec)
     
     network_params['n_classes']=n_classes
 
@@ -147,6 +154,10 @@ def train_simple_mill_all_classes(model_name,
     init = False
     
 
+    
+    out_dir_meta = os.path.join('../experiments',model_name)
+    util.mkdir(out_dir_meta)
+
     out_dir_meta_str = [model_name]
     for k in network_params.keys():
         out_dir_meta_str.append(k)
@@ -157,7 +168,8 @@ def train_simple_mill_all_classes(model_name,
     out_dir_meta_str.append(dataset)
     out_dir_meta_str = '_'.join([str(val) for val in out_dir_meta_str])
     
-    out_dir_meta = os.path.join('../experiments',out_dir_meta_str)
+    out_dir_meta = os.path.join(out_dir_meta,out_dir_meta_str)
+    # print out_dir_meta
     util.mkdir(out_dir_meta)
     
 
@@ -165,7 +177,7 @@ def train_simple_mill_all_classes(model_name,
     strs_append_list = ['all_classes',all_classes,'just_primary',just_primary,'limit',limit,'cw',class_weights, criterion_str, num_epochs]+dec_after+lr
     
     if loss_weights is not None:
-        strs_append_list += ['lw']+loss_weights
+        strs_append_list += ['lw']+['%.2f' % val for val in loss_weights]
     
     strs_append_list+=[post_pend] if len(post_pend)>0 else []
     strs_append = '_'.join([str(val) for val in strs_append_list])
@@ -225,7 +237,7 @@ def train_simple_mill_all_classes(model_name,
     # model_nums = [0]+[i-1 for i in range(save_after,num_epochs,save_after)]
     # if model_nums[-1]!=(num_epochs-1):
     #     model_nums.append(num_epochs-1)
-
+    # return
     for model_num in model_nums:
 
         print 'MODEL NUM',model_num
@@ -276,20 +288,50 @@ def train_simple_mill_all_classes(model_name,
             visualize_sim_mat(**test_params)
 
 def testing_exp():
-    model_name = 'graph_multi_video_multi_F_joint_train'
+    # model_name = 'graph_multi_video_multi_F_joint_train_gaft'
+    # lr = [0.001,0.001]
+    # multibranch = 2
+    # loss_weights = [0,1]
+    # branch_to_test = 1
+
+
+    model_name = 'graph_multi_video_i3dF_gaft'
+    lr = [0.001]
+    loss_weights = None
+    multibranch = 1
+    branch_to_test = 0
+
+
+    # model_name = 'graph_multi_video_same_F'
+    # lr = [0.001,0.001]
+    # loss_weights = None
+    # multibranch = 1
+    # branch_to_test = 0
+    # for idx_class in [1]:
+    # range(18,20):
+    k_vec = None
+
+    # model_name = 'graph_multi_video_cooc_ofe_olg'
+    # lr = [0.001]
+    # loss_weights = None
+    # multibranch = 1
+    # branch_to_test = 0
+    # k_vec = 'k_100'
+
+
     gt_vec = False
     just_primary = False
 
     torch.backends.cudnn.deterministic = True
     torch.manual_seed(999)
 
-    lr = [0.001,0.001]
+    
     epoch_stuff = [300,300]
     dataset = 'ucf'
     limit  = 500
     save_after = 100
     
-    test_mode = True
+    test_mode = False
 
     model_nums = None
     retrain = False
@@ -302,24 +344,24 @@ def testing_exp():
     network_params = {}
     network_params['deno'] = 8
     # network_params['pretrained'] = 'ucf'
-    network_params['in_out'] = [2048,64]
-    network_params['feat_dim'] = [2048,64]
+    network_params['in_out'] = [2048,256]
+    network_params['feat_dim'] = [2048,32]
+    # '100_all'
+    # network_params['post_pend'] = ''
+    # [2048,32]
     network_params['graph_size'] = 2
-    
+    # network_params['gk'] = 8
     network_params['method'] = 'cos'
     # network_params['num_switch'] = [5,5]
     # network_params['focus'] = 0
-    network_params['sparsify'] = True
-    network_params['non_lin'] = 'HT'
-    network_params['normalize'] = [True, True]
+    network_params['sparsify'] = 0.8
+    network_params['non_lin'] = None
+    # network_params['normalize'] = [True, True]
+    network_params['aft_nonlin']='HT_l2'
     # network_params['attention'] = False
 
-    post_pend = 'ABS'
-    # loss_weights = None
-    multibranch = 2
-    loss_weights = [0.5,0.5]
-    branch_to_test = 1
-
+    post_pend = 'ABS_bias'
+    
     first_thresh=0
 
     
@@ -327,7 +369,7 @@ def testing_exp():
     class_weights = True
     test_after = 5
     
-    all_classes = False
+    all_classes = True
     # just_primary = False
     # gt_vec = False
 
@@ -362,7 +404,8 @@ def testing_exp():
                         gt_vec = gt_vec,
                         loss_weights = loss_weights,
                         multibranch = multibranch,
-                        branch_to_test = branch_to_test)
+                        branch_to_test = branch_to_test,
+                        k_vec = k_vec)
 
 def super_simple_experiment():
     # model_name = 'just_mill_flexible'

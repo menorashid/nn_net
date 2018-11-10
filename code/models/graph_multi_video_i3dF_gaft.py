@@ -20,7 +20,8 @@ class Graph_Multi_Video(nn.Module):
                  non_lin = 'HT',
                  normalize = [True,True],
                  attention = False,
-                 gk = 8
+                 gk = 8,
+                 aft_nonlin = None,
                  ):
         super(Graph_Multi_Video, self).__init__()
         
@@ -31,62 +32,69 @@ class Graph_Multi_Video(nn.Module):
         self.gk = gk
         if in_out is None:
             in_out = [2048,64]
-        if feat_dim is None:
-            feat_dim = [2048,64]
+        # if feat_dim is None:
+        #     feat_dim = [2048,64]
 
         num_layers = len(in_out)-1
         
         print 'NUM LAYERS', num_layers, in_out
+        
+        self.bn =None
+        # nn.BatchNorm1d(2048, affine = False)
 
-        self.linear_layers = nn.ModuleList()
-        self.linear_layers_after = nn.ModuleList()
-        for idx_layer_num,layer_num in enumerate(range(num_layers)):
 
-            if non_lin =='HT':
-                non_lin_curr = nn.Hardtanh()
-            elif non_lin =='RL':
-                non_lin_curr = nn.ReLU()
-            else:
-                error_message = str('Non lin %s not valid', non_lin)
-                raise ValueError(error_message)
+        # self.linear_layers = nn.ModuleList()
+        # self.linear_layers_after = nn.ModuleList()
+        # for idx_layer_num,layer_num in enumerate(range(num_layers)):
 
-            idx_curr = idx_layer_num*2
+        #     if non_lin =='HT':
+        #         non_lin_curr = nn.Hardtanh()
+        #     elif non_lin =='RL':
+        #         non_lin_curr = nn.ReLU()
+        #     else:
+        #         error_message = str('Non lin %s not valid', non_lin)
+        #         raise ValueError(error_message)
 
-            self.linear_layers.append(nn.Linear(feat_dim[idx_curr], feat_dim[idx_curr+1], bias = False))
+        #     idx_curr = idx_layer_num*2
+
+        #     self.linear_layers.append(nn.Linear(feat_dim[idx_curr], feat_dim[idx_curr+1], bias = True))
             
-            last_linear = []
-            last_linear.append(non_lin_curr)
-            if normalize[0]:
-                last_linear.append(Normalize())
-            last_linear.append(nn.Dropout(0.5))
-            last_linear.append(nn.Linear(feat_dim[idx_curr+1],n_classes))
-            last_linear = nn.Sequential(*last_linear)
-            self.linear_layers_after.append(last_linear)
+        #     last_linear = []
+        #     last_linear.append(non_lin_curr)
+        #     if normalize[0]:
+        #         last_linear.append(Normalize())
+        #     last_linear.append(nn.Dropout(0.5))
+        #     last_linear.append(nn.Linear(feat_dim[idx_curr+1],n_classes))
+        #     last_linear = nn.Sequential(*last_linear)
+        #     self.linear_layers_after.append(last_linear)
 
 
         
         self.graph_layers = nn.ModuleList()
         for num_layer in range(num_layers): 
-            self.graph_layers.append(Graph_Layer_Wrapper(in_out[num_layer],n_out = in_out[num_layer+1], non_lin = non_lin, method = method))
+            self.graph_layers.append(Graph_Layer_Wrapper(in_out[num_layer],n_out = in_out[num_layer+1], non_lin = non_lin, method = method, aft_nonlin = aft_nonlin))
         
-        last_graph = []
-        if non_lin =='HT':
-            last_graph.append(nn.Hardtanh())
-        elif non_lin =='RL':
-            last_graph.append(nn.ReLU())
-        else:
-            error_message = str('Non lin %s not valid', non_lin)
-            raise ValueError(error_message)
 
-        if normalize[1]:
-            last_graph.append(Normalize())
+        last_graph = []
+        if aft_nonlin is None:
+            if non_lin =='HT':
+                last_graph.append(nn.Hardtanh())
+            elif non_lin =='RL':
+                last_graph.append(nn.ReLU())
+            else:
+                error_message = str('Non lin %s not valid', non_lin)
+                raise ValueError(error_message)
+
+            if normalize[1]:
+                last_graph.append(Normalize())
 
         last_graph.append(nn.Dropout(0.5))
         last_graph.append(nn.Linear(in_out[-1],n_classes))
         last_graph = nn.Sequential(*last_graph)
         self.last_graph = last_graph
 
-        self.num_branches = num_layers+1
+        self.num_branches = 1
+        # num_layers+1
         self.attention = attention
         print 'self.num_branches', self.num_branches
         
@@ -128,7 +136,9 @@ class Graph_Multi_Video(nn.Module):
             input_sizes = [input_curr.size(0) for input_curr in input]
             input = torch.cat(input,0)
 
-            if self.sparsify:
+            if type(self.sparsify)==float:
+                to_keep = self.sparsify
+            elif self.sparsify==True:
                 to_keep = (self.get_to_keep(input_sizes),input_sizes)
             else:
                 to_keep = None
@@ -136,29 +146,32 @@ class Graph_Multi_Video(nn.Module):
             if is_cuda:
                 input = input.cuda()
             
-            assert len(self.graph_layers)==(self.num_branches-1)
+            # assert len(self.graph_layers)==(self.num_branches-1)
             
+            if self.bn is not None:
+                input = self.bn(input)
+
             input_graph = input
             for col_num in range(len(self.graph_layers)):
                 graph_layer = self.graph_layers[col_num]
-                linear_layer = self.linear_layers[col_num]
-                linear_layer_after = self.linear_layers_after[col_num]
+                # linear_layer = self.linear_layers[col_num]
+                # linear_layer_after = self.linear_layers_after[col_num]
             
-                feature_out = self.linear_layers[col_num](input_graph)
-                out_col = self.linear_layers_after[col_num](feature_out)
+                # feature_out = self.linear_layers[col_num](input_graph)
+                # out_col = self.linear_layers_after[col_num](feature_out)
 
-                if self.attention:
-                    alpha = F.softmax(out_col,dim = 1)
-                    alpha,_ = torch.max(alpha,dim =1)
-                else:
-                    alpha = None
+                # if self.attention:
+                #     alpha = F.softmax(out_col,dim = 1)
+                #     alpha,_ = torch.max(alpha,dim =1)
+                # else:
+                alpha = None
 
-                input_graph = self.graph_layers[col_num](input_graph, feature_out, to_keep = to_keep, alpha = alpha)
+                input_graph = self.graph_layers[col_num](input_graph, input_graph, to_keep = to_keep, alpha = alpha)
                 
-                x_all_all[col_num].append(out_col)
+                # x_all_all[col_num].append(out_col)
                 
 
-            x_all_all[len(self.graph_layers)].append(self.last_graph(input_graph))
+            x_all_all[-1].append(self.last_graph(input_graph))
 
             for branch_num in range(len(x_all_all)):
                 
@@ -174,7 +187,8 @@ class Graph_Multi_Video(nn.Module):
                     x_curr = x[start:end,:]
                     pmf_all[branch_num] += [self.make_pmf(x_curr).unsqueeze(0)]
                 
-            
+        
+
         if strip:
             for idx_pmf, pmf in enumerate(pmf_all):
                 assert len(pmf)==1
@@ -183,10 +197,13 @@ class Graph_Multi_Video(nn.Module):
         for idx_x, x in enumerate(x_all_all):
             x_all_all[idx_x] = torch.cat(x,dim=0)
         
+        pmf_all = pmf_all[0]
+        x_all_all = x_all_all[0]
 
-        if branch_to_test>-1:
-            x_all_all = x_all_all[branch_to_test]
-            pmf_all = pmf_all[branch_to_test]
+
+        # if branch_to_test>-1:
+        #     x_all_all = x_all_all[branch_to_test]
+        #     pmf_all = pmf_all[branch_to_test]
 
         if ret_bg:
             return x_all_all, pmf_all, None
@@ -208,42 +225,52 @@ class Graph_Multi_Video(nn.Module):
         if sparsify is None:
             sparsify = self.sparsify
 
+
+        print 'sparsify',sparsify
         is_cuda = next(self.parameters()).is_cuda
 
         input_sizes = [input_curr.size(0) for input_curr in input]
         input = torch.cat(input,0)
 
-        if sparsify:
+        if type(sparsify)==float:
+            to_keep = sparsify
+        elif sparsify==True:
             to_keep = (self.get_to_keep(input_sizes),input_sizes)
         else:
             to_keep = None
+
 
         # print 'to_keep',to_keep
 
         if is_cuda:
             input = input.cuda()
         
-        assert len(self.graph_layers)==(self.num_branches-1)
+        # assert len(self.graph_layers)==(self.num_branches-1)
         assert idx_graph_layer<len(self.graph_layers)
+
+        if self.bn is not None:
+            input = self.bn(input)
 
         input_graph = input
         for col_num in range(idx_graph_layer+1):
             graph_layer = self.graph_layers[col_num]
-            linear_layer = self.linear_layers[col_num]
-            linear_layer_after = self.linear_layers_after[col_num]
+            # linear_layer = self.linear_layers[col_num]
+            # linear_layer_after = self.linear_layers_after[col_num]
         
-            feature_out = self.linear_layers[col_num](input_graph)
-            out_col = self.linear_layers_after[col_num](feature_out)
+            # feature_out = self.linear_layers[col_num](input_graph)
+            # out_col = self.linear_layers_after[col_num](feature_out)
 
-            if self.attention:
-                alpha = F.softmax(out_col,dim = 1)
-                alpha,_ = torch.max(alpha,dim =1)
-            else:
-                alpha = None
+            # if self.attention:
+            #     alpha = F.softmax(out_col,dim = 1)
+            #     alpha,_ = torch.max(alpha,dim =1)
+            # else:
+            
+            alpha = None
+
             if col_num ==idx_graph_layer:
-                sim_mat = self.graph_layers[col_num].get_affinity(feature_out, to_keep = to_keep, alpha = alpha, nosum = nosum)
+                sim_mat = self.graph_layers[col_num].get_affinity(input_graph, to_keep = to_keep, alpha = alpha, nosum = nosum)
             else:
-                input_graph = self.graph_layers[col_num](input_graph, feature_out, to_keep = to_keep, alpha = alpha)
+                input_graph = self.graph_layers[col_num](input_graph, input_graph, to_keep = to_keep, alpha = alpha)
         
         return sim_mat
     
@@ -264,22 +291,23 @@ class Network:
                  non_lin = 'HT',
                  normalize = [True,True],
                  attention = False,
-                 gk = 8
+                 gk = 8,
+                 aft_nonlin = None
                  ):
-        self.model = Graph_Multi_Video(n_classes, deno, in_out,feat_dim, graph_size, method, sparsify, non_lin, normalize, attention,gk)
+        self.model = Graph_Multi_Video(n_classes, deno, in_out,feat_dim, graph_size, method, sparsify, non_lin, normalize, attention,gk, aft_nonlin)
         
     def get_lr_list(self, lr):
         
         
         lr_list = []
 
-        lr_list+= [{'params': [p for p in self.model.linear_layers.parameters() if p.requires_grad], 'lr': lr[0]}]
+        # lr_list+= [{'params': [p for p in self.model.linear_layers.parameters() if p.requires_grad], 'lr': lr[0]}]
 
-        lr_list+= [{'params': [p for p in self.model.linear_layers_after.parameters() if p.requires_grad], 'lr': lr[0]}]
+        # lr_list+= [{'params': [p for p in self.model.linear_layers_after.parameters() if p.requires_grad], 'lr': lr[0]}]
         
-        lr_list+= [{'params': [p for p in self.model.graph_layers.parameters() if p.requires_grad], 'lr': lr[1]}]        
+        lr_list+= [{'params': [p for p in self.model.graph_layers.parameters() if p.requires_grad], 'lr': lr[0]}]        
         # lr_list+= [{'params': [p for p in self.model.last_linear.parameters() if p.requires_grad], 'lr': lr[2]}]
-        lr_list+= [{'params': [p for p in self.model.last_graph.parameters() if p.requires_grad], 'lr': lr[1]}]
+        lr_list+= [{'params': [p for p in self.model.last_graph.parameters() if p.requires_grad], 'lr': lr[0]}]
 
         return lr_list
 
