@@ -52,10 +52,10 @@ class Graph_Multi_Video_Cooc(nn.Module):
 
         #     elif feat_curr=='ind':
         # print feat_dim, class_names
-        # for class_name in class_names:
-        #     file_curr =os.path.join(dir_feat,class_name+post_pend+'.npy')
-        #     print file_curr
-        #     feat_dicts.append(file_curr)
+        for class_name in class_names:
+            file_curr =os.path.join(dir_feat,class_name+post_pend+'.npy')
+            print file_curr
+            feat_dicts.append(file_curr)
             # else:
             #     # print os.path.join(dir_feat,feat_curr+'.npy')
             #     feat_dicts.append(os.path.join(dir_feat,feat_curr+'.npy'))

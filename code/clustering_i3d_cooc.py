@@ -276,6 +276,28 @@ def save_neg_cooc_graphs(out_dir):
         np.save(out_file, out_cooc)
     visualize.writeHTMLForFolder(out_dir)
 
+def save_neg_exp_cooc_graphs(out_dir):
+    for class_name in class_names:
+        in_file = os.path.join(out_dir,class_name+'neg.npy')
+        curr_cooc = np.load(in_file)
+        print np.min(curr_cooc),np.max(curr_cooc)
+        out_cooc = np.exp(curr_cooc-1)
+        print np.min(out_cooc),np.max(out_cooc)
+
+        
+        out_file = os.path.join(out_dir,class_name+'negexp.jpg')
+        visualize.saveMatAsImage(out_cooc, out_file)
+        # print out_file
+        # print 'curr_cooc',curr_cooc.shape,np.min(curr_cooc),np.max(curr_cooc)
+        # print 'out_cooc',out_cooc.shape,np.min(out_cooc),np.max(out_cooc)
+        # print 'all_cooc',all_cooc.shape,np.min(all_cooc),np.max(all_cooc)
+        
+        out_file = os.path.join(out_dir,class_name+'negexp.npy')
+        print out_file
+        np.save(out_file, out_cooc)
+        # raw_input()
+    visualize.writeHTMLForFolder(out_dir)
+
 
 def main():
     dir_train_test_files = '../data/ucf101/train_test_files'
@@ -283,7 +305,7 @@ def main():
     train_file = os.path.join(dir_train_test_files,'train_ultra_correct.txt')
     test_file = os.path.join(dir_train_test_files,'test_ultra_correct.txt')
     n_per_video = 3
-    k = 200
+    k = 100
     post_pend = 'k_'+str(k)
 
     out_dir_meta = '../data/ucf101/kmeans'
@@ -297,16 +319,17 @@ def main():
     util.mkdir(out_dir_labels)
     util.mkdir(out_dir_edges)
 
-    make_clusters(train_file, n_per_video,k, dir_curr)
-    save_kmean_labels(train_file,dir_curr, out_dir_labels)
-    save_kmean_labels(test_file,dir_curr, out_dir_labels)
+    # make_clusters(train_file, n_per_video,k, dir_curr)
+    # save_kmean_labels(train_file,dir_curr, out_dir_labels)
+    # save_kmean_labels(test_file,dir_curr, out_dir_labels)
 
-    getting_edge_weights(train_file, out_dir_labels, out_dir_edges, k)
+    # getting_edge_weights(train_file, out_dir_labels, out_dir_edges, k)
     # getting_edge_weights(train_file, out_dir_labels, out_dir_edges, k, set_k = set_k_int, normalize_k = normalize_k_union)
-    save_neg_cooc_graphs(out_dir_edges)
+    # save_neg_cooc_graphs(out_dir_edges)
+    save_neg_exp_cooc_graphs(out_dir_edges)
     
-    write_train_test_files(train_file, post_pend, out_dir_labels)
-    write_train_test_files(test_file, post_pend, out_dir_labels)
+    # write_train_test_files(train_file, post_pend, out_dir_labels)
+    # write_train_test_files(test_file, post_pend, out_dir_labels)
 
 
     print 'hello'

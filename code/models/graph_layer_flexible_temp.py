@@ -84,8 +84,11 @@ class Graph_Layer(nn.Module):
 
 
         if alpha is not None:
+            assert to_keep is None
+            # print torch.min(alpha),torch.max(alpha)
             alpha = alpha.view(1,alpha.size(0))
             G = G*alpha
+
             alpha1 = alpha.view(alpha.size(1),1)
             G = G*alpha1
             
@@ -124,7 +127,12 @@ class Graph_Layer(nn.Module):
                 G = G.scatter(1, indices, topk)
             elif type(to_keep)==float:
                 # print torch.sum(G==0)
+                # print to_keep
+                # print 'torch.min(G),torch.max(G)'
+                # print torch.min(G),torch.max(G)
                 G[torch.abs(G)<to_keep] = 0
+                # print 'torch.min(G),torch.max(G)'
+                # print torch.min(G),torch.max(G)
                 # print torch.sum(G==0)
                 # raw_input()
 

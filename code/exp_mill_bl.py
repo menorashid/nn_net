@@ -32,7 +32,8 @@ def get_data(dataset, limit, all_classes, just_primary, gt_vec, k_vec):
             post_pends = [pp+val for pp,val in zip(post_pends,['_just_primary','_just_primary','_just_primary'])]
         
         # post_pends = [pp+val for pp,val in zip(post_pends,['_corrected','_corrected','_corrected'])]
-        # post_pends = [pp+val for pp,val in zip(post_pends,['_ultra_correct','_ultra_correct','_ultra_correct'])]
+        if not all_classes:
+            post_pends = [pp+val for pp,val in zip(post_pends,['_ultra_correct','_ultra_correct','_ultra_correct'])]
                 
 
         if gt_vec:
@@ -287,6 +288,183 @@ def train_simple_mill_all_classes(model_name,
                     first_thresh = first_thresh)
             visualize_sim_mat(**test_params)
 
+
+def ens_experiments():
+    model_name = 'graph_multi_video_same_F_ens_dll'
+    # lr = [0.001]
+    lr = [0.001, 0.001]
+    multibranch = 2
+    loss_weights = [1/float(multibranch)]*multibranch
+    # None
+    branch_to_test = -2
+
+    # model_name = 'graph_multi_video_same_i3dF_ens_sll'
+    # lr = [0.001]
+    # model_name = 'graph_multi_video_same_F_ens_sll'
+    # lr = [0.001,0.001]
+    # loss_weights = None
+    # multibranch = 1
+    # branch_to_test = 0
+
+    k_vec = None
+
+    gt_vec = False
+    just_primary = False
+
+    torch.backends.cudnn.deterministic = True
+    torch.manual_seed(999)
+
+    
+    epoch_stuff = [300,300]
+    dataset = 'ucf'
+    limit  = None
+    save_after = 100
+    
+    test_mode = True
+
+    model_nums = None
+    retrain = False
+    viz_mode = False
+    viz_sim = False
+    test_post_pend = ''
+
+    post_pend = ''
+    
+    network_params = {}
+    network_params['deno'] = 8
+    network_params['in_out'] = [2048,128]
+    network_params['feat_dim'] = [2048,256]
+    network_params['graph_size'] = 2
+    network_params['method'] = 'cos'
+    # network_params['sparsify'] = list(np.arange(0.5,1.0,0.1))[::-1]
+    network_params['sparsify'] = [0.8,0.6]
+    # ,0.75,0.5]
+    network_params['non_lin'] = 'HT'
+    network_params['aft_nonlin']='HT_l2'
+    post_pend = 'ABS_bias'
+    
+    first_thresh=0
+
+    class_weights = True
+    test_after = 5
+    
+    all_classes = False
+    # just_primary = False
+    # gt_vec = False
+
+    
+    second_thresh = 0.5
+    det_class = -1
+    train_simple_mill_all_classes (model_name = model_name,
+                        lr = lr,
+                        dataset = dataset,
+                        network_params = network_params,
+                        limit = limit, 
+                        epoch_stuff= epoch_stuff,
+                        batch_size = 32,
+                        batch_size_val = 32,
+                        save_after = save_after,
+                        test_mode = test_mode,
+                        class_weights = class_weights,
+                        test_after = test_after,
+                        all_classes = all_classes,
+                        just_primary = just_primary,
+                        model_nums = model_nums,
+                        retrain = retrain,
+                        viz_mode = viz_mode,
+                        second_thresh = second_thresh,
+                        first_thresh = first_thresh,
+                        det_class = det_class,
+                        post_pend = post_pend,
+                        viz_sim = viz_sim,
+                        test_post_pend = test_post_pend,
+                        gt_vec = gt_vec,
+                        loss_weights = loss_weights,
+                        multibranch = multibranch,
+                        branch_to_test = branch_to_test,
+                        k_vec = k_vec)
+
+
+def ens_att_experiments():
+    model_name = 'graph_multi_video_attention_hard'
+    lr = [0.001, 0.001]
+    multibranch = 1
+    loss_weights = [1/float(multibranch)]*multibranch
+    branch_to_test = -2
+
+    k_vec = None
+
+    gt_vec = False
+    just_primary = False
+    all_classes = False
+
+    torch.backends.cudnn.deterministic = True
+    torch.manual_seed(999)
+
+    
+    epoch_stuff = [300,300]
+    dataset = 'ucf'
+    limit  = None
+    save_after = 100
+    
+    test_mode = False
+
+    model_nums = None
+    retrain = False
+    viz_mode = False
+    viz_sim = False
+    test_post_pend = ''
+
+    post_pend = ''
+    
+    network_params = {}
+    network_params['deno'] = 8
+    network_params['in_out'] = [2048,128]
+    network_params['feat_dim'] = [2048,512]
+    network_params['graph_size'] = 2
+    network_params['method'] = 'cos'
+    network_params['att'] = 256
+    network_params['sparsify'] = [0.5]
+    network_params['non_lin'] = 'HT'
+    network_params['aft_nonlin']='HT_l2'
+    post_pend = 'ABS_bias'
+    
+    first_thresh=0
+    second_thresh = 0.5
+    det_class = -1
+    
+    class_weights = True
+    test_after = 5
+    
+    train_simple_mill_all_classes (model_name = model_name,
+                        lr = lr,
+                        dataset = dataset,
+                        network_params = network_params,
+                        limit = limit, 
+                        epoch_stuff= epoch_stuff,
+                        batch_size = 32,
+                        batch_size_val = 32,
+                        save_after = save_after,
+                        test_mode = test_mode,
+                        class_weights = class_weights,
+                        test_after = test_after,
+                        all_classes = all_classes,
+                        just_primary = just_primary,
+                        model_nums = model_nums,
+                        retrain = retrain,
+                        viz_mode = viz_mode,
+                        second_thresh = second_thresh,
+                        first_thresh = first_thresh,
+                        det_class = det_class,
+                        post_pend = post_pend,
+                        viz_sim = viz_sim,
+                        test_post_pend = test_post_pend,
+                        gt_vec = gt_vec,
+                        loss_weights = loss_weights,
+                        multibranch = multibranch,
+                        branch_to_test = branch_to_test,
+                        k_vec = k_vec)
+
 def testing_exp():
     # model_name = 'graph_multi_video_multi_F_joint_train_gaft'
     # lr = [0.001,0.001]
@@ -295,11 +473,11 @@ def testing_exp():
     # branch_to_test = 1
 
 
-    model_name = 'graph_multi_video_i3dF_gaft'
-    lr = [0.001]
-    loss_weights = None
-    multibranch = 1
-    branch_to_test = 0
+    # model_name = 'graph_multi_video_i3dF_gaft'
+    # lr = [0.001]
+    # loss_weights = None
+    # multibranch = 1
+    # branch_to_test = 0
 
 
     # model_name = 'graph_multi_video_same_F'
@@ -311,12 +489,12 @@ def testing_exp():
     # range(18,20):
     k_vec = None
 
-    # model_name = 'graph_multi_video_cooc_ofe_olg'
-    # lr = [0.001]
-    # loss_weights = None
-    # multibranch = 1
-    # branch_to_test = 0
-    # k_vec = 'k_100'
+    model_name = 'graph_multi_video_cooc_ofe_olg'
+    lr = [0.001]
+    loss_weights = None
+    multibranch = 1
+    branch_to_test = 0
+    k_vec = 'k_100'
 
 
     gt_vec = False
@@ -344,17 +522,18 @@ def testing_exp():
     network_params = {}
     network_params['deno'] = 8
     # network_params['pretrained'] = 'ucf'
-    network_params['in_out'] = [2048,256]
-    network_params['feat_dim'] = [2048,32]
-    # '100_all'
-    # network_params['post_pend'] = ''
+    network_params['in_out'] = [2048,16]
+    network_params['feat_dim'] = '100'
+    # [2048,32]
+    # 
+    network_params['post_pend'] = 'negexp'
     # [2048,32]
     network_params['graph_size'] = 2
     # network_params['gk'] = 8
-    network_params['method'] = 'cos'
+    network_params['method'] = 'affinity_dict'
     # network_params['num_switch'] = [5,5]
     # network_params['focus'] = 0
-    network_params['sparsify'] = 0.8
+    network_params['sparsify'] = False
     network_params['non_lin'] = None
     # network_params['normalize'] = [True, True]
     network_params['aft_nonlin']='HT_l2'
@@ -369,7 +548,7 @@ def testing_exp():
     class_weights = True
     test_after = 5
     
-    all_classes = True
+    all_classes = False
     # just_primary = False
     # gt_vec = False
 
@@ -646,7 +825,9 @@ def main():
     
     # separate_supervision_experiment()
     # super_simple_experiment()
-    testing_exp()
+    # testing_exp()
+    # ens_experiments()
+    ens_att_experiments()
 
 
 if __name__=='__main__':
