@@ -111,7 +111,8 @@ def train_simple_mill_all_classes(model_name,
                                     loss_weights = None,
                                     branch_to_test = 0,
                                     gt_vec = False,
-                                    k_vec = None):
+                                    k_vec = None,
+                                    attention = False):
 
     num_epochs = epoch_stuff[1]
 
@@ -141,12 +142,21 @@ def train_simple_mill_all_classes(model_name,
     else:
         class_weights_val = None
 
-    if multibranch>1:
-        criterion = MultiCrossEntropyMultiBranch(class_weights= class_weights_val, loss_weights = loss_weights, num_branches = multibranch)
-        criterion_str = 'MultiCrossEntropyMultiBranch'
+    if attention:
+        if multibranch>1:
+            criterion = MultiCrossEntropyMultiBranchWithL1(class_weights= class_weights_val, loss_weights = loss_weights, num_branches = multibranch)
+            criterion_str = 'MultiCrossEntropyMultiBranchWithL1'
+        else:
+            criterion = MultiCrossEntropyMultiBranchWithL1(class_weights= class_weights_val, loss_weights = loss_weights, num_branches = 1)
+            criterion_str = 'MultiCrossEntropyMultiBranchWithL1'
     else:
-        criterion = MultiCrossEntropy(class_weights= class_weights_val)
-        criterion_str = 'MultiCrossEntropy'
+        if multibranch>1:
+            criterion = MultiCrossEntropyMultiBranch(class_weights= class_weights_val, loss_weights = loss_weights, num_branches = multibranch)
+            criterion_str = 'MultiCrossEntropyMultiBranch'
+        else:
+            criterion = MultiCrossEntropy(class_weights= class_weights_val)
+            criterion_str = 'MultiCrossEntropy'
+
 
     # criterion = MCE_CenterLoss_Combo(n_classes, feat_dim = 2048, bg = True, lambda_param = 0.0, alpha_param = 0.5, class_weights= class_weights_val)
     # criterion_str = 'Multi_Center_Combo'
@@ -291,16 +301,17 @@ def train_simple_mill_all_classes(model_name,
 
 def ens_experiments():
     model_name = 'graph_multi_video_same_F_ens_dll'
-    # lr = [0.001]
+    # # lr = [0.001]
     lr = [0.001, 0.001]
-    multibranch = 2
-    loss_weights = [1/float(multibranch)]*multibranch
-    # None
-    branch_to_test = -2
+    multibranch = 4
+    loss_weights = None
+    # [1/float(multibranch)]*multibranch
+    # 
+    branch_to_test = 0
 
     # model_name = 'graph_multi_video_same_i3dF_ens_sll'
     # lr = [0.001]
-    # model_name = 'graph_multi_video_same_F_ens_sll'
+    # model_name = 'graph_multi_video_diff_F_ens_sll'
     # lr = [0.001,0.001]
     # loss_weights = None
     # multibranch = 1
@@ -318,7 +329,7 @@ def ens_experiments():
     epoch_stuff = [300,300]
     dataset = 'ucf'
     limit  = None
-    save_after = 100
+    save_after = 50
     
     test_mode = True
 
@@ -332,18 +343,22 @@ def ens_experiments():
     
     network_params = {}
     network_params['deno'] = 8
-    network_params['in_out'] = [2048,128]
-    network_params['feat_dim'] = [2048,256]
+    network_params['in_out'] = [2048,256]
+    network_params['feat_dim'] = [2048,512]
+    # network_params['layer_bef'] = [2048,512]
     network_params['graph_size'] = 2
     network_params['method'] = 'cos'
     # network_params['sparsify'] = list(np.arange(0.5,1.0,0.1))[::-1]
-    network_params['sparsify'] = [0.8,0.6]
+    network_params['sparsify'] = [0.75,0.5,-0.75,-0.5]
+    # loss_weights = network_params['sparsify']
+    # [0.9,0.8,0.7,0.6,0.5]
     # ,0.75,0.5]
     network_params['non_lin'] = 'HT'
     network_params['aft_nonlin']='HT_l2'
+    network_params['sigmoid'] = True
     post_pend = 'ABS_bias'
     
-    first_thresh=0
+    first_thresh=0.1
 
     class_weights = True
     test_after = 5
@@ -386,11 +401,12 @@ def ens_experiments():
 
 
 def ens_att_experiments():
-    model_name = 'graph_multi_video_attention_hard'
+    model_name = 'graph_multi_video_attention_soft'
     lr = [0.001, 0.001]
     multibranch = 1
-    loss_weights = [1/float(multibranch)]*multibranch
-    branch_to_test = -2
+    loss_weights = [1/float(multibranch)]*multibranch + [0.1]
+    branch_to_test = -1
+    attention = True
 
     k_vec = None
 
@@ -404,13 +420,13 @@ def ens_att_experiments():
     
     epoch_stuff = [300,300]
     dataset = 'ucf'
-    limit  = None
+    limit  = 500
     save_after = 100
     
     test_mode = False
 
     model_nums = None
-    retrain = False
+    retrain = True
     viz_mode = False
     viz_sim = False
     test_post_pend = ''
@@ -420,7 +436,7 @@ def ens_att_experiments():
     network_params = {}
     network_params['deno'] = 8
     network_params['in_out'] = [2048,128]
-    network_params['feat_dim'] = [2048,512]
+    network_params['feat_dim'] = [2048,256]
     network_params['graph_size'] = 2
     network_params['method'] = 'cos'
     network_params['att'] = 256
@@ -463,7 +479,8 @@ def ens_att_experiments():
                         loss_weights = loss_weights,
                         multibranch = multibranch,
                         branch_to_test = branch_to_test,
-                        k_vec = k_vec)
+                        k_vec = k_vec,
+                        attention = attention)
 
 def testing_exp():
     # model_name = 'graph_multi_video_multi_F_joint_train_gaft'
@@ -826,8 +843,8 @@ def main():
     # separate_supervision_experiment()
     # super_simple_experiment()
     # testing_exp()
-    # ens_experiments()
-    ens_att_experiments()
+    ens_experiments()
+    # ens_att_experiments()
 
 
 if __name__=='__main__':

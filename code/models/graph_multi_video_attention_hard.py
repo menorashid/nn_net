@@ -42,7 +42,7 @@ class Graph_Multi_Video(nn.Module):
         self.linear_layer = nn.Linear(feat_dim[0], feat_dim[1], bias = True)
         
         att_module = []
-        att_module.append(nn.Linear(feat_dim[1], att, bias = True))
+        att_module.append(nn.Linear(feat_dim[0], att, bias = True))
         att_module.append(nn.ReLU())
         att_module.append(nn.Linear(att,1))
         att_module.append(nn.Sigmoid())
@@ -99,16 +99,16 @@ class Graph_Multi_Video(nn.Module):
             assert len(self.graph_layers)==(self.num_branches)
             
             feature_out = self.linear_layer(input)
-            
+            alpha_curr = self.att_module(input)
 
             for col_num in range(len(self.graph_layers)):
 
                 to_keep = self.sparsify[col_num]
+                                
                 
-                alpha_curr = self.att_module(feature_out)
                 # print to_keep, torch.min(alpha_curr),torch.max(alpha_curr)
-                # alpha_curr[alpha_curr>=to_keep]=1
-                # alpha_curr[alpha_curr<to_keep]=0
+                alpha_curr[alpha_curr>=to_keep]=1
+                alpha_curr[alpha_curr<to_keep]=0
                 # print to_keep, torch.min(alpha_curr),torch.max(alpha_curr)
                 
                 out_graph = self.graph_layers[col_num](input, feature_out, alpha = alpha_curr)

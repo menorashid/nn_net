@@ -17,10 +17,9 @@ class Graph_Multi_Video(nn.Module):
                  graph_size = None,
                  method = 'cos',
                  sparsify = [0.8],
+                 att = 256,
                  non_lin = 'HT',
                  aft_nonlin = None,
-                 sigmoid = False,
-                 layer_bef = None
                  ):
         super(Graph_Multi_Video, self).__init__()
         
@@ -28,7 +27,7 @@ class Graph_Multi_Video(nn.Module):
         self.deno = deno
         self.graph_size = graph_size
         self.sparsify = sparsify
-        
+
         if in_out is None:
             in_out = [2048,64]
         
@@ -39,21 +38,17 @@ class Graph_Multi_Video(nn.Module):
         
         print 'NUM LAYERS', num_layers, in_out
         
-        self.bn =None
-        # nn.BatchNorm1d(2048, affine = False)
+        
         self.linear_layer = nn.Linear(feat_dim[0], feat_dim[1], bias = True)
-
-        if layer_bef is None:
-            self.layer_bef = None    
-        else:
-            self.layer_bef = []
-            self.layer_bef.append(nn.Linear(layer_bef[0],layer_bef[1], bias = True))
-            self.layer_bef.append(nn.ReLU())
-            self.layer_bef = nn.Sequential(*self.layer_bef)
-
-            
         
+        att_module = []
+        att_module.append(nn.Linear(feat_dim[0], att, bias = True))
+        att_module.append(nn.ReLU())
+        att_module.append(nn.Linear(att,1))
+        att_module.append(nn.Sigmoid())
+        self.att_module = nn.Sequential(*att_module)
         
+
         self.graph_layers = nn.ModuleList()
         
         self.last_graphs = nn.ModuleList()
@@ -64,8 +59,6 @@ class Graph_Multi_Video(nn.Module):
             last_graph = []
             last_graph.append(nn.Dropout(0.5))
             last_graph.append(nn.Linear(in_out[-1],n_classes))
-            if sigmoid:
-                last_graph.append(nn.Sigmoid())
             last_graph = nn.Sequential(*last_graph)
             self.last_graphs.append(last_graph)
 
@@ -95,7 +88,8 @@ class Graph_Multi_Video(nn.Module):
         
         pmf_all = [[] for i in range(self.num_branches)]
         x_all_all = [[] for i in range(self.num_branches)]
-        
+        alpha_all = []
+
         for input in input_chunks:
             input_sizes = [input_curr.size(0) for input_curr in input]
             input = torch.cat(input,0)
@@ -105,17 +99,24 @@ class Graph_Multi_Video(nn.Module):
             
             assert len(self.graph_layers)==(self.num_branches)
             
-            if hasattr(self, 'layer_bef') and self.layer_bef is not None:
-                input = self.layer_bef(input)
-
             feature_out = self.linear_layer(input)
+            alpha_curr = self.att_module(input)
+            alpha_all.append(alpha_curr)
             for col_num in range(len(self.graph_layers)):
 
-                to_keep = self.sparsify[col_num]                
-                out_graph = self.graph_layers[col_num](input, feature_out, to_keep = to_keep)
+                to_keep = self.sparsify[col_num]
+                
+                
+                # print to_keep, torch.min(alpha_curr),torch.max(alpha_curr)
+                # alpha_curr[alpha_curr>=to_keep]=1
+                # alpha_curr[alpha_curr<to_keep]=0
+                # print to_keep, torch.min(alpha_curr),torch.max(alpha_curr)
+                
+                out_graph = self.graph_layers[col_num](input, feature_out, alpha = alpha_curr)
                 out_col = self.last_graphs[col_num](out_graph)
 
                 x_all_all[col_num].append(out_col)
+                # raw_input()
 
 
             for branch_num in range(len(x_all_all)):
@@ -131,7 +132,12 @@ class Graph_Multi_Video(nn.Module):
                     end = start+input_sizes[idx_sample]
                     x_curr = x[start:end,:]
                     pmf_all[branch_num] += [self.make_pmf(x_curr).unsqueeze(0)]
-                
+        # print len(input_chunks)
+        # print len(alpha_all)
+        # print alpha_all[0].size()
+        alpha_all = torch.cat(alpha_all,dim = 0)
+        # print alpha_all.size()
+        # raw_input()
             
         if strip:
             for idx_pmf, pmf in enumerate(pmf_all):
@@ -145,28 +151,22 @@ class Graph_Multi_Video(nn.Module):
             x_all_all = x_all_all[0]
             pmf_all = pmf_all[0]
 
+        if self.num_branches>1:
+            if branch_to_test>-1:
+                x_all_all = x_all_all[branch_to_test]
+                pmf_all = pmf_all[branch_to_test]
+            elif branch_to_test==-2:
+                pmf_all = torch.cat([pmf.view(pmf.size(0),1) for pmf in pmf_all],dim = 1)
+                pmf_all = torch.mean(pmf_all,dim = 1)
 
-        if branch_to_test>-1:
-            x_all_all = x_all_all[branch_to_test]
-            pmf_all = pmf_all[branch_to_test]
-        elif branch_to_test==-2:
-            pmf_all = torch.cat([pmf.view(pmf.size(0),1) for pmf in pmf_all],dim = 1)
-            pmf_all = torch.mean(pmf_all,dim = 1)
-
-            x_all_all = torch.cat([torch.nn.functional.softmax(x_all,dim = 1).unsqueeze(2) for x_all in x_all_all],dim=2)
-            # x_all_all = torch.cat([x_all.unsqueeze(2) for x_all in x_all_all],dim=2)
-            x_all_all = torch.mean(x_all_all,dim=2)
-        elif branch_to_test==-4 or branch_to_test==-3:
-            pmf_all = torch.cat([pmf.view(pmf.size(0),1) for pmf in pmf_all],dim = 1)
-            pmf_all = torch.mean(pmf_all,dim = 1)
-
-            x_all_all = torch.cat([x_all.unsqueeze(2) for x_all in x_all_all],dim=2)
-            x_all_all = torch.mean(x_all_all,dim=2)
+                x_all_all = torch.cat([torch.nn.functional.softmax(x_all,dim = 1).unsqueeze(2) for x_all in x_all_all],dim=2)
+                x_all_all = torch.mean(x_all_all,dim=2)
+            
 
         if ret_bg:
             return x_all_all, pmf_all, None
         else:
-            return x_all_all, pmf_all
+            return x_all_all, [pmf_all, alpha_all]
         
 
     def make_pmf(self,x):
@@ -178,34 +178,51 @@ class Graph_Multi_Video(nn.Module):
         pmf = torch.sum(pmf[:k,:], dim = 0)/k
         return pmf
 
-    def get_similarity(self,input,idx_graph_layer = 0,sparsify = False, nosum = False):
+    def get_similarity(self,input,idx_graph_layer = 0,sparsify = None, nosum = False):
 
-        # if sparsify is None:
-        #     sparsify = self.sparsify
+        if sparsify is None:
+            sparsify = self.sparsify
 
         is_cuda = next(self.parameters()).is_cuda
 
         input_sizes = [input_curr.size(0) for input_curr in input]
         input = torch.cat(input,0)
 
+        if sparsify:
+            to_keep = (self.get_to_keep(input_sizes),input_sizes)
+        else:
+            to_keep = None
+
+        # print 'to_keep',to_keep
 
         if is_cuda:
             input = input.cuda()
         
+        assert len(self.graph_layers)==(self.num_branches-1)
         assert idx_graph_layer<len(self.graph_layers)
+
+        # if self.bn is not None:
+        #     input = self.bn(input)
+
+        input_graph = input
+        for col_num in range(idx_graph_layer+1):
+            graph_layer = self.graph_layers[col_num]
+            linear_layer = self.linear_layers[col_num]
+            linear_layer_after = self.linear_layers_after[col_num]
         
-        if hasattr(self, 'layer_bef') and self.layer_bef is not None:
-            input = self.layer_bef(input)
+            feature_out = self.linear_layers[col_num](input_graph)
+            out_col = self.linear_layers_after[col_num](feature_out)
 
-        feature_out = self.linear_layer(input)
+            if self.attention:
+                alpha = F.softmax(out_col,dim = 1)
+                alpha,_ = torch.max(alpha,dim =1)
+            else:
+                alpha = None
+            if col_num ==idx_graph_layer:
+                sim_mat = self.graph_layers[col_num].get_affinity(feature_out, to_keep = to_keep, alpha = alpha, nosum = nosum)
+            else:
+                input_graph = self.graph_layers[col_num](input_graph, feature_out, to_keep = to_keep, alpha = alpha)
         
-        if sparsify:
-            to_keep = self.sparsify[idx_graph_layer]                
-        else:
-            to_keep = None
-
-        sim_mat = self.graph_layers[idx_graph_layer].get_affinity(feature_out, to_keep = to_keep,nosum = nosum)
-
         return sim_mat
     
     def printGraphGrad(self):
@@ -222,12 +239,11 @@ class Network:
                  graph_size = None,
                  method = 'cos',
                  sparsify = False,
+                 att = 256,
                  non_lin = 'HT',
-                 aft_nonlin = None,
-                 sigmoid = False,
-                 layer_bef = None
+                 aft_nonlin = None
                  ):
-        self.model = Graph_Multi_Video(n_classes, deno, in_out,feat_dim, graph_size, method, sparsify, non_lin, aft_nonlin,sigmoid, layer_bef)
+        self.model = Graph_Multi_Video(n_classes, deno, in_out,feat_dim, graph_size, method, sparsify, att,non_lin, aft_nonlin)
         print self.model
         raw_input()
 

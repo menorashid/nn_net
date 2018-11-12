@@ -83,14 +83,6 @@ class Graph_Layer(nn.Module):
         
 
 
-        if alpha is not None:
-            assert to_keep is None
-            # print torch.min(alpha),torch.max(alpha)
-            alpha = alpha.view(1,alpha.size(0))
-            G = G*alpha
-
-            alpha1 = alpha.view(alpha.size(1),1)
-            G = G*alpha1
             
         if to_keep is not None:
             if type(to_keep) == type(()):
@@ -130,7 +122,10 @@ class Graph_Layer(nn.Module):
                 # print to_keep
                 # print 'torch.min(G),torch.max(G)'
                 # print torch.min(G),torch.max(G)
-                G[torch.abs(G)<to_keep] = 0
+                if to_keep>0:
+                    G[torch.abs(G)<to_keep] = 0
+                else:
+                    G[G<to_keep] = 0
                 # print 'torch.min(G),torch.max(G)'
                 # print torch.min(G),torch.max(G)
                 # print torch.sum(G==0)
@@ -141,6 +136,27 @@ class Graph_Layer(nn.Module):
             sums = torch.sum(G,dim = 1, keepdim = True)
             sums[sums==0]=1
             G = G/sums
+
+
+        if alpha is not None:
+            assert to_keep is None
+            # print G[:2,:2]
+            # print torch.min(alpha),torch.max(alpha)
+            alpha = alpha.view(1,alpha.size(0))
+            G = G*alpha
+            diag_vals = torch.diagonal(G)
+
+            alpha1 = alpha.view(alpha.size(1),1)
+            G = G*alpha1
+            # print G[:2,:2]
+            eye_inv = (torch.eye(G.size(0)).cuda()+1) % 2
+            G = G*eye_inv
+            # print G[:2,:2]
+            G = G+torch.diag(diag_vals)
+            # print G[:2,:2]
+
+            # raw_input()
+
 
         # print torch.min(G), torch.max(G)    
         # raw_input()

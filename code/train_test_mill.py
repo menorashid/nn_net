@@ -50,6 +50,8 @@ def test_model_core(model, test_dataloader, criterion, log_arr, multibranch = 1)
     labels_all = []
     loss_iter_total = 0.
     model_name = model.__class__.__name__.lower()
+    criterion_str = criterion.__class__.__name__.lower()
+    
     for num_iter_test,batch in enumerate(test_dataloader):
         samples = batch['features']
         labels = batch['label'].cuda()
@@ -78,6 +80,9 @@ def test_model_core(model, test_dataloader, criterion, log_arr, multibranch = 1)
                     else:
                         out,preds_mini = model.forward(samples)
                     
+                    if 'l1' in criterion_str:
+                        [preds_mini, att] = preds_mini
+
                     if multibranch>1:
 
                         for idx_preds_curr,preds_curr in enumerate(preds_mini):
@@ -110,8 +115,10 @@ def test_model_core(model, test_dataloader, criterion, log_arr, multibranch = 1)
             else:
                 preds_mini = torch.cat(preds_mini,0)
         
-        
-        loss = criterion(labels, preds_mini)
+        if 'l1' in criterion_str:
+            loss = criterion(labels, preds_mini, att)
+        else:
+            loss = criterion(labels, preds_mini)
         labels_all.append(labels.data.cpu().numpy())
         loss_iter = loss.data[0]
         loss_iter_total+=loss_iter    
@@ -411,6 +418,7 @@ def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh ,
     model.eval()
     model = model.cuda()
     model_name = model.__class__.__name__.lower()
+    criterion_str = criterion.__class__.__name__.lower()
 
     preds = []
     labels_all = []
@@ -449,7 +457,8 @@ def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh ,
                         out,pmf = model.forward([sample.cuda(),batch['gt_vec'][idx_sample].cuda()])
                     else:    
                         out, pmf = model.forward(sample.cuda())
-                
+            if 'l1' in criterion_str:
+                [pmf, att] = pmf
 
             # print out.size(),torch.min(out), torch.max(out)
             # print pmf.size(),torch.min(pmf), torch.max(pmf)
@@ -464,7 +473,7 @@ def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh ,
 
                 # print out.size()
                 # raw_input()
-            if second_thresh>=0 and branch_to_test!=-2:
+            if second_thresh>=0 and branch_to_test!=-2 and branch_to_test!=-4:
                 out = torch.nn.functional.softmax(out,dim = 1)
 
             start_seq = np.array(range(0,out.shape[0]))*16./25.
@@ -485,6 +494,7 @@ def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh ,
             # print labels[idx_sample]
             # print pmf
             # print first_thresh
+            # raw_input()
 
             for class_idx in range(pmf.size):
                 if bin_not_keep[class_idx]:
@@ -546,7 +556,7 @@ def test_model(out_dir_train,
     
     out_dir_results = os.path.join(out_dir_train,'results_model_'+str(model_num)+post_pend+'_'+str(first_thresh)+'_'+str(second_thresh))
     
-    if branch_to_test>-1:
+    if branch_to_test!=-1:
         out_dir_results = out_dir_results +'_'+str(branch_to_test)
 
     util.mkdir(out_dir_results)
@@ -759,6 +769,7 @@ def train_model(out_dir_train,
     # print 'saving',out_file
     # torch.save(model,out_file)    
     # return
+    criterion_str = criterion.__class__.__name__.lower()
 
     optimizer = torch.optim.Adam(network.get_lr_list(lr),weight_decay=weight_decay)
 
@@ -814,12 +825,19 @@ def train_model(out_dir_train,
                     else:
                         preds.append(pmf.unsqueeze(0))
                 
+
+                if 'l1' in criterion_str:
+                    [preds, att] = preds
+
                 if multibranch>1:
                     preds = [torch.cat(preds_curr,0) for preds_curr in preds]        
                 else:
                     preds = torch.cat(preds,0)        
 
-            loss = criterion(labels, preds)
+            if 'l1' in criterion_str:
+                loss = criterion(labels, preds,att)
+            else:
+                loss = criterion(labels, preds)
             loss_iter = loss.data[0]
 
             optimizer.zero_grad()

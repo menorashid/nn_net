@@ -61,7 +61,39 @@ class MultiCrossEntropyMultiBranch(nn.Module):
             loss_all += loss*self.loss_weights[idx_pred]
         return loss_all
 
+class MultiCrossEntropyMultiBranchWithL1(MultiCrossEntropyMultiBranch):
+    def __init__(self,class_weights=None, loss_weights = None, num_branches = 2, att_weight = 0.5):
+        super(MultiCrossEntropyMultiBranchWithL1, self).__init__(class_weights=class_weights, loss_weights = loss_weights[:-1], num_branches = num_branches)
+        self.att_weight = loss_weights[-1]
+        
+    def forward(self, gt, preds, att):
+        if self.num_branches ==1:
+            preds = [preds]
 
+        loss_regular = super(MultiCrossEntropyMultiBranchWithL1,self).forward(gt, preds)
+        # print 'min_val',torch.min(torch.abs(att))
+        
+
+        l1 = torch.mean(torch.abs(att))
+        l1 = self.att_weight*l1
+        # print 'l1',l1,'loss_regular',loss_regular
+        loss_all = l1+loss_regular
+        
+        # loss_all = 0
+        # assert len(preds) == self.num_branches
+        # for idx_pred, pred in enumerate(preds):
+        #     pred = self.LogSoftmax(pred)
+        #     # print pred.size()
+        #     if self.class_weights is not None:
+        #         assert self.class_weights.size(1)==pred.size(1)
+        #         loss = self.class_weights*-1*gt*pred
+        #     else:
+        #         loss = -1*gt* pred
+
+        #     loss = torch.sum(loss, dim = 1)
+        #     loss = torch.mean(loss)
+        #     loss_all += loss*self.loss_weights[idx_pred]
+        return loss_all
 
 class MCE_CenterLoss_Combo(nn.Module):
     def __init__(self, n_classes, feat_dim, bg, lambda_param, alpha_param, class_weights = None):

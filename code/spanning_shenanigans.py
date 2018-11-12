@@ -11,7 +11,7 @@ from debugging_graph import get_gt_vector, readTrainTestFile, softmax
 from analysis import evaluate_thumos as et
 from train_test_mill import merge_detections
 
-def saving_graphs_etc(model_file = None, graph_num = None,k_vec = None):
+def saving_graphs_etc(model_file = None, graph_num = None,k_vec = None,sparsify = False):
     # model_file = '../experiments/graph_multi_video_multi_F_joint_train_normalize_True_True_non_lin_HT_sparsify_True_graph_size_2_deno_8_n_classes_20_in_out_2048_64_feat_dim_2048_64_method_cos_ucf/all_classes_False_just_primary_False_limit_500_cw_True_MultiCrossEntropyMultiBranch_300_step_300_0.1_0.001_0.001_lw_0.5_0.5_ABS/model_299.pt'
     if model_file is None:
         model_file = '../experiments/graph_multi_video_multi_F_joint_train_normalize_True_True_non_lin_HT_sparsify_True_graph_size_2_deno_8_n_classes_20_in_out_2048_64_feat_dim_2048_64_method_cos_ucf/all_classes_False_just_primary_False_limit_500_cw_True_MultiCrossEntropyMultiBranch_300_step_300_0.1_0.001_0.001_lw_0.5_0.5_ABS_gk6/model_299.pt'
@@ -22,13 +22,13 @@ def saving_graphs_etc(model_file = None, graph_num = None,k_vec = None):
 
     train_data, test_train_data, test_data, n_classes, trim_preds = emb.get_data('ucf', 500, False, just_primary = False, gt_vec = False, k_vec = k_vec)
 
-    test_data = train_data
-    test_bool = False
-    test_data.feature_limit = None
+    # test_data = train_data
+    # test_bool = False
+    # test_data.feature_limit = None
 
     batch_size = 1
-    # test_bool = True
-    # print 'test_bool',test_bool
+    test_bool = True
+    print 'test_bool',test_bool
 
 
     out_dir_meta = model_file[:model_file.rindex('.')]
@@ -69,7 +69,7 @@ def saving_graphs_etc(model_file = None, graph_num = None,k_vec = None):
         else:
             to_pass_in = [data['features'],data['gt_vec']]
             
-        affinity = model.get_similarity(to_pass_in,idx_graph_layer = graph_num, sparsify = False, nosum = True)
+        affinity = model.get_similarity(to_pass_in,idx_graph_layer = graph_num, sparsify = sparsify, nosum = True)
 
         x_all, pmf = model(to_pass_in)
         if len(x_all)>4:
@@ -388,7 +388,7 @@ def save_graphs_to_look_at(model_file, graph_nums):
     for graph_num in graph_nums:
         out_dir_meta=out_dir_meta_meta+'_'+str(graph_num)
         assert os.path.exists(out_dir_meta)
-        vid_files = glob.glob(os.path.join(out_dir_meta,'*validation*.npz'))
+        vid_files = glob.glob(os.path.join(out_dir_meta,'*test*.npz'))
         
 
         for vid_file in vid_files:
@@ -559,8 +559,13 @@ def main():
 
     dir_model = '../experiments/graph_multi_video_cooc/graph_multi_video_cooc_aft_nonlin_HT_l2_non_lin_None_sparsify_False_graph_size_rand_deno_8_n_classes_20_in_out_2048_256_feat_dim_100_TennisSwingneg_method_affinity_dict_ucf/all_classes_False_just_primary_False_limit_500_cw_True_MultiCrossEntropy_100_step_100_0.1_0.001_ABS_bias/model_99.pt'
 
-    saving_graphs_etc(dir_model, graph_num,k_vec = 'k_100')
-    save_graphs_to_look_at(dir_model, [0])
+    dir_model = '../experiments/graph_multi_video_same_F_ens_dll/graph_multi_video_same_F_ens_dll_aft_nonlin_HT_l2_non_lin_HT_sparsify_0.8_0.6_graph_size_2_deno_8_n_classes_20_in_out_2048_128_feat_dim_2048_256_method_cos_ucf/all_classes_False_just_primary_False_limit_500_cw_True_MultiCrossEntropyMultiBranch_300_step_300_0.1_0.001_0.001_lw_0.50_0.50_ABS_bias/model_299.pt'
+
+
+    dir_model = '../experiments/graph_multi_video_same_F_ens_dll/graph_multi_video_same_F_ens_dll_aft_nonlin_HT_l2_non_lin_HT_sparsify_0.75_0.5_0.25_graph_size_2_sigmoid_True_deno_8_n_classes_20_in_out_2048_256_feat_dim_2048_512_method_cos_zero_self_ucf/all_classes_False_just_primary_False_limit_None_cw_True_MultiCrossEntropyMultiBranch_300_step_300_0.1_0.001_0.001_ABS_bias/model_299.pt'
+    for num in range(3):
+        saving_graphs_etc(dir_model, num,k_vec = None, sparsify = True)
+        save_graphs_to_look_at(dir_model, [num])
 
     # get_distance_from_perfect(dir_model, graph_num)
 
