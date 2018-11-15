@@ -256,7 +256,7 @@ def test_model_overlap_old(model, test_dataloader, criterion, log_arr, overlap_t
     
     return aps
 
-def merge_detections(bin_keep, det_conf, det_time_intervals):
+def merge_detections(bin_keep, det_conf, det_time_intervals, merge_with = 'max'):
     bin_keep = bin_keep.astype(int)
     bin_keep_rot = np.roll(bin_keep, 1)
     bin_keep_rot[0] = 0
@@ -279,7 +279,16 @@ def merge_detections(bin_keep, det_conf, det_time_intervals):
         idx_end = idx_end_all[idx_curr]
 
         det_conf_rel = det_conf[idx_start:idx_end]
-        det_conf_new[idx_curr]=np.max(det_conf_rel)
+        if merge_with=='max':
+            det_conf_new[idx_curr]=np.max(det_conf_rel)
+        elif merge_with=='min':
+            det_conf_new[idx_curr]=np.min(det_conf_rel)
+        elif merge_with=='mean':
+            det_conf_new[idx_curr]=np.mean(det_conf_rel)
+        else:
+            error_message = str('merge_with %s not recognized', merge_with)
+            raise ValueError(error_message)
+
 
         # print det_time_intervals.shape, idx_start
         det_time_intervals_new[idx_curr,0]=det_time_intervals[idx_start,0]

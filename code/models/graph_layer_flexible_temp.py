@@ -8,6 +8,20 @@ from normalize import Normalize
 import numpy as np
 from torch.autograd import Variable
 
+
+class Thresher(nn.Module):
+    def __init__(self):
+        super(Thresher,self).__init__()
+        self.weight = nn.Parameter(torch.ones(1))
+        self.bias = nn.Parameter(torch.zeros(1))
+
+    def forward(self,G):
+        G = G*F.sigmoid(self.weight)
+        G = G+F.tanh(self.bias)
+        G = F.relu(G)
+        return G
+
+
 class Graph_Layer(nn.Module):
     def __init__(self,in_size, n_out = None, method = 'cos', k = None,
         affinity_dict = None):
@@ -23,6 +37,26 @@ class Graph_Layer(nn.Module):
         if self.affinity_dict is not None:
             self.affinity_dict = Variable(torch.Tensor(np.load(self.affinity_dict))).cuda()
             # print torch.min(self.affinity_dict), torch.max(self.affinity_dict)
+
+        
+        if 'learn_thresh' in self.method:
+            self.thresher = Thresher()
+            # []
+            # # torch.nn.Conv2d(in_channels, out_channels, kernel_size, stride=1
+            # conv = nn.Conv2d(1,1,1,stride = 1, bias = True)
+            # conv.weight.data.fill_(1)
+            # conv.bias.data.fill_(0)
+            # # nn.init.kaiming_uniform_(con.weight, a=math.sqrt(5))
+            # self.thresher.append(conv)
+            # self.thresher.append(nn.LeakyReLU())
+            # self.thresher = nn.Sequential(*self.thresher)
+        # elif 'learn_thresh' in self.method:
+        #     self.thresher = []
+        #     self.thresher.append(nn.Linear(1,1,bias = False))
+        #     self.thresher.append(nn.ReLU())
+        #     self.thresher = nn.Sequential(*self.thresher)
+
+
 
 
 
@@ -77,12 +111,49 @@ class Graph_Layer(nn.Module):
             
             G = torch.mm(input,torch.t(input))
             
+            if 'exp' in self.method:
+                G = torch.exp(G)
+
+            if 'thresh_self' in self.method:
+                assert type(to_keep)==float
+                eye_curr = torch.eye(G.size(0)).cuda()
+                eye_inv = (eye_curr+1) % 2
+                eye_curr = to_keep*eye_curr
+                
+                G = (G*eye_inv)+eye_curr
+            
+            elif 'learn_thresh' in self.method:
+                assert to_keep is None
+                G = self.thresher(G)
+              
             if 'zero_self' in self.method:
                 eye_inv = (torch.eye(G.size(0)).cuda()+1) % 2
                 G = G*eye_inv
-        
+            
 
 
+
+        if alpha is not None:
+            assert to_keep is None
+            # print G[:2,:2]
+            # print torch.min(alpha),torch.max(alpha)
+            alpha = alpha.view(1,alpha.size(0))
+            # print alpha[0,:2]
+            G = G*alpha
+            # diag_vals = torch.diagonal(G)
+
+            # print G[:2,:2]
+            # alpha1 = alpha.view(alpha.size(1),1)
+            # G = G*alpha1
+            
+            # print G[:2,:2]
+            # eye_inv = (torch.eye(G.size(0)).cuda()+1) % 2
+            # G = G*eye_inv
+            # print G[:2,:2]
+            # G = G+torch.diag(diag_vals)
+            # print G[:2,:2]
+
+            # raw_input()
             
         if to_keep is not None:
             if type(to_keep) == type(()):
@@ -138,24 +209,7 @@ class Graph_Layer(nn.Module):
             G = G/sums
 
 
-        if alpha is not None:
-            assert to_keep is None
-            # print G[:2,:2]
-            # print torch.min(alpha),torch.max(alpha)
-            alpha = alpha.view(1,alpha.size(0))
-            G = G*alpha
-            diag_vals = torch.diagonal(G)
-
-            alpha1 = alpha.view(alpha.size(1),1)
-            G = G*alpha1
-            # print G[:2,:2]
-            eye_inv = (torch.eye(G.size(0)).cuda()+1) % 2
-            G = G*eye_inv
-            # print G[:2,:2]
-            G = G+torch.diag(diag_vals)
-            # print G[:2,:2]
-
-            # raw_input()
+        
 
 
         # print torch.min(G), torch.max(G)    

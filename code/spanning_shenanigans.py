@@ -104,26 +104,35 @@ def saving_graphs_etc(model_file = None, graph_num = None,k_vec = None,sparsify 
             gt_classes = gt_classes)
 
 
-def get_spanned_nodes(gt_class, x_all, affinity, thresh, deno = 8, oracle = False, gt_vec = None):
+def get_spanned_nodes(gt_class, x_all, affinity, thresh, deno = 8, oracle = 'topk', gt_vec = None):
 
     # turn off self connections
     # make undirected
     affinity = np.triu(affinity,k=1)
 
     # oracle gives best start node
-    if oracle:
+    if oracle=='gt':
         assert gt_vec is not None
         rel_cols = np.array(affinity)
         rel_cols[:,gt_vec==0]= 0
         start_node = np.argmax(np.sum(rel_cols, axis = 1))
         nodes_kept = [start_node]
 
-    else:
+    elif oracle=='topk':
 
         nodes_kept = np.argsort(x_all[:,gt_class])[::-1]
-        k = max(1,x_all.shape[0]//8)
+        k = max(1,x_all.shape[0]//deno)
         nodes_kept = list(nodes_kept[:k])
-        # print nodes_kept
+        
+    elif oracle=='conf':
+        deno = np.max(x_all[:,gt_class]) - deno
+        nodes_kept = np.where(x_all[:,gt_class]>=deno)[0]
+        # k = max(1,x_all.shape[0]//deno)
+        nodes_kept = list(nodes_kept)
+        # print x_all[nodes_kept,gt_class]
+        # raw_input()
+    else:
+        raise ValueError('oracle '+oracle+' not good')
 
 
 
@@ -184,6 +193,66 @@ def get_spanned_nodes(gt_class, x_all, affinity, thresh, deno = 8, oracle = Fals
 
     # print 'gt_count[-1], np.sum(gt_vec)', gt_count[-1], np.sum(gt_vec)
     # print 'edge_threshes[-1]',edge_threshes[-1]
+    return nodes_kept, edge_threshes, gt_count, iter_inserted
+
+
+def get_spanned_nodes_expansion_level(gt_class, x_all, affinity, thresh, deno = 8, oracle = 'topk', gt_vec = None, expansion_level = 1):
+
+    # turn off self connections
+    # make undirected
+    affinity = np.triu(affinity,k=1)
+    # affinity = np.abs(affinity)
+
+    # oracle gives best start node
+    if oracle=='gt':
+        assert gt_vec is not None
+        rel_cols = np.array(affinity)
+        rel_cols[:,gt_vec==0]= 0
+        start_node = np.argmax(np.sum(rel_cols, axis = 1))
+        nodes_kept = [start_node]
+
+    elif oracle=='topk':
+
+        nodes_kept = np.argsort(x_all[:,gt_class])[::-1]
+        k = max(1,x_all.shape[0]//deno)
+        nodes_kept = list(nodes_kept[:k])
+        
+    elif oracle=='conf':
+        deno = np.max(x_all[:,gt_class]) - deno
+        nodes_kept = np.where(x_all[:,gt_class]>=deno)[0]
+        # k = max(1,x_all.shape[0]//deno)
+        nodes_kept = list(nodes_kept)
+        # print x_all[nodes_kept,gt_class]
+        # raw_input()
+    else:
+        raise ValueError('oracle '+oracle+' not good')
+
+
+
+    edge_thresh = 1
+    gt_count = []
+    edge_threshes = [1]*len(nodes_kept)
+    iter_inserted = [0]*len(nodes_kept)
+    # print len(nodes_kept)
+
+    for iter_curr in range(expansion_level):
+        affinity[:,nodes_kept]= 0
+        # thresh-1
+        rel_graph = affinity[nodes_kept,:]
+        # print np.min(rel_graph), np.max(rel_graph)
+
+        nodes_to_keep = np.where(rel_graph>=thresh)[0]
+        edge_thresh = rel_graph[rel_graph>=thresh]
+
+        edge_threshes.extend(list(edge_thresh))
+        nodes_kept.extend(list(nodes_to_keep))
+        iter_inserted.extend([iter_curr]*len(nodes_to_keep))
+        if gt_vec is not None:
+            gt_count.append( np.sum(gt_vec[nodes_kept]))
+        
+        if edge_thresh.size>0:
+            print len(nodes_to_keep), iter_curr, np.min(edge_thresh), np.max(edge_thresh)
+
     return nodes_kept, edge_threshes, gt_count, iter_inserted
 
 
@@ -268,12 +337,16 @@ def trying_it_out():
     print out_dir_curr
 
 
-
+    
 def getting_detection_results(model_file = None, graph_num = None,
     oracle = False,
     thresh = 0.8,
     branch_pred = 0,
-    gt_it = False):
+    gt_it = False,
+    add_identity = False,
+    merge_with = 'max',
+    deno = 8, 
+    expansion_level = 0):
 
     # model_file = '../experiments/graph_multi_video_multi_F_joint_train_normalize_True_True_non_lin_HT_sparsify_True_graph_size_2_deno_8_n_classes_20_in_out_2048_64_feat_dim_2048_64_method_cos_ucf/all_classes_False_just_primary_False_limit_500_cw_True_MultiCrossEntropyMultiBranch_300_step_300_0.1_0.001_0.001_lw_0.5_0.5_ABS/model_299.pt'
     if model_file is None:
@@ -290,10 +363,11 @@ def getting_detection_results(model_file = None, graph_num = None,
     out_dir_meta = os.path.join(os.path.split(dir_graphs)[0],'spanning_shenanigans')
     util.mkdir(out_dir_meta)
     
-    out_dir = '_'.join([str(val) for val in ['eval',oracle,thresh,branch_pred,gt_it]])
+    out_dir = '_'.join([str(val) for val in ['eval',oracle,thresh,branch_pred,gt_it, merge_with,deno, expansion_level]])
     out_dir = os.path.join(out_dir_meta,out_dir)
     util.mkdir(out_dir)
-
+    out_dir_span = os.path.join(out_dir,'span')
+    util.mkdir(out_dir_span)
 
     vid_files = glob.glob(os.path.join(dir_graphs,'*test*.npz'))
     
@@ -317,6 +391,10 @@ def getting_detection_results(model_file = None, graph_num = None,
         end_seq = np.array(range(1,len_video+1))*16./25.
         det_time_intervals_meta = np.concatenate([start_seq[:,np.newaxis],end_seq[:,np.newaxis]],axis=1)
         
+        nodes_kept_arr = []
+        edge_threshes_arr = []
+        gt_count_arr = []
+        iter_inserted_arr = []
 
         for idx in range(gt_classes.size):
 
@@ -326,7 +404,17 @@ def getting_detection_results(model_file = None, graph_num = None,
             gt_class = gt_classes[idx]
             # print vid_name, idx, gt_class
             
-            nodes_kept, edge_threshes, gt_count, iter_inserted = get_spanned_nodes(gt_class, x_all, affinity, thresh , deno = 8, oracle = oracle, gt_vec = gt_vec)
+            # nodes_kept, edge_threshes, gt_count, iter_inserted = get_spanned_nodes(gt_class, x_all, affinity, thresh , deno = deno, oracle = oracle, gt_vec = gt_vec)
+            if expansion_level>0:
+                nodes_kept, edge_threshes, gt_count, iter_inserted = get_spanned_nodes_expansion_level(gt_class, x_all, affinity, thresh , deno = deno, oracle = oracle, gt_vec = gt_vec,expansion_level = expansion_level)
+            else:
+                nodes_kept, edge_threshes, gt_count, iter_inserted = get_spanned_nodes(gt_class, x_all, affinity, thresh , deno = deno, oracle = oracle, gt_vec = gt_vec)
+
+            nodes_kept_arr.append(nodes_kept)
+            edge_threshes_arr.append(edge_threshes)
+            gt_count_arr.append(gt_count)
+            iter_inserted_arr.append(iter_inserted)
+
 
             det_conf = np.zeros((len_video,))
             
@@ -334,28 +422,19 @@ def getting_detection_results(model_file = None, graph_num = None,
             iter_inserted = np.array(iter_inserted)
             iter_inserted = (len_video-iter_inserted)/float(len_video)
 
-            edge_threshes_scaled = edge_threshes
-
-            det_sf = softmax(x_all, axis = 1)
-            max_det = np.max(det_sf[:,gt_class])
-            # edge_threshes_scaled = max_det * np.array(edge_threshes)
-            # # edge_threshes_scaled = det_sf[nodes_kept,gt_class]
-
-            # edge_threshes_scaled = edge_threshes - np.min(edge_threshes)
-            # edge_threshes_scaled = edge_threshes_scaled/np.max(edge_threshes_scaled)
-            # edge_threshes_scaled =  (0.5+(edge_threshes_scaled*0.5))
-
-            print np.min(edge_threshes_scaled), np.max(edge_threshes_scaled)
-
-            det_conf[nodes_kept] = edge_threshes_scaled
-            # det_conf[nodes_kept] = thresh
+            if gt_it:
+                det_conf[nodes_kept] = x_all[nodes_kept,gt_class]
+            else:
+                det_conf[nodes_kept] = edge_threshes
+            
+            print np.min(det_conf), np.max(det_conf)
 
             bin_keep = np.zeros((len_video,))
             bin_keep[nodes_kept] = 1
             bin_keep = bin_keep>0
 
             # array(edge_threshes)
-            det_conf, det_time_intervals = merge_detections(bin_keep, det_conf, det_time_intervals_meta)
+            det_conf, det_time_intervals = merge_detections(bin_keep, det_conf, det_time_intervals_meta, merge_with = merge_with)
                 # print class_idx, labels[idx_sample][class_idx],np.min(det_conf), np.max(det_conf),len(det_time_intervals)
 
                 # det_time_intervals = det_time_intervals_meta
@@ -364,7 +443,23 @@ def getting_detection_results(model_file = None, graph_num = None,
             det_events_class.extend([gt_class]*det_conf.shape[0])
             det_conf_all.append(det_conf)
             det_time_intervals_all.append(det_time_intervals)
-            
+        
+        out_file_span = os.path.join(out_dir_span,vid_name+'.npy')
+        nodes_kept_arr = np.array(nodes_kept_arr)
+        edge_threshes_arr = np.array(edge_threshes_arr)
+        gt_count_arr = np.array(gt_count_arr)
+        iter_inserted_arr = np.array(iter_inserted_arr)
+        
+        np.savez_compressed(out_file_span, 
+                    nodes_kept_arr = nodes_kept_arr,
+                    edge_threshes_arr = edge_threshes_arr,
+                    gt_count_arr = gt_count_arr,
+                    iter_inserted_arr = iter_inserted_arr,
+                    gt_vecs = npz_data['gt_vecs'],
+                    affinity = npz_data['affinity'],
+                    x_all = npz_data['x_all'],
+                    gt_classes = npz_data['gt_classes'])
+
     det_conf = np.concatenate(det_conf_all,axis =0)
     det_time_intervals = np.concatenate(det_time_intervals_all,axis = 0)
     det_events_class = np.array(det_events_class)
@@ -399,19 +494,25 @@ def save_graphs_to_look_at(model_file, graph_nums):
             
             gt_vecs = npz_data['gt_vecs']
             gt_classes = npz_data['gt_classes']
+            x_all = npz_data['x_all']
+            
             
             plotter = []
             legend_entries = []
             for gt_idx,gt_class in enumerate(gt_classes):
                 gt_vec = gt_vecs[gt_idx]
+                val_rel =x_all[0,:,gt_class]
                 gt_vec = gt_vec/np.max(gt_vec)
-                gt_vec = gt_vec* (gt_idx+1)
+                gt_vec = gt_vec* np.max(val_rel)
+                # (gt_idx+1)
                 x_axis = range(gt_vec.size)
                 plotter.append((x_axis,gt_vec))
+                plotter.append((x_axis,val_rel))
                 legend_entries.append(class_names[gt_class])
+                legend_entries.append(class_names[gt_class]+' pred')
 
             out_file = os.path.join(out_dir_viz, vid_file[:vid_file.rindex('.')]+'_gt.jpg')
-            visualize.plotSimple(plotter,out_file = out_file,xlabel = 'time',ylabel = '',legend_entries=legend_entries)
+            visualize.plotSimple(plotter,out_file = out_file,xlabel = 'time',ylabel = '',legend_entries=legend_entries,outside = True)
 
 
             out_file = os.path.join(out_dir_viz, vid_file[:vid_file.rindex('.')]+'_'+str(graph_num)+'.jpg')
@@ -517,11 +618,49 @@ def get_distance_from_perfect(model_file, graph_num):
     visualize.writeHTMLForFolder(out_dir_viz)
 
 
+
+def trying_it_out_expansion_levels(model_file, graph_num = None,
+    oracle = False,
+    thresh = 0.8,
+    branch_pred = 0,
+    gt_it = False,
+    add_identity = False,
+    merge_with = 'max',
+    deno = 8,
+    expansion_level = 1):
+
+    pass
+
     
+def script_for_ens_best_yet():
+    # oracle = False
+    # oracle = 'topk'
+    # deno = 8
+    oracle = 'conf'
+    deno = 0.01
+    gt_it = False
+    expansion_level = 1
+    merge_with = 'max'
+
+    dir_model = '../experiments/graph_multi_video_same_F_ens_dll/graph_multi_video_same_F_ens_dll_aft_nonlin_HT_l2_non_lin_HT_sparsify_0.75_0.5_0.25_graph_size_2_sigmoid_True_deno_8_n_classes_20_in_out_2048_256_feat_dim_2048_512_method_cos_zero_self_ucf/all_classes_False_just_primary_False_limit_None_cw_True_MultiCrossEntropyMultiBranch_500_step_500_0.1_0.001_0.001_ABS_bias/model_499.pt'
+    threshes = [0.75,0.5,0.25]
+    # [0.25,0.5,0.75]
+    # 
+    for num in range(1,2):
+        thresh = threshes[num]
+        # saving_graphs_etc(dir_model, num,k_vec = None, sparsify = True)
+
+    # get_distance_from_perfect(dir_model, graph_num)
+
+    # dir_model = None
+    # graph_num = 0
+
+        getting_detection_results(dir_model, num, oracle = oracle, thresh = thresh, gt_it = gt_it,branch_pred = num, merge_with =merge_with, deno = deno, expansion_level = expansion_level)
+        # raw_input()
+    
+def scratch():
 
 
-
-def main():
     # trying_it_out()
 
     # return
@@ -563,9 +702,24 @@ def main():
 
 
     dir_model = '../experiments/graph_multi_video_same_F_ens_dll/graph_multi_video_same_F_ens_dll_aft_nonlin_HT_l2_non_lin_HT_sparsify_0.75_0.5_0.25_graph_size_2_sigmoid_True_deno_8_n_classes_20_in_out_2048_256_feat_dim_2048_512_method_cos_zero_self_ucf/all_classes_False_just_primary_False_limit_None_cw_True_MultiCrossEntropyMultiBranch_300_step_300_0.1_0.001_0.001_ABS_bias/model_299.pt'
-    for num in range(3):
-        saving_graphs_etc(dir_model, num,k_vec = None, sparsify = True)
-        save_graphs_to_look_at(dir_model, [num])
+
+
+    dir_model = '../experiments/graph_multi_video_same_F_ens_dll_moredepth_concat_sim/graph_multi_video_same_F_ens_dll_moredepth_concat_sim_aft_nonlin_HT_L2_num_graphs_1_num_branches_1_non_lin_aft_RL_graph_size_1_sigmoid_True_deno_8_n_classes_20_in_out_2048_128_feat_dim_2048_64_non_lin_HT_scaling_method_n_ucf/all_classes_False_just_primary_False_limit_500_cw_True_MultiCrossEntropy_100_step_100_0.1_0.001_0.001_ABS_bias/model_99.pt'
+    dir_model = '../experiments/graph_multi_video_same_F_ens_dll_moredepth_concat_sim/graph_multi_video_same_F_ens_dll_moredepth_concat_sim_aft_nonlin_HT_L2_num_graphs_1_num_branches_1_non_lin_aft_RL_graph_size_1_sigmoid_False_deno_8_n_classes_20_in_out_2048_128_feat_dim_2048_64_non_lin_HT_scaling_method_n_ucf/all_classes_False_just_primary_False_limit_500_cw_True_MultiCrossEntropy_100_step_100_0.1_0.001_0.001_ABS_bias_t/model_9.pt'
+
+    dir_model = '../experiments/graph_multi_video_same_F_ens_dll_moredepth_concat_sim/graph_multi_video_same_F_ens_dll_moredepth_concat_sim_aft_nonlin_HT_L2_num_graphs_1_num_branches_1_non_lin_aft_RL_graph_size_1_sigmoid_False_deno_8_n_classes_20_in_out_2048_128_feat_dim_2048_64_non_lin_HT_scaling_method_n_ucf/all_classes_False_just_primary_False_limit_500_cw_True_MultiCrossEntropy_100_step_100_0.1_0.001_0.001_ABS_bias_sym/model_39.pt'
+    dir_model = '../experiments/graph_multi_video_same_F_ens_dll_moredepth_concat_sim/graph_multi_video_same_F_ens_dll_moredepth_concat_sim_aft_nonlin_HT_L2_num_graphs_1_num_branches_1_non_lin_aft_RL_graph_size_1_sigmoid_False_deno_8_n_classes_20_in_out_2048_128_feat_dim_2048_64_non_lin_HT_scaling_method_sum_ucf/all_classes_False_just_primary_False_limit_500_cw_True_MultiCrossEntropy_100_step_100_0.1_0.001_0.001_ABS_bias_sym/model_9.pt'
+    dir_model = '../experiments/graph_multi_video_same_F_ens_dll_moredepth_concat_sim/graph_multi_video_same_F_ens_dll_moredepth_concat_sim_aft_nonlin_HT_L2_num_graphs_1_num_branches_1_non_lin_aft_HT_graph_size_1_sigmoid_False_deno_8_n_classes_20_in_out_2048_128_feat_dim_2048_64_non_lin_HT_scaling_method_n_ucf/all_classes_False_just_primary_False_limit_500_cw_True_MultiCrossEntropy_100_step_100_0.1_0.001_0.001_ABS_bias_sym/model_9.pt'
+
+    dir_model = '../experiments/graph_multi_video_same_F_ens_dll_moredepth_concat_sim/graph_multi_video_same_F_ens_dll_moredepth_concat_sim_aft_nonlin_HT_L2_num_graphs_1_num_branches_1_non_lin_aft_RL_graph_size_1_sigmoid_True_deno_8_n_classes_20_in_out_2048_128_feat_dim_2048_64_non_lin_HT_scaling_method_n_ucf/all_classes_False_just_primary_False_limit_500_cw_True_MultiCrossEntropy_100_step_100_0.1_0.001_0.001_ABS_bias_sym/model_9.pt'
+    num = 0
+    # for num in range(3):
+
+    dir_model = '../experiments/graph_multi_video_same_F_ens_dll/graph_multi_video_same_F_ens_dll_aft_nonlin_HT_l2_non_lin_HT_sparsify_None_graph_size_1_sigmoid_True_deno_8_n_classes_20_in_out_2048_128_feat_dim_2048_256_method_cos_learn_thresh_ucf/all_classes_False_just_primary_False_limit_None_cw_True_MultiCrossEntropy_100_step_100_0.1_0.001_0.001_ABS_bias/model_99.pt'
+
+
+    saving_graphs_etc(dir_model, num,k_vec = None, sparsify = False)
+    save_graphs_to_look_at(dir_model, [num])
 
     # get_distance_from_perfect(dir_model, graph_num)
 
@@ -578,6 +732,13 @@ def main():
     # print 'hello'
     
 
+def main():
+    scratch()
+
+    # script_for_ens_best_yet()
+
+
+    
 
 if __name__=='__main__':
     main()

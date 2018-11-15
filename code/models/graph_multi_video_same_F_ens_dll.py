@@ -49,6 +49,7 @@ class Graph_Multi_Video(nn.Module):
             self.layer_bef = []
             self.layer_bef.append(nn.Linear(layer_bef[0],layer_bef[1], bias = True))
             self.layer_bef.append(nn.ReLU())
+            # self.layer_bef.append(Normalize())
             self.layer_bef = nn.Sequential(*self.layer_bef)
 
             
@@ -236,9 +237,19 @@ class Network:
         
         lr_list = []
 
-        lr_list+= [{'params': [p for p in self.model.linear_layer.parameters() if p.requires_grad], 'lr': lr[0]}]
-        lr_list+= [{'params': [p for p in self.model.graph_layers.parameters() if p.requires_grad], 'lr': lr[1]}]        
-        lr_list+= [{'params': [p for p in self.model.last_graphs.parameters() if p.requires_grad], 'lr': lr[1]}]
+        i = 0
+        if self.model.layer_bef is not None:
+            print lr[i]
+            lr_list+= [{'params': [p for p in self.model.layer_bef.parameters() if p.requires_grad], 'lr': lr[i]}]
+            i+=1
+
+        print lr[i]
+        lr_list+= [{'params': [p for p in self.model.linear_layer.parameters() if p.requires_grad], 'lr': lr[i]}]
+        i+=1
+
+        print lr[i]
+        lr_list+= [{'params': [p for p in self.model.graph_layers.parameters() if p.requires_grad], 'lr': lr[i]}]        
+        lr_list+= [{'params': [p for p in self.model.last_graphs.parameters() if p.requires_grad], 'lr': lr[i]}]
 
         return lr_list
 
