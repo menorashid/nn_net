@@ -717,8 +717,11 @@ def scratch():
 
     dir_model = '../experiments/graph_multi_video_same_F_ens_dll/graph_multi_video_same_F_ens_dll_aft_nonlin_HT_l2_non_lin_HT_sparsify_None_graph_size_1_sigmoid_True_deno_8_n_classes_20_in_out_2048_128_feat_dim_2048_256_method_cos_learn_thresh_ucf/all_classes_False_just_primary_False_limit_None_cw_True_MultiCrossEntropy_100_step_100_0.1_0.001_0.001_ABS_bias/model_99.pt'
 
+    dir_model = '../experiments/graph_multi_video_same_F_ens_dll_moredepth/graph_multi_video_same_F_ens_dll_moredepth_aft_nonlin_HT_L2_non_lin_HT_num_graphs_1_sparsify_0.5_graph_size_2_sigmoid_True_deno_0.5_n_classes_20_in_out_2048_256_feat_dim_2048_512_method_cos_zero_self_ucf/all_classes_False_just_primary_False_limit_None_cw_True_MultiCrossEntropy_300_step_300_0.1_0.001_0.001_0.001_ABS_bias_retry/model_299.pt'
+    
+    dir_model = '../experiments/graph_multi_video_same_i3dF/graph_multi_video_same_i3dF_aft_nonlin_HT_l2_sparsify_0.5_non_lin_None_method_cos_zero_self_deno_8_n_classes_20_in_out_2048_2_graph_size_2_ucf/all_classes_False_just_primary_False_limit_None_cw_True_MultiCrossEntropy_100_step_100_0.1_0.001_0.01_ABS_bias_wb/model_99.pt'
 
-    saving_graphs_etc(dir_model, num,k_vec = None, sparsify = False)
+    # saving_graphs_etc(dir_model, num,k_vec = None, sparsify = True)
     save_graphs_to_look_at(dir_model, [num])
 
     # get_distance_from_perfect(dir_model, graph_num)

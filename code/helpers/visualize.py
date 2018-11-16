@@ -205,7 +205,7 @@ def plotErrorBars(dict_to_plot,x_lim,y_lim,xlabel,y_label,title,out_file,margin=
     plt.savefig(out_file);
     plt.close();
 
-def plotSimple(xAndYs,out_file=None,title='',xlabel='',ylabel='',legend_entries=None,loc=0,outside=False,logscale=False,colors=None,xticks=None,ylim=None):
+def plotSimple(xAndYs,out_file=None,title='',xlabel='',ylabel='',legend_entries=None,loc=0,outside=False,logscale=False,colors=None,xticks=None,ylim=None,noline = False):
     plt.title(title);
     plt.grid(1);
     plt.xlabel(xlabel);
@@ -220,7 +220,10 @@ def plotSimple(xAndYs,out_file=None,title='',xlabel='',ylabel='',legend_entries=
             handle,=plt.plot(x,y,color_curr)
                 # ,linewidth=2.0);
         else:
-            handle,=plt.plot(x,y)
+            if noline:
+                handle,=plt.plot(x,y, marker = '.',linewidth = 0)
+            else:
+                handle,=plt.plot(x,y)
                 # ,linewidth=2.0);
 
         handles.append(handle);

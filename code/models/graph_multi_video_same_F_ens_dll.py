@@ -60,7 +60,38 @@ class Graph_Multi_Video(nn.Module):
         self.last_graphs = nn.ModuleList()
         
         for num_layer in range(num_layers): 
-            self.graph_layers.append(Graph_Layer_Wrapper(in_out[0],n_out = in_out[1], non_lin = non_lin, method = method, aft_nonlin = aft_nonlin))
+            if self.sparsify[num_layer]=='lin':
+                lin_curr = []
+                
+                if non_lin=='HT':
+                    lin_curr.append( nn.Hardtanh())
+                elif non_lin.lower()=='rl':
+                    lin_curr.append( nn.ReLU())
+                elif non_lin is not None:
+                    error_message = str('non_lin %s not recognized', non_lin)
+                    raise ValueError(error_message)
+                
+                lin_curr.append(nn.Linear(in_out[0],in_out[1]))
+                
+                to_pend = aft_nonlin.split('_')
+                for tp in to_pend:
+                    if tp.lower()=='ht':
+                        lin_curr.append(nn.Hardtanh())
+                    elif tp.lower()=='rl':
+                        lin_curr.append(nn.ReLU())
+                    elif tp.lower()=='l2':
+                        lin_curr.append(Normalize())
+                    elif tp.lower()=='ln':
+                        lin_curr.append(nn.LayerNorm(n_out))
+                    elif tp.lower()=='bn':
+                        lin_curr.append(nn.BatchNorm1d(n_out, affine = False, track_running_stats = False))
+                    else:
+                        error_message = str('non_lin %s not recognized', non_lin)
+                        raise ValueError(error_message)
+                lin_curr = nn.Sequential(*lin_curr)
+                self.graph_layers.append(lin_curr)
+            else:
+                self.graph_layers.append(Graph_Layer_Wrapper(in_out[0],n_out = in_out[1], non_lin = non_lin, method = method, aft_nonlin = aft_nonlin))
 
             last_graph = []
             last_graph.append(nn.Dropout(0.5))
@@ -112,8 +143,11 @@ class Graph_Multi_Video(nn.Module):
             feature_out = self.linear_layer(input)
             for col_num in range(len(self.graph_layers)):
 
-                to_keep = self.sparsify[col_num]                
-                out_graph = self.graph_layers[col_num](input, feature_out, to_keep = to_keep)
+                to_keep = self.sparsify[col_num]   
+                if to_keep=='lin':
+                    out_graph = self.graph_layers[col_num](input)
+                else:             
+                    out_graph = self.graph_layers[col_num](input, feature_out, to_keep = to_keep)
                 out_col = self.last_graphs[col_num](out_graph)
 
                 x_all_all[col_num].append(out_col)
@@ -163,6 +197,12 @@ class Graph_Multi_Video(nn.Module):
 
             x_all_all = torch.cat([x_all.unsqueeze(2) for x_all in x_all_all],dim=2)
             x_all_all = torch.mean(x_all_all,dim=2)
+        elif branch_to_test==-5:
+            pmf_all = torch.cat([pmf.view(pmf.size(0),1) for pmf in pmf_all],dim = 1)
+            pmf_all = torch.max(pmf_all,dim = 1)[0]
+
+            x_all_all = torch.cat([x_all.unsqueeze(2) for x_all in x_all_all],dim=2)
+            x_all_all = torch.max(x_all_all,dim=2)[0]
 
         if ret_bg:
             return x_all_all, pmf_all, None
@@ -237,19 +277,32 @@ class Network:
         
         lr_list = []
 
-        i = 0
+        modules = []
         if self.model.layer_bef is not None:
-            print lr[i]
-            lr_list+= [{'params': [p for p in self.model.layer_bef.parameters() if p.requires_grad], 'lr': lr[i]}]
-            i+=1
+            modules.append(self.model.layer_bef)
 
-        print lr[i]
-        lr_list+= [{'params': [p for p in self.model.linear_layer.parameters() if p.requires_grad], 'lr': lr[i]}]
-        i+=1
+        modules+=[self.model.linear_layer, self.model.graph_layers, self.model.last_graphs]
 
-        print lr[i]
-        lr_list+= [{'params': [p for p in self.model.graph_layers.parameters() if p.requires_grad], 'lr': lr[i]}]        
-        lr_list+= [{'params': [p for p in self.model.last_graphs.parameters() if p.requires_grad], 'lr': lr[i]}]
+        for i,module in enumerate(modules):
+            print i, lr[i]
+            lr_list+= [{'params': [p for p in module.parameters() if p.requires_grad], 'lr': lr[i]}]
+
+        # i = 0
+        # if self.model.layer_bef is not None:
+        #     print lr[i]
+        #     lr_list+= [{'params': [p for p in self.model.layer_bef.parameters() if p.requires_grad], 'lr': lr[i]}]
+        #     i+=1
+
+        # print lr[i]
+        # lr_list+= [{'params': [p for p in self.model.linear_layer.parameters() if p.requires_grad], 'lr': lr[i]}]
+        # i+=1
+
+        # print lr[i]
+        # lr_list+= [{'params': [p for p in self.model.graph_layers.parameters() if p.requires_grad], 'lr': lr[i]}]        
+        # i+=1
+
+        # print lr[i]
+        # lr_list+= [{'params': [p for p in self.model.last_graphs.parameters() if p.requires_grad], 'lr': lr[i]}]
 
         return lr_list
 

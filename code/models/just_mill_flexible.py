@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch
 import torch.nn.functional as F
 from normalize import Normalize
+
 class Just_Mill(nn.Module):
     def __init__(self, n_classes, deno, layer_sizes):
         super(Just_Mill, self).__init__()
@@ -29,6 +30,13 @@ class Just_Mill(nn.Module):
             return x, pmf, None
         else:    
             return x, pmf
+
+    def out_f(self, input, ret_bg = False):
+        x = self.linear(input)
+        # x = F.normalize(x)
+        # x = self.features[0](x)
+        # x = self.features[1](x)
+        return x
 
     def make_pmf(self,x):
         k = max(1,x.size(0)//self.deno)

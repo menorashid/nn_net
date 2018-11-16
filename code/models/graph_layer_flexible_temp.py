@@ -31,6 +31,10 @@ class Graph_Layer(nn.Module):
         self.n_out = self.in_size if n_out is None else n_out
         self.weight = nn.Parameter(torch.randn(in_size,self.n_out))
         nn.init.kaiming_uniform_(self.weight, a=math.sqrt(5))
+
+        # self.bias = nn.Parameter(torch.zeros(1,self.n_out))
+        # nn.init.kaiming_uniform_(self.weight, a=math.sqrt(5))
+
         print self.weight.size()
         self.method = method
         self.affinity_dict = affinity_dict
@@ -66,6 +70,7 @@ class Graph_Layer(nn.Module):
         G = self.get_affinity(sim_feat, to_keep = to_keep, alpha = alpha)
         temp = torch.mm(G,x)
         out = torch.mm(temp,self.weight)
+        # +self.bias
         
         return out
 

@@ -390,7 +390,7 @@ def ens_moredepth_concat_sim_experiments():
 def ens_moredepth_experiments():
     model_name = 'graph_multi_video_same_F_ens_dll_moredepth'
 
-    lr = [0.001,0.001, 0.001]
+    lr = [0.001,0.001, 0.01]
     multibranch = 1
     loss_weights = None
     # [1/float(multibranch)]*multibranch
@@ -404,14 +404,14 @@ def ens_moredepth_experiments():
     torch.backends.cudnn.deterministic = True
     torch.manual_seed(999)
     
-    epoch_stuff = [500,500]
+    epoch_stuff = [300,300]
     dataset = 'ucf'
     limit  = None
     save_after = 100
     
     test_mode = False
 
-    model_nums = None
+    model_nums = [99,199,299]
     retrain = False
     viz_mode = False
     viz_sim = False
@@ -421,18 +421,18 @@ def ens_moredepth_experiments():
     
     network_params = {}
     network_params['deno'] = 8
-    network_params['in_out'] = [2048,1024]
+    network_params['in_out'] = [2048,256]
     network_params['feat_dim'] = [2048,512]
     network_params['num_graphs'] = 1
     network_params['graph_size'] = 2
-    network_params['method'] = 'cos_zero_self_learn_thresh'
-    network_params['sparsify'] = [None]
+    network_params['method'] = 'cos_zero_self'
+    network_params['sparsify'] = [0.5]
     # ,None,None]
     # network_params['layer_bef'] = [2048,512]
     network_params['non_lin'] = 'HT'
     network_params['aft_nonlin']='HT_L2'
     network_params['sigmoid'] = True
-    post_pend = 'ABS_bias_bias_tzs'
+    post_pend = 'ABS_bias'
     
     first_thresh=0.1
 
@@ -477,12 +477,11 @@ def ens_moredepth_experiments():
 def ens_experiments():
     model_name = 'graph_multi_video_same_F_ens_dll'
     # # lr = [0.001]
-    lr = [0.001, 0.001]
-    multibranch = 1
-    loss_weights = None
-    # [1/float(multibranch)]*multibranch
+    lr = [0.001, 0.001,0.001]
+    multibranch = 4
+    loss_weights = [1/float(6)]*3+[1/2.]
     # 
-    branch_to_test = -1
+    branch_to_test = -4
 
     # model_name = 'graph_multi_video_same_i3dF_ens_sll'
     # lr = [0.001]
@@ -501,14 +500,14 @@ def ens_experiments():
     torch.manual_seed(999)
 
     
-    epoch_stuff = [150,150]
+    epoch_stuff = [500,500]
     dataset = 'ucf'
-    limit  = None
+    limit  = 500
     save_after = 50
     
-    test_mode = False
+    test_mode = True
 
-    model_nums = [49,99,149]
+    model_nums = range(99,epoch_stuff[1],100)
     retrain = False
     viz_mode = False
     viz_sim = False
@@ -518,20 +517,20 @@ def ens_experiments():
     
     network_params = {}
     network_params['deno'] = 8
-    network_params['in_out'] = [2048,512]
-    network_params['feat_dim'] = [2048,256]
+    network_params['in_out'] = [2048,256]
+    network_params['feat_dim'] = [2048,512]
     # network_params['layer_bef'] = [2048,2048]
     network_params['graph_size'] = 2
-    network_params['method'] = 'cos_learn_thresh_zero_self'
+    network_params['method'] = 'cos_zero_self'
     # network_params['sparsify'] = list(np.arange(0.5,1.0,0.1))[::-1]
-    network_params['sparsify'] = [None]
+    network_params['sparsify'] = [0.75,0.5,0.25,'lin']
     # loss_weights = network_params['sparsify']
     # [0.9,0.8,0.7,0.6,0.5]
     # ,0.75,0.5]
     network_params['non_lin'] = 'HT'
     network_params['aft_nonlin']='HT_l2'
-    network_params['sigmoid'] = False
-    post_pend = 'ABS_bias_bias'
+    network_params['sigmoid'] = True
+    post_pend = 'ABS_bias'
     
     first_thresh=0.1
 
@@ -1011,6 +1010,194 @@ def scripts_comparative():
 
     create_comparative_viz(dirs, class_names, dir_strs, out_dir_html) 
 
+
+
+def exps_for_visualizing_W():
+    model_name = 'graph_multi_video_same_i3dF'
+    lr = [0.001,0.01]
+    
+    # model_name = 'just_mill_flexible'
+    # lr = [0.001,0.001]
+    # epoch_stuff = [100,100]
+
+    multibranch = 1
+    loss_weights = None
+    branch_to_test = -1
+    
+    gt_vec = False
+    just_primary = False
+    all_classes = False
+
+    torch.backends.cudnn.deterministic = True
+    torch.manual_seed(999)
+
+    epoch_stuff = [100,100]
+    dataset = 'ucf'
+    limit  = None
+    save_after = 50
+    
+    test_mode = True
+
+    model_nums = [99]
+    retrain = False
+    viz_mode = False
+    viz_sim = False
+    test_post_pend = ''
+
+    post_pend = ''
+    
+    # network_params = {}
+    # network_params['deno'] = 8
+    # network_params['layer_sizes'] = [2048,2]
+    
+
+    network_params = {}
+    network_params['deno'] = 8
+    network_params['in_out'] = [2048,2]
+    # network_params['feat_dim'] = [2048,64]
+    network_params['graph_size'] = 2
+    network_params['method'] = 'cos_zero_self'
+    network_params['sparsify'] = 0.5
+
+    network_params['non_lin'] = None
+    network_params['aft_nonlin']='HT_l2'
+    post_pend = 'ABS_bias_wb'
+    
+    first_thresh=0
+    second_thresh = 0.5
+    det_class = -1
+    
+    class_weights = True
+    test_after = 5
+    
+    train_simple_mill_all_classes (model_name = model_name,
+                        lr = lr,
+                        dataset = dataset,
+                        network_params = network_params,
+                        limit = limit, 
+                        epoch_stuff= epoch_stuff,
+                        batch_size = 32,
+                        batch_size_val = 32,
+                        save_after = save_after,
+                        test_mode = test_mode,
+                        class_weights = class_weights,
+                        test_after = test_after,
+                        all_classes = all_classes,
+                        just_primary = just_primary,
+                        model_nums = model_nums,
+                        retrain = retrain,
+                        viz_mode = viz_mode,
+                        second_thresh = second_thresh,
+                        first_thresh = first_thresh,
+                        det_class = det_class,
+                        post_pend = post_pend,
+                        viz_sim = viz_sim,
+                        test_post_pend = test_post_pend,
+                        loss_weights = loss_weights,
+                        multibranch = multibranch,
+                        branch_to_test = branch_to_test,
+                        )
+
+
+
+def ens_experiments_pool():
+    model_name = 'graph_multi_video_same_F_ens_pool'
+    # # lr = [0.001]
+    lr = [0.001, 0.001,0.001,0.001]
+    multibranch = 1
+    loss_weights = None
+    # [1/float(multibranch)]*multibranch
+    # 
+    branch_to_test = -1
+
+    # model_name = 'graph_multi_video_same_i3dF_ens_sll'
+    # lr = [0.001]
+    # model_name = 'graph_multi_video_diff_F_ens_sll'
+    # lr = [0.001,0.001]
+    # loss_weights = None
+    # multibranch = 1
+    # branch_to_test = 0
+
+    k_vec = None
+
+    gt_vec = False
+    just_primary = False
+
+    torch.backends.cudnn.deterministic = True
+    torch.manual_seed(999)
+
+    
+    epoch_stuff = [100,100]
+    dataset = 'ucf'
+    limit  = 500
+    save_after = 100
+    
+    test_mode = False
+
+    model_nums = [99]
+    retrain = False
+    viz_mode = False
+    viz_sim = False
+    test_post_pend = ''
+
+    post_pend = ''
+    
+    network_params = {}
+    network_params['deno'] = 8
+    network_params['in_out'] = [2048,256]
+    network_params['feat_dim'] = [2048,512]
+    # network_params['layer_bef'] = [2048,1024]
+    network_params['graph_size'] = 2
+    network_params['method'] = 'cos_zero_self'
+    network_params['sparsify'] = [0.5,'lin']
+    network_params['non_lin'] = 'HT'
+    network_params['aft_nonlin']='HT_L2'
+    network_params['pool_method']='avg_cat'
+    network_params['sigmoid'] = True
+    post_pend = 'ABS_bias'
+    
+    first_thresh=0.1
+
+    class_weights = True
+    test_after = 5
+    
+    all_classes = False
+    # just_primary = False
+    # gt_vec = False
+
+    
+    second_thresh = 0.5
+    det_class = -1
+    train_simple_mill_all_classes (model_name = model_name,
+                        lr = lr,
+                        dataset = dataset,
+                        network_params = network_params,
+                        limit = limit, 
+                        epoch_stuff= epoch_stuff,
+                        batch_size = 32,
+                        batch_size_val = 32,
+                        save_after = save_after,
+                        test_mode = test_mode,
+                        class_weights = class_weights,
+                        test_after = test_after,
+                        all_classes = all_classes,
+                        just_primary = just_primary,
+                        model_nums = model_nums,
+                        retrain = retrain,
+                        viz_mode = viz_mode,
+                        second_thresh = second_thresh,
+                        first_thresh = first_thresh,
+                        det_class = det_class,
+                        post_pend = post_pend,
+                        viz_sim = viz_sim,
+                        test_post_pend = test_post_pend,
+                        gt_vec = gt_vec,
+                        loss_weights = loss_weights,
+                        multibranch = multibranch,
+                        branch_to_test = branch_to_test,
+                        k_vec = k_vec)
+
+
 def main():
     # print 'hello hello baby'
     # scripts_comparative()
@@ -1018,10 +1205,12 @@ def main():
     # separate_supervision_experiment()
     # super_simple_experiment()
     # testing_exp()
-    # ens_experiments()
-    ens_moredepth_experiments()
+    ens_experiments()
+    # ens_experiments_pool()
+    # ens_moredepth_experiments()
     # ens_att_experiments()
     # ens_moredepth_concat_sim_experiments()
+    # exps_for_visualizing_W()
 
 if __name__=='__main__':
     main()

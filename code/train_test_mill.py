@@ -423,6 +423,10 @@ def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh ,
     # print 'FIRST THRESH', first_thresh
     # print 'SECOND THRESH', second_thresh
     # raw_input()
+    # out_dir = '../scratch/graph_2_nononlin_b'
+    # util.mkdir(out_dir)
+    # print out_dir
+    # raw_input()
 
     model.eval()
     model = model.cuda()
@@ -466,6 +470,18 @@ def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh ,
                         out,pmf = model.forward([sample.cuda(),batch['gt_vec'][idx_sample].cuda()])
                     else:    
                         out, pmf = model.forward(sample.cuda())
+                        # print pmf
+                        # print model
+                        # outf = model.out_f(sample.cuda()).data.cpu().numpy()
+                        # vid_name = det_vid_names_ac[idx_test]
+                        # out_file_f = os.path.join(out_dir,vid_name+'.npy')
+                        # np.save(out_file_f,outf)
+                        # print out_file_f
+                        # print outf.shape
+                        # raw_input()
+
+
+
             if 'l1' in criterion_str:
                 [pmf, att] = pmf
 
@@ -482,8 +498,8 @@ def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh ,
 
                 # print out.size()
                 # raw_input()
-            if second_thresh>=0 and branch_to_test!=-2 and branch_to_test!=-4:
-                out = torch.nn.functional.softmax(out,dim = 1)
+            # if second_thresh>=0 and branch_to_test!=-2 and branch_to_test!=-4 and branch_to_test!=-5:
+            #     out = torch.nn.functional.softmax(out,dim = 1)
 
             start_seq = np.array(range(0,out.shape[0]))*16./25.
             end_seq = np.array(range(1,out.shape[0]+1))*16./25.
