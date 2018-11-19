@@ -5,7 +5,7 @@ import torch.nn.functional as F
 from graph_layer_flexible_temp import Graph_Layer
 from graph_layer_flexible_temp import Graph_Layer_Wrapper
 from normalize import Normalize
-
+import random
 import numpy as np
 
 class Graph_Multi_Video(nn.Module):
@@ -20,7 +20,8 @@ class Graph_Multi_Video(nn.Module):
                  non_lin = 'HT',
                  aft_nonlin = None,
                  sigmoid = False,
-                 layer_bef = None
+                 layer_bef = None,
+                 graph_sum = False
                  ):
         super(Graph_Multi_Video, self).__init__()
         
@@ -28,7 +29,8 @@ class Graph_Multi_Video(nn.Module):
         self.deno = deno
         self.graph_size = graph_size
         self.sparsify = sparsify
-        
+        self.graph_sum = graph_sum
+
         if in_out is None:
             in_out = [2048,64]
         
@@ -112,13 +114,22 @@ class Graph_Multi_Video(nn.Module):
             input = [input]
             strip = True
 
-        if self.graph_size is None:
+        if not self.training:
+            graph_size = 1
+        elif self.graph_size is None:
             graph_size = len(input)
         elif self.graph_size=='rand':
-            import random
             graph_size = random.randint(1,len(input))
         else:
-            graph_size = min(self.graph_size, len(input))
+            graph_size = random.randint(1,min(self.graph_size, len(input)))
+
+        # if self.graph_size is None:
+        #     graph_size = len(input)
+        # elif self.graph_size=='rand':
+        #     import random
+        #     graph_size = random.randint(1,len(input))
+        # else:
+        #     graph_size = min(self.graph_size, len(input))
 
         input_chunks = [input[i:i + graph_size] for i in xrange(0, len(input), graph_size)]
 
@@ -127,7 +138,8 @@ class Graph_Multi_Video(nn.Module):
         
         pmf_all = [[] for i in range(self.num_branches)]
         x_all_all = [[] for i in range(self.num_branches)]
-        
+        graph_sums = []
+
         for input in input_chunks:
             input_sizes = [input_curr.size(0) for input_curr in input]
             input = torch.cat(input,0)
@@ -147,7 +159,11 @@ class Graph_Multi_Video(nn.Module):
                 if to_keep=='lin':
                     out_graph = self.graph_layers[col_num](input)
                 else:             
-                    out_graph = self.graph_layers[col_num](input, feature_out, to_keep = to_keep)
+                    out_graph = self.graph_layers[col_num](input, feature_out, to_keep = to_keep, graph_sum = self.graph_sum)
+                    if self.graph_sum:
+                        [out_graph, graph_sum] = out_graph       
+                        graph_sums.append(graph_sum.unsqueeze(0))
+
                 out_col = self.last_graphs[col_num](out_graph)
 
                 x_all_all[col_num].append(out_col)
@@ -203,6 +219,9 @@ class Graph_Multi_Video(nn.Module):
 
             x_all_all = torch.cat([x_all.unsqueeze(2) for x_all in x_all_all],dim=2)
             x_all_all = torch.max(x_all_all,dim=2)[0]
+
+        if self.graph_sum:
+            pmf_all = [pmf_all, torch.cat(graph_sums,dim = 0)]
 
         if ret_bg:
             return x_all_all, pmf_all, None
@@ -266,9 +285,10 @@ class Network:
                  non_lin = 'HT',
                  aft_nonlin = None,
                  sigmoid = False,
-                 layer_bef = None
+                 layer_bef = None,
+                 graph_sum = False
                  ):
-        self.model = Graph_Multi_Video(n_classes, deno, in_out,feat_dim, graph_size, method, sparsify, non_lin, aft_nonlin,sigmoid, layer_bef)
+        self.model = Graph_Multi_Video(n_classes, deno, in_out,feat_dim, graph_size, method, sparsify, non_lin, aft_nonlin,sigmoid, layer_bef, graph_sum)
         print self.model
         raw_input()
 

@@ -65,14 +65,19 @@ class Graph_Layer(nn.Module):
 
 
         
-    def forward(self, x, sim_feat, to_keep = None, alpha = None):
+    def forward(self, x, sim_feat, to_keep = None, alpha = None, graph_sum = False):
 
-        G = self.get_affinity(sim_feat, to_keep = to_keep, alpha = alpha)
+        G = self.get_affinity(sim_feat, to_keep = to_keep, alpha = alpha, graph_sum = graph_sum)
+        if graph_sum:
+            [G, gsum] = G
         temp = torch.mm(G,x)
         out = torch.mm(temp,self.weight)
+
+        if graph_sum:
         # +self.bias
-        
-        return out
+            return [out, gsum]
+        else:
+            return out
 
 
     # def get_to_keep(self,input_sizes):
@@ -90,7 +95,7 @@ class Graph_Layer(nn.Module):
     
 
 
-    def get_affinity(self,input, to_keep = None, alpha = None, nosum = False):
+    def get_affinity(self,input, to_keep = None, alpha = None, nosum = False,graph_sum = False):
         
         # print input.size()
         if 'affinity_dict' in self.method:
@@ -116,6 +121,8 @@ class Graph_Layer(nn.Module):
             
             G = torch.mm(input,torch.t(input))
             
+            gsum = torch.sum(torch.abs(G))/(G.size(0)*G.size(1))
+
             if 'exp' in self.method:
                 G = torch.exp(G)
 
@@ -219,7 +226,10 @@ class Graph_Layer(nn.Module):
 
         # print torch.min(G), torch.max(G)    
         # raw_input()
-        return G
+        if graph_sum:
+            return [G, gsum]
+        else:
+            return G
 
 
 
@@ -268,14 +278,17 @@ class Graph_Layer_Wrapper(nn.Module):
             error_message = str('non_lin %s not recognized', non_lin)
             raise ValueError(error_message)
     
-    def forward(self, x, sim_feat, to_keep = None, alpha = None):
+    def forward(self, x, sim_feat, to_keep = None, alpha = None, graph_sum = False):
         if self.non_linearity is not None:
             sim_feat = self.non_linearity(sim_feat)
         # sim_feat = self.do(sim_feat)
-        out = self.graph_layer(x, sim_feat, to_keep = to_keep, alpha = alpha)
+        out = self.graph_layer(x, sim_feat, to_keep = to_keep, alpha = alpha, graph_sum = graph_sum)
         
         if hasattr(self,'aft') and self.aft is not None:
-            out = self.aft(out)
+            if graph_sum:
+                out[0] = self.aft(out[0])
+            else:
+                out = self.aft(out)
 
         return out
 

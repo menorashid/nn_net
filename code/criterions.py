@@ -75,6 +75,7 @@ class MultiCrossEntropyMultiBranchWithL1(MultiCrossEntropyMultiBranch):
         
 
         l1 = torch.mean(torch.abs(att))
+        # print 'l1',l1,'loss_regular',loss_regular
         l1 = self.att_weight*l1
         # print 'l1',l1,'loss_regular',loss_regular
         loss_all = l1+loss_regular

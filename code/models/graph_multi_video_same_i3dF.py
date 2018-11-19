@@ -20,6 +20,7 @@ class Graph_Multi_Video(nn.Module):
                  non_lin = 'HT',
                  gk = 8,
                  aft_nonlin = None,
+                 graph_sum = False
                  ):
         super(Graph_Multi_Video, self).__init__()
         
@@ -28,6 +29,8 @@ class Graph_Multi_Video(nn.Module):
         self.graph_size = graph_size
         self.sparsify = sparsify
         self.gk = gk
+        self.graph_sum = graph_sum
+
         if in_out is None:
             in_out = [2048,64]
         if feat_dim is None:
@@ -88,7 +91,7 @@ class Graph_Multi_Video(nn.Module):
         # x_all_all = [[] for i in range(self.num_branches)]
         x_all = []
         pmf_all = []
-
+        graph_sums = []
         for input in input_chunks:
             input_sizes = [input_curr.size(0) for input_curr in input]
             input = torch.cat(input,0)
@@ -109,8 +112,12 @@ class Graph_Multi_Video(nn.Module):
 
             input_graph = input
             for col_num in range(len(self.graph_layers)):
-                input_graph = self.graph_layers[col_num](input_graph, input, to_keep = to_keep)
-                
+                input_graph = self.graph_layers[col_num](input_graph, input, to_keep = to_keep, graph_sum = self.graph_sum)
+
+                if self.graph_sum:
+                    [input_graph, graph_sum] = input_graph       
+                    graph_sums.append(graph_sum.unsqueeze(0))
+
                 # x_all_all[col_num].append(out_col)
                 
 
@@ -144,7 +151,7 @@ class Graph_Multi_Video(nn.Module):
         if ret_bg:
             return x_all, pmf_all, None
         else:
-            return x_all, pmf_all
+            return x_all,[ pmf_all, torch.cat(graph_sums,dim = 0)]
     
 
     def out_f(self, input, epoch_num = None, ret_bg =False, branch_to_test = -1):
@@ -261,9 +268,10 @@ class Network:
                  sparsify = False,
                  non_lin = 'HT',
                  gk = 8,
-                 aft_nonlin = None
+                 aft_nonlin = None,
+                 graph_sum = False
                  ):
-        self.model = Graph_Multi_Video(n_classes, deno, in_out,feat_dim, graph_size, method, sparsify, non_lin,gk, aft_nonlin)
+        self.model = Graph_Multi_Video(n_classes, deno, in_out,feat_dim, graph_size, method, sparsify, non_lin,gk, aft_nonlin, graph_sum)
         print self.model
         raw_input()
 

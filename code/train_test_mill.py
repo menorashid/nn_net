@@ -167,95 +167,6 @@ def test_model_core(model, test_dataloader, criterion, log_arr, multibranch = 1)
 
     return accuracy, loss_iter
 
-def test_model_overlap_old(model, test_dataloader, criterion, log_arr, overlap_thresh=0.1, bin_trim = None, first_thresh = 0, second_thresh = 0.5):
-
-    model.eval()
-
-    preds = []
-    labels_all = []
-
-    det_vid_names_ac = [os.path.split(line.split(' ')[0])[1][:-4] for line in test_dataloader.dataset.files]
-    
-    outs = []
-    min_all = None
-    max_all = None
-
-    det_events_class = []
-    det_time_intervals = []
-    det_conf = []
-    det_vid_names = []
-    idx_test = 0
-
-    threshes_all = []
-    for num_iter_test,batch in enumerate(test_dataloader):
-        samples = batch['features']
-        labels = batch['label'].cuda()
-
-        preds_mini = []
-        for sample in samples:
-
-            out, pmf = model.forward(sample.cuda())
-
-
-            # print out.size(),torch.min(out), torch.max(out)
-            # print pmf.size(),torch.min(pmf), torch.max(pmf)
-
-            # raw_input()
-
-            if bin_trim is not None:
-                # print out.size()
-                out = out[:,np.where(bin_trim)[0]]
-                pmf = pmf[np.where(bin_trim)[0]]
-
-
-                # print out.size()
-                # raw_input()
-
-            out = torch.nn.functional.softmax(out,dim = 1)
-
-            pmf = pmf.data.cpu().numpy()
-            out = out.data.cpu().numpy()
-
-            bin_not_keep = pmf<first_thresh
-            
-            # for r in range(out.shape[0]):
-            #     out[r,~bin_not_keep]=util.softmax(out[r,~bin_not_keep])
-
-            max_vals = np.max(out, axis = 0)
-            min_vals = np.min(out, axis = 0)
-            threshes = max_vals - (max_vals - min_vals)*second_thresh
-            
-            out[:,bin_not_keep]= np.min(threshes)-1
-            for idx_class in range(threshes.shape[0]):
-                out[out[:,idx_class]<threshes[idx_class],idx_class] = threshes[idx_class]-1
-            threshes = np.tile(threshes[np.newaxis,:],[out.shape[0],1])
-            threshes_all.append(threshes)
-
-
-            
-
-            start_seq = np.array(range(0,out.shape[0]))*16./25.
-            end_seq = np.array(range(1,out.shape[0]+1))*16./25.
-            time_intervals = np.concatenate([start_seq[:,np.newaxis],end_seq[:,np.newaxis]],axis=1)
-            # print time_intervals.shape
-
-            det_conf.append(out)
-            det_vid_names.extend([det_vid_names_ac[idx_test]]*out.shape[0])
-            det_time_intervals.append(time_intervals)
-            idx_test +=1
-
-    threshes_all = np.concatenate(threshes_all,0)
-    det_conf = np.concatenate(det_conf,axis =0)
-    det_time_intervals = np.concatenate(det_time_intervals,axis = 0)
-    class_keep = np.argmax(det_conf , axis = 1)
-
-    # np.savez('../scratch/debug_det.npz', det_vid_names = det_vid_names, det_conf = det_conf, det_time_intervals = det_time_intervals)
-    # raw_input()
-
-    aps = et.test_overlap(det_vid_names, det_conf, det_time_intervals, threshes_all,log_arr = log_arr)
-    
-    return aps
-
 def merge_detections(bin_keep, det_conf, det_time_intervals, merge_with = 'max'):
     bin_keep = bin_keep.astype(int)
     bin_keep_rot = np.roll(bin_keep, 1)
@@ -416,9 +327,7 @@ def visualize_dets(model, test_dataloader, dir_viz, first_thresh , second_thresh
     # np.savez('../scratch/debug_det_graph.npz', det_vid_names = det_vid_names, det_conf = det_conf, det_time_intervals = det_time_intervals, det_events_class = det_events_class)
 
 
-
-
-def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh , second_thresh , bin_trim = None , multibranch =1, branch_to_test = -1,dataset = 'ucf'):
+def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh , second_thresh , bin_trim = None , multibranch =1, branch_to_test = -1,dataset = 'ucf', save_outfs = None):
 
     # print 'FIRST THRESH', first_thresh
     # print 'SECOND THRESH', second_thresh
@@ -472,14 +381,11 @@ def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh ,
                         out, pmf = model.forward(sample.cuda())
                         # print pmf
                         # print model
-                        # outf = model.out_f(sample.cuda()).data.cpu().numpy()
-                        # vid_name = det_vid_names_ac[idx_test]
-                        # out_file_f = os.path.join(out_dir,vid_name+'.npy')
-                        # np.save(out_file_f,outf)
-                        # print out_file_f
-                        # print outf.shape
-                        # raw_input()
-
+                        if save_outfs:
+                            outf = model.out_f(sample.cuda()).data.cpu().numpy()
+                            vid_name = det_vid_names_ac[idx_test]
+                            out_file_f = os.path.join(save_outfs,vid_name+'.npy')
+                            np.save(out_file_f,outf)
 
 
             if 'l1' in criterion_str:
@@ -577,14 +483,22 @@ def test_model(out_dir_train,
                 det_class = -1, 
                 multibranch = 1,
                 branch_to_test = -1,
-                dataset = 'ucf'):
+                dataset = 'ucf',
+                save_outfs = None):
     
     out_dir_results = os.path.join(out_dir_train,'results_model_'+str(model_num)+post_pend+'_'+str(first_thresh)+'_'+str(second_thresh))
     
+    print out_dir_results
+
     if branch_to_test!=-1:
         out_dir_results = out_dir_results +'_'+str(branch_to_test)
 
     util.mkdir(out_dir_results)
+
+    if save_outfs:
+        save_outfs = os.path.join(out_dir_results,'outf')
+        util.mkdir(save_outfs)
+    
     model_file = os.path.join(out_dir_train,'model_'+str(model_num)+'.pt')
     if branch_to_test>-1:
         append_name = '_'+str(branch_to_test)
@@ -628,7 +542,7 @@ def test_model(out_dir_train,
         bin_trim = None
         
     if not visualize:
-        aps = test_model_overlap(model, test_dataloader, criterion, log_arr ,first_thresh = first_thresh, second_thresh = second_thresh, bin_trim = bin_trim, multibranch = multibranch, branch_to_test = branch_to_test,dataset = dataset)
+        aps = test_model_overlap(model, test_dataloader, criterion, log_arr ,first_thresh = first_thresh, second_thresh = second_thresh, bin_trim = bin_trim, multibranch = multibranch, branch_to_test = branch_to_test,dataset = dataset, save_outfs = save_outfs)
         np.save(out_file, aps)
         util.writeFile(log_file, log_arr)
     else:

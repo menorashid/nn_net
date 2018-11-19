@@ -45,7 +45,7 @@ class Graph_Multi_Video(nn.Module):
         
         self.bn =None
         # nn.BatchNorm1d(2048, affine = False)
-        self.linear_layer = nn.Linear(feat_dim[0], feat_dim[1], bias = True)
+        
 
         if layer_bef is None:
             self.layer_bef = None    
@@ -57,7 +57,8 @@ class Graph_Multi_Video(nn.Module):
             self.layer_bef = nn.Sequential(*self.layer_bef)
 
             
-        
+        self.linear_layers = nn.ModuleList()
+        # Linear(feat_dim[0], feat_dim[1], bias = True)
         
         self.graph_layers = nn.ModuleList()
         
@@ -66,9 +67,14 @@ class Graph_Multi_Video(nn.Module):
         for num_layer in range(num_layers): 
 
             graph_pipe = nn.ModuleList()
+
+            lin_pipe = nn.ModuleList()
+
             for graph_num in range(num_graphs):
+                lin_pipe.append(nn.Linear(in_out[graph_num],feat_dim[graph_num]))
                 graph_pipe.append(Graph_Layer_Wrapper(in_out[graph_num],n_out = in_out[graph_num+1], non_lin = non_lin, method = method, aft_nonlin = aft_nonlin))
 
+            self.linear_layers.append(lin_pipe)
             self.graph_layers.append(graph_pipe)
                 # Graph_Layer_Wrapper(in_out[0],n_out = in_out[1], non_lin = non_lin, method = method, aft_nonlin = aft_nonlin))
 
@@ -91,9 +97,7 @@ class Graph_Multi_Video(nn.Module):
             input = [input]
             strip = True
 
-        if not self.training:
-            graph_size = 1
-        elif self.graph_size is None:
+        if self.graph_size is None:
             graph_size = len(input)
         elif self.graph_size=='rand':
             import random
@@ -132,15 +136,18 @@ class Graph_Multi_Video(nn.Module):
             if hasattr(self, 'layer_bef') and self.layer_bef is not None:
                 input = self.layer_bef(input)
 
-            feature_out = self.linear_layer(input)
+            # feature_out = self.linear_layer(input)
             for col_num in range(len(self.graph_layers)):
 
                 
                 out_graph = input
                 to_keep = self.sparsify[col_num] 
                 graph_pipe = self.graph_layers[col_num]
+                lin_pipe = self.linear_layers[col_num]
 
                 for graph_num in range(len(graph_pipe)):
+
+                    feature_out = lin_pipe[graph_num](out_graph)
                     out_graph = graph_pipe[graph_num](out_graph, feature_out, to_keep = to_keep, graph_sum = self.graph_sum)
                     if self.graph_sum:
                         [out_graph, graph_sum] = out_graph       
@@ -294,25 +301,20 @@ class Network:
 
     def get_lr_list(self, lr):
         
-        
         lr_list = []
-        i = 0
+
+        modules = []
         if self.model.layer_bef is not None:
-            print lr[i]
-            lr_list+= [{'params': [p for p in self.model.layer_bef.parameters() if p.requires_grad], 'lr': lr[i]}]
-            i+=1
+            modules.append(self.model.layer_bef)
 
-        print lr[i]
-        lr_list+= [{'params': [p for p in self.model.linear_layer.parameters() if p.requires_grad], 'lr': lr[i]}]
-        i+=1
+        modules+=[self.model.linear_layers, self.model.graph_layers, self.model.last_graphs]
 
-        print lr[i]
-        lr_list+= [{'params': [p for p in self.model.graph_layers.parameters() if p.requires_grad], 'lr': lr[i]}]        
-        i+=1
+        for i,module in enumerate(modules):
+            list_params = [p for p in module.parameters() if p.requires_grad]
+            lr_list+= [{'params': list_params, 'lr': lr[i]}]
+
         
-        print lr[i]
-        lr_list+= [{'params': [p for p in self.model.last_graphs.parameters() if p.requires_grad], 'lr': lr[i]}]
-
+        
         return lr_list
 
 def main():
