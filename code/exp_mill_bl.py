@@ -477,7 +477,8 @@ def ens_moredepth_experiments():
 
 
 def ens_experiments():
-    model_name = 'graph_multi_video_same_F_ens_dll'
+    # model_name = 'graph_multi_video_same_F_ens_dll'
+    model_name = 'graph_multi_video_flexF_ofe'
     # _moredepth'
     # # lr = [0.001]
     lr = [0.001,0.001, 0.001]
@@ -512,7 +513,7 @@ def ens_experiments():
     
     test_mode = False
 
-    model_nums = [99,149,199,249,299]
+    model_nums = [49,99]
     # range(99,300,100)
     retrain = False
     viz_mode = False
@@ -523,22 +524,23 @@ def ens_experiments():
     
     network_params = {}
     network_params['deno'] = 8
-    network_params['in_out'] = [2048,512]
-    network_params['feat_dim'] = [2048,1024]
+    network_params['in_out'] = [2048,1]
+    network_params['feat_dim'] = [2048,512]
     # network_params['num_graphs'] = 2
     # network_params['layer_bef'] = [2048,1024]
+    network_params['sameF'] = True
     network_params['graph_size'] = 1
     network_params['method'] = 'cos_zero_self'
     # network_params['sparsify'] = list(np.arange(0.5,1.0,0.1))[::-1]
-    network_params['sparsify'] = [0.5]
+    network_params['sparsify'] = 0.5
     network_params['graph_sum'] = attention
     # loss_weights = network_params['sparsify']
     # [0.9,0.8,0.7,0.6,0.5]
     # ,0.75,0.5]
     network_params['non_lin'] = 'HT'
-    network_params['aft_nonlin']='HT_l2'
+    network_params['aft_nonlin']=None
     network_params['sigmoid'] = True
-    post_pend = 'ABS_bias_rand_upto'
+    post_pend = 'ABS_bias'
     
     first_thresh=0.1
 

@@ -65,12 +65,17 @@ class Graph_Layer(nn.Module):
 
 
         
-    def forward(self, x, sim_feat, to_keep = None, alpha = None, graph_sum = False):
+    def forward(self, x, sim_feat, to_keep = None, alpha = None, graph_sum = False, identity = False, method = None):
 
-        G = self.get_affinity(sim_feat, to_keep = to_keep, alpha = alpha, graph_sum = graph_sum)
+        # if identity:
+        #     temp = x
+        #     if graph_sum= True:
+        # else:
+        G = self.get_affinity(sim_feat, to_keep = to_keep, alpha = alpha, graph_sum = graph_sum, identity = identity, method = method)
         if graph_sum:
             [G, gsum] = G
         temp = torch.mm(G,x)
+
         out = torch.mm(temp,self.weight)
 
         if graph_sum:
@@ -95,10 +100,16 @@ class Graph_Layer(nn.Module):
     
 
 
-    def get_affinity(self,input, to_keep = None, alpha = None, nosum = False,graph_sum = False):
+    def get_affinity(self,input, to_keep = None, alpha = None, nosum = False,graph_sum = False, identity = False, method = None):
         
         # print input.size()
-        if 'affinity_dict' in self.method:
+        if method is None:
+            method = self.method
+
+        if identity:
+            G = Variable(torch.eye(input.size(0)).cuda())
+            gsum = torch.sum(G)
+        elif 'affinity_dict' in self.method:
             assert self.affinity_dict is not None
             if next(self.parameters()).is_cuda and 'cuda' not in self.affinity_dict.type():
                 self.affinity_dict = self.affinity_dict.cuda()
@@ -113,20 +124,18 @@ class Graph_Layer(nn.Module):
             # expand aff col wise
             index = input.view(1,in_size).expand(in_size,in_size).long()
             G = torch.gather(G,1,index)
-            
-            
         else:
-            if 'cos' in self.method:
+            if 'cos' in method:
                 input = F.normalize(input)
             
             G = torch.mm(input,torch.t(input))
             
             gsum = torch.sum(torch.abs(G))/(G.size(0)*G.size(1))
 
-            if 'exp' in self.method:
+            if 'exp' in method:
                 G = torch.exp(G)
 
-            if 'thresh_self' in self.method:
+            if 'thresh_self' in method:
                 assert type(to_keep)==float
                 eye_curr = torch.eye(G.size(0)).cuda()
                 eye_inv = (eye_curr+1) % 2
@@ -134,11 +143,11 @@ class Graph_Layer(nn.Module):
                 
                 G = (G*eye_inv)+eye_curr
             
-            elif 'learn_thresh' in self.method:
+            elif 'learn_thresh' in method:
                 assert to_keep is None
                 G = self.thresher(G)
               
-            if 'zero_self' in self.method:
+            if 'zero_self' in method:
                 eye_inv = (torch.eye(G.size(0)).cuda()+1) % 2
                 G = G*eye_inv
             
@@ -278,11 +287,11 @@ class Graph_Layer_Wrapper(nn.Module):
             error_message = str('non_lin %s not recognized', non_lin)
             raise ValueError(error_message)
     
-    def forward(self, x, sim_feat, to_keep = None, alpha = None, graph_sum = False):
+    def forward(self, x, sim_feat, to_keep = None, alpha = None, graph_sum = False, identity = False, method= None):
         if self.non_linearity is not None:
             sim_feat = self.non_linearity(sim_feat)
         # sim_feat = self.do(sim_feat)
-        out = self.graph_layer(x, sim_feat, to_keep = to_keep, alpha = alpha, graph_sum = graph_sum)
+        out = self.graph_layer(x, sim_feat, to_keep = to_keep, alpha = alpha, graph_sum = graph_sum, identity = identity, method = method)
         
         if hasattr(self,'aft') and self.aft is not None:
             if graph_sum:

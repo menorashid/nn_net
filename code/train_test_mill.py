@@ -404,8 +404,8 @@ def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh ,
 
                 # print out.size()
                 # raw_input()
-            # if second_thresh>=0 and branch_to_test!=-2 and branch_to_test!=-4 and branch_to_test!=-5:
-            #     out = torch.nn.functional.softmax(out,dim = 1)
+            if second_thresh>=0 and branch_to_test!=-2 and branch_to_test!=-4 and branch_to_test!=-5:
+                out = torch.nn.functional.softmax(out,dim = 1)
 
             start_seq = np.array(range(0,out.shape[0]))*16./25.
             end_seq = np.array(range(1,out.shape[0]+1))*16./25.
