@@ -129,8 +129,8 @@ class Graph_Layer(nn.Module):
                 input = F.normalize(input)
             
             G = torch.mm(input,torch.t(input))
+            gsum = torch.sum(torch.abs(G.clone()))/(G.size(0)*G.size(1))
             
-            gsum = torch.sum(torch.abs(G))/(G.size(0)*G.size(1))
 
             if 'exp' in method:
                 G = torch.exp(G)
@@ -151,6 +151,9 @@ class Graph_Layer(nn.Module):
                 eye_inv = (torch.eye(G.size(0)).cuda()+1) % 2
                 G = G*eye_inv
             
+
+            # print torch.min(G), torch.max(G)
+
 
 
 
@@ -223,6 +226,7 @@ class Graph_Layer(nn.Module):
                 # print torch.sum(G==0)
                 # raw_input()
 
+        
 
         if not nosum:
             sums = torch.sum(G,dim = 1, keepdim = True)
@@ -270,6 +274,8 @@ class Graph_Layer_Wrapper(nn.Module):
                     self.aft.append(nn.LayerNorm(n_out))
                 elif tp.lower()=='bn':
                     self.aft.append(nn.BatchNorm1d(n_out, affine = False, track_running_stats = False))
+                elif tp.lower()=='sig':
+                    self.aft.append(nn.Sigmoid())
                 else:
                     error_message = str('non_lin %s not recognized', non_lin)
                     raise ValueError(error_message)

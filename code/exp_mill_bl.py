@@ -8,7 +8,7 @@ import numpy as np
 import torch
 from globals import * 
 
-def get_data(dataset, limit, all_classes, just_primary, gt_vec, k_vec):
+def get_data(dataset, limit, all_classes, just_primary, gt_vec, k_vec, test_pair = False):
 
     if dataset =='ucf':
         dir_files = '../data/ucf101/train_test_files'
@@ -17,7 +17,10 @@ def get_data(dataset, limit, all_classes, just_primary, gt_vec, k_vec):
         post_pends = ['','','']
         train_file = os.path.join(dir_files, 'train')
         test_train_file = os.path.join(dir_files, 'test')
-        test_file = os.path.join(dir_files, 'test')
+        if test_pair:
+            test_file = os.path.join(dir_files, 'test_pair_rand20')
+        else:
+            test_file = os.path.join(dir_files, 'test')
             
         files = [train_file, test_train_file, test_file]
 
@@ -113,7 +116,8 @@ def train_simple_mill_all_classes(model_name,
                                     gt_vec = False,
                                     k_vec = None,
                                     attention = False,
-                                    save_outfs = False):
+                                    save_outfs = False,
+                                    test_pair = False):
 
     num_epochs = epoch_stuff[1]
 
@@ -127,7 +131,7 @@ def train_simple_mill_all_classes(model_name,
 
     lr = lr
 
-    train_data, test_train_data, test_data, n_classes, trim_preds = get_data(dataset, limit, all_classes, just_primary, gt_vec, k_vec)
+    train_data, test_train_data, test_data, n_classes, trim_preds = get_data(dataset, limit, all_classes, just_primary, gt_vec, k_vec, test_pair = test_pair)
     
     network_params['n_classes']=n_classes
 
@@ -270,7 +274,8 @@ def train_simple_mill_all_classes(model_name,
                 multibranch = multibranch,
                 branch_to_test =branch_to_test,
                 dataset = dataset, 
-                save_outfs = save_outfs)
+                save_outfs = save_outfs,
+                test_pair = test_pair)
         test_model(**test_params)
         if viz_mode:
             test_params = dict(out_dir_train = out_dir_train,
@@ -477,8 +482,8 @@ def ens_moredepth_experiments():
 
 
 def ens_experiments():
-    # model_name = 'graph_multi_video_same_F_ens_dll'
-    model_name = 'graph_multi_video_flexF_ofe'
+    model_name = 'graph_multi_video_same_F_ens_dll'
+    # model_name = 'graph_multi_video_flexF_ofe'
     # _moredepth'
     # # lr = [0.001]
     lr = [0.001,0.001, 0.001]
@@ -486,7 +491,7 @@ def ens_experiments():
     loss_weights = [1,1]
     # [1/float(6)]*3+[1/2.]
     # 
-    branch_to_test = -1
+    branch_to_test = -2
     attention = True
 
     # model_name = 'graph_multi_video_same_i3dF_ens_sll'
@@ -511,35 +516,40 @@ def ens_experiments():
     limit  = 500
     save_after = 50
     
-    test_mode = False
+    test_mode = True
 
-    model_nums = [49,99]
-    # range(99,300,100)
+    model_nums = range(save_after-1,epoch_stuff[1],save_after)
+    # 
+    # [49,99]
+    # 
     retrain = False
     viz_mode = False
     viz_sim = False
-    test_post_pend = ''
+    test_post_pend = '_rand20'
 
     post_pend = ''
     
     network_params = {}
     network_params['deno'] = 8
-    network_params['in_out'] = [2048,1]
-    network_params['feat_dim'] = [2048,512]
+    network_params['in_out'] = [2048,512]
+    network_params['feat_dim'] = [2048,1024]
     # network_params['num_graphs'] = 2
     # network_params['layer_bef'] = [2048,1024]
-    network_params['sameF'] = True
-    network_params['graph_size'] = 1
+    # network_params['sameF'] = True
+    network_params['graph_size'] = 2
     network_params['method'] = 'cos_zero_self'
     # network_params['sparsify'] = list(np.arange(0.5,1.0,0.1))[::-1]
-    network_params['sparsify'] = 0.5
+    network_params['sparsify'] = [0.5]
     network_params['graph_sum'] = attention
+    # network_params['just_graph'] = True
+    # network_params['background'] = False
     # loss_weights = network_params['sparsify']
     # [0.9,0.8,0.7,0.6,0.5]
     # ,0.75,0.5]
     network_params['non_lin'] = 'HT'
-    network_params['aft_nonlin']=None
+    network_params['aft_nonlin']='HT_L2'
     network_params['sigmoid'] = True
+
     post_pend = 'ABS_bias'
     
     first_thresh=0.1
@@ -561,7 +571,7 @@ def ens_experiments():
                         limit = limit, 
                         epoch_stuff= epoch_stuff,
                         batch_size = 32,
-                        batch_size_val = 32,
+                        batch_size_val = 20,
                         save_after = save_after,
                         test_mode = test_mode,
                         class_weights = class_weights,
@@ -582,7 +592,8 @@ def ens_experiments():
                         multibranch = multibranch,
                         branch_to_test = branch_to_test,
                         k_vec = k_vec,
-                        attention = attention)
+                        attention = attention,
+                        test_pair = True)
 
 def ens_Fperg_experiments():
     model_name = 'graph_multi_video_Fperg_ens_dll_moredepth'

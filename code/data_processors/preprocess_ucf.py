@@ -10,6 +10,7 @@ import scipy.stats
 import multiprocessing
 import subprocess
 import scipy.io
+import random
 
 dir_meta = '../data/ucf101'
 dir_meta_features = '../data/i3d_features'
@@ -750,13 +751,45 @@ def write_classes_list_files():
     util.writeFile(out_file, classes)
 
 
+def save_test_pair_file():
+    dir_train_test_files = '../data/ucf101/train_test_files'
+    num_to_pick = 20    
+    train_file = os.path.join(dir_train_test_files,'train_ultra_correct.txt')
+    test_file = os.path.join(dir_train_test_files,'test_ultra_correct.txt')
+
+    train_data = util.readLinesFromFile(train_file)
+    test_data = util.readLinesFromFile(test_file)
+
+    test_new_data = []
+    for line_curr in test_data:
+        # rand_idx = random.randint(0,len(train_data)-1)
+        num_rand = random.sample(xrange(len(train_data)), num_to_pick)
+        for rand_idx in num_rand:
+        
+        # for line_train in train_data:
+            test_new_data.append(line_curr)
+            test_new_data.append(train_data[rand_idx])
+
+    print len(test_new_data)
+    print len(test_data)
+    print len(train_data)
+    print len(test_data)*len(train_data)*2
+    out_file = os.path.join(dir_train_test_files,'test_pair_rand'+str(num_to_pick)+'_ultra_correct.txt')
+    print out_file
+    # raw_input()
+    util.writeFile(out_file, test_new_data)
+
+
 
 def main():
-    just_primary = True
+
+    save_test_pair_file()
+
+    # just_primary = True
     # write_train_test_files_all(False, just_primary = just_primary)
     # write_train_test_files_all(True, just_primary = just_primary)
     # write_train_test_files(False, just_primary = just_primary)
-    write_train_test_files(True, just_primary = just_primary)
+    # write_train_test_files(True, just_primary = just_primary)
 
 
     # write_train_test_files()

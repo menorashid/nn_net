@@ -466,7 +466,161 @@ def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh ,
     aps = et.test_overlap(det_vid_names, det_conf, det_time_intervals,det_events_class,log_arr = log_arr, dataset = dataset)
     
     return aps
+
+
+def test_model_overlap_pairs(model, test_dataloader, criterion, log_arr,first_thresh , second_thresh , bin_trim = None , multibranch =1, branch_to_test = -1,dataset = 'ucf', save_outfs = None):
+
+    # print 'FIRST THRESH', first_thresh
+    # print 'SECOND THRESH', second_thresh
+    # raw_input()
+    # out_dir = '../scratch/graph_2_nononlin_b'
+    # util.mkdir(out_dir)
+    # print out_dir
+    # raw_input()
+
+    model.eval()
+    model = model.cuda()
+    model_name = model.__class__.__name__.lower()
+    criterion_str = criterion.__class__.__name__.lower()
+
+    preds = []
+    labels_all = []
+
+    det_vid_names_ac = [os.path.split(line.split(' ')[0])[1][:-4] for line in test_dataloader.dataset.files]
+    det_vid_names_ac = det_vid_names_ac[::20]
+
+    outs = []
+    min_all = None
+    max_all = None
+
+    det_events_class = []
+    det_time_intervals_all = []
+    det_conf_all = []
+    det_vid_names = []
+    idx_test = 0
+
+    threshes_all = []
+    for num_iter_test,batch in enumerate(test_dataloader):
+        print num_iter_test
+        print idx_test
+
+        samples = batch['features']
+        labels = batch['label'].cuda()
         
+        preds_mini = []
+        
+        assert len(samples)==20
+        chunk_size = 2
+        
+        sample_chunks = [samples[i:i + chunk_size] for i in xrange(0, len(samples), chunk_size)]
+        
+        if 'perfectg' in model_name or 'cooc' in model_name:
+            gt_vecs = batch['gt_vec']
+            gt_vecs_chunks = [gt_vecs[i:i + chunk_size] for i in xrange(0, len(gt_vecs), chunk_size)]
+
+        # out_chunk = []
+        # pmf_chunk = []
+        for idx_sample, sample in enumerate(sample_chunks):
+            sample_size = sample[0].size(0)
+            
+
+            if multibranch>1:
+                if 'perfectg' in model_name or 'cooc' in model_name:
+                    out, pmf = model.forward([sample,gt_vecs_chunks[idx_sample]], branch_to_test = branch_to_test)
+                else:
+                    out, pmf = model.forward(sample, branch_to_test = branch_to_test)
+            else:
+                if 'perfectg' in model_name or 'cooc' in model_name:
+                    out,pmf = model.forward([sample,gt_vecs_chunks[idx_sample]])
+                else:    
+                    out, pmf = model.forward(sample)
+
+
+            if 'l1' in criterion_str:
+                [pmf, att] = pmf
+
+            out = out[:sample_size]
+            pmf = pmf[0].squeeze()
+            
+
+            # print out.size(),torch.min(out), torch.max(out)
+            # print pmf.size(),torch.min(pmf), torch.max(pmf)
+
+            # raw_input()
+
+            if bin_trim is not None:
+                # print out.size()
+                out = out[:,np.where(bin_trim)[0]]
+                pmf = pmf[np.where(bin_trim)[0]]
+
+
+                # print out.size()
+                # raw_input()
+            if second_thresh>=0 and branch_to_test!=-2 and branch_to_test!=-4 and branch_to_test!=-5:
+                out = torch.nn.functional.softmax(out,dim = 1)
+
+            start_seq = np.array(range(0,out.shape[0]))*16./25.
+            end_seq = np.array(range(1,out.shape[0]+1))*16./25.
+            det_time_intervals_meta = np.concatenate([start_seq[:,np.newaxis],end_seq[:,np.newaxis]],axis=1)
+            
+
+            pmf = pmf.data.cpu().numpy()
+            out = out.data.cpu().numpy()
+
+            if first_thresh==-1:
+                bin_not_keep = labels[idx_sample].data.cpu().numpy()==0
+            else:
+                bin_not_keep = pmf<first_thresh
+            
+            # print np.min(pmf), np.max(pmf)
+            # print bin_not_keep
+            # print labels[idx_sample]
+            # print pmf
+            # print first_thresh
+            # raw_input()
+
+
+            for class_idx in range(pmf.size):
+                if bin_not_keep[class_idx]:
+                    continue
+
+                det_conf = out[:,class_idx]
+                if second_thresh<0:
+                    thresh = 0
+                else:
+                    thresh = np.max(det_conf)-(np.max(det_conf)-np.min(det_conf))*second_thresh
+                bin_second_thresh = det_conf>thresh
+                # print thresh, np.sum(bin_second_thresh)
+
+
+                det_conf, det_time_intervals = merge_detections(bin_second_thresh, det_conf, det_time_intervals_meta)
+                # print class_idx, labels[idx_sample][class_idx],np.min(det_conf), np.max(det_conf),len(det_time_intervals)
+
+                # det_time_intervals = det_time_intervals_meta
+                
+                det_vid_names.extend([det_vid_names_ac[idx_test]]*det_conf.shape[0])
+                det_events_class.extend([class_idx]*det_conf.shape[0])
+                det_conf_all.append(det_conf)
+                det_time_intervals_all.append(det_time_intervals)
+            
+            # raw_input()
+
+        idx_test +=1
+
+    # threshes_all = np.concatenate(threshes_all,0)
+    det_conf = np.concatenate(det_conf_all,axis =0)
+    det_time_intervals = np.concatenate(det_time_intervals_all,axis = 0)
+    det_events_class = np.array(det_events_class)
+    # class_keep = np.argmax(det_conf , axis = 1)
+
+    # np.savez('../scratch/debug_det_graph.npz', det_vid_names = det_vid_names, det_conf = det_conf, det_time_intervals = det_time_intervals, det_events_class = det_events_class)
+    # raw_input()
+
+    aps = et.test_overlap(det_vid_names, det_conf, det_time_intervals,det_events_class,log_arr = log_arr, dataset = dataset)
+    
+    return aps
+
+
 
 def test_model(out_dir_train,
                 model_num, 
@@ -484,15 +638,18 @@ def test_model(out_dir_train,
                 multibranch = 1,
                 branch_to_test = -1,
                 dataset = 'ucf',
-                save_outfs = None):
+                save_outfs = None,
+                test_pair = False):
     
     out_dir_results = os.path.join(out_dir_train,'results_model_'+str(model_num)+post_pend+'_'+str(first_thresh)+'_'+str(second_thresh))
     
-    print out_dir_results
-
     if branch_to_test!=-1:
         out_dir_results = out_dir_results +'_'+str(branch_to_test)
 
+    if test_pair:
+        out_dir_results = out_dir_results +'_test_pair'        
+
+    print out_dir_results
     util.mkdir(out_dir_results)
 
     if save_outfs:
@@ -520,6 +677,8 @@ def test_model(out_dir_train,
     if batch_size_val is None:
         batch_size_val = len(test_data)
 
+    # print 'batch_size_val', batch_size_val
+    # raw_input()
     
     test_dataloader = torch.utils.data.DataLoader(test_data, 
                         batch_size = batch_size_val,
@@ -540,12 +699,8 @@ def test_model(out_dir_train,
         assert np.all(new_trim==old_trim)
     else:
         bin_trim = None
-        
-    if not visualize:
-        aps = test_model_overlap(model, test_dataloader, criterion, log_arr ,first_thresh = first_thresh, second_thresh = second_thresh, bin_trim = bin_trim, multibranch = multibranch, branch_to_test = branch_to_test,dataset = dataset, save_outfs = save_outfs)
-        np.save(out_file, aps)
-        util.writeFile(log_file, log_arr)
-    else:
+    
+    if visualize:
         dir_viz = os.path.join(out_dir_results, '_'.join([str(val) for val in ['viz',det_class, first_thresh, second_thresh]]))
         util.mkdir(dir_viz)
         if multibranch>1:
@@ -553,6 +708,14 @@ def test_model(out_dir_train,
         else:
             branch_to_test_pass = -1
         visualize_dets(model, test_dataloader,  dir_viz,first_thresh = first_thresh, second_thresh = second_thresh,bin_trim = bin_trim,det_class = det_class, branch_to_test = branch_to_test_pass)
+    elif test_pair:
+        aps = test_model_overlap_pairs(model, test_dataloader, criterion, log_arr ,first_thresh = first_thresh, second_thresh = second_thresh, bin_trim = bin_trim, multibranch = multibranch, branch_to_test = branch_to_test,dataset = dataset, save_outfs = save_outfs)
+        np.save(out_file, aps)
+        util.writeFile(log_file, log_arr)
+    else:
+        aps = test_model_overlap(model, test_dataloader, criterion, log_arr ,first_thresh = first_thresh, second_thresh = second_thresh, bin_trim = bin_trim, multibranch = multibranch, branch_to_test = branch_to_test,dataset = dataset, save_outfs = save_outfs)
+        np.save(out_file, aps)
+        util.writeFile(log_file, log_arr)
 
 
 def visualize_sim_mat(out_dir_train,

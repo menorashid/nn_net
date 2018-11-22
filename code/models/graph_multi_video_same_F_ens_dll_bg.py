@@ -21,24 +21,15 @@ class Graph_Multi_Video(nn.Module):
                  aft_nonlin = None,
                  sigmoid = False,
                  layer_bef = None,
-                 graph_sum = False,
-                 background = False,
-                 just_graph = False
+                 graph_sum = False
                  ):
         super(Graph_Multi_Video, self).__init__()
         
         self.num_classes = n_classes
-        self.background = background
-        
-        if self.background:
-            assert sigmoid
-            n_classes+=1
-
         self.deno = deno
         self.graph_size = graph_size
         self.sparsify = sparsify
         self.graph_sum = graph_sum
-        self.just_graph = just_graph
 
         if in_out is None:
             in_out = [2048,64]
@@ -103,49 +94,18 @@ class Graph_Multi_Video(nn.Module):
                 self.graph_layers.append(lin_curr)
             else:
                 self.graph_layers.append(Graph_Layer_Wrapper(in_out[0],n_out = in_out[1], non_lin = non_lin, method = method, aft_nonlin = aft_nonlin))
-            
-            if self.just_graph:
-                if sigmoid:
-                    aft_nonlin_curr = 'sig'
-                else:
-                    aft_nonlin_curr = None
-                last_graph = Graph_Layer_Wrapper(in_out[-1],n_classes, non_lin = non_lin, method = method, aft_nonlin = aft_nonlin_curr)
-            else:
-                last_graph = []
-                last_graph.append(nn.Dropout(0.5))
-                last_graph.append(nn.Linear(in_out[-1],n_classes))
-                if sigmoid:
-                    last_graph.append(nn.Sigmoid())
-                last_graph = nn.Sequential(*last_graph)
+
+            last_graph = []
+            last_graph.append(nn.Dropout(0.5))
+            last_graph.append(nn.Linear(in_out[-1],n_classes))
+            if sigmoid:
+                last_graph.append(nn.Sigmoid())
+            last_graph = nn.Sequential(*last_graph)
             self.last_graphs.append(last_graph)
 
         self.num_branches = num_layers
         print 'self.num_branches', self.num_branches
-
-    def process_background(self, out_pred):
-        is_cuda = next(self.parameters()).is_cuda
-
-        background = out_pred[:,-1].unsqueeze(1)
-        out_pred = out_pred[:,:-1]
         
-        # diff = out_pred - background
-        
-        # background = background.expand(background.size(0),out_pred.size(1))
-        # background = 1-background
-        # background = torch.min(background,out_pred)
-        # background[diff>=0] = 0
-        
-        # mask = torch.ones(out_pred.size())
-        # if is_cuda:
-        #     mask = mask.cuda()
-        # mask[diff<0] = 0
-        # out_pred = out_pred*mask
-        # out_pred = out_pred+background
-        
-        out_pred = out_pred - background
-
-        return out_pred
-
 
     def forward(self, input, epoch_num = None, ret_bg =False, branch_to_test = -1):
         
@@ -156,12 +116,11 @@ class Graph_Multi_Video(nn.Module):
 
         identity = False
         method = None
-        # if not self.training:
-        #     graph_size = 1
-        #     # identity = True
-        #     # method = 'cos'
-        # el
-        if self.graph_size is None:
+        if not self.training:
+            graph_size = 1
+            # identity = True
+            # method = 'cos'
+        elif self.graph_size is None:
             graph_size = len(input)
         elif self.graph_size=='rand':
             graph_size = random.randint(1,len(input))
@@ -171,8 +130,6 @@ class Graph_Multi_Video(nn.Module):
         else:
             graph_size = min(self.graph_size, len(input))
 
-        # print graph_size
-        # raw_input()
         # if self.graph_size is None:
         #     graph_size = len(input)
         # elif self.graph_size=='rand':
@@ -214,15 +171,8 @@ class Graph_Multi_Video(nn.Module):
                         [out_graph, graph_sum] = out_graph       
                         graph_sums.append(graph_sum.unsqueeze(0))
 
-                if hasattr(self, 'just_graph') and self.just_graph:
-                    out_col = self.last_graphs[col_num](out_graph, feature_out,to_keep = to_keep, graph_sum = self.graph_sum, identity = identity, method = method)
-                    if self.graph_sum:
-                        [out_col, graph_sum] = out_col       
-                        graph_sums.append(graph_sum.unsqueeze(0))                    
-                else:
-                    out_col = self.last_graphs[col_num](out_graph)
-                if self.background:
-                    out_col = self.process_background(out_col)
+                out_col = self.last_graphs[col_num](out_graph)
+
                 x_all_all[col_num].append(out_col)
 
 
@@ -343,11 +293,9 @@ class Network:
                  aft_nonlin = None,
                  sigmoid = False,
                  layer_bef = None,
-                 graph_sum = False,
-                 background = False,
-                 just_graph = False
+                 graph_sum = False
                  ):
-        self.model = Graph_Multi_Video(n_classes, deno, in_out,feat_dim, graph_size, method, sparsify, non_lin, aft_nonlin,sigmoid, layer_bef, graph_sum, background, just_graph)
+        self.model = Graph_Multi_Video(n_classes, deno, in_out,feat_dim, graph_size, method, sparsify, non_lin, aft_nonlin,sigmoid, layer_bef, graph_sum)
         print self.model
         raw_input()
 
