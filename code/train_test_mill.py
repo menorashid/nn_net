@@ -253,7 +253,8 @@ def visualize_dets(model, test_dataloader, dir_viz, first_thresh , second_thresh
                 out, pmf, bg = model.forward([sample.cuda(),batch['gt_vec'][idx_sample].cuda()], ret_bg = True)
                 # out, pmf, bg = model.forward(sample.cuda(), ret_bg = True)
             else:
-                out, pmf, bg = model.forward(sample.cuda(), ret_bg = True)
+                out, pmf = model.forward(sample.cuda())
+                # , ret_bg = True)
             # out = out-bg
             if bin_trim is not None:
                 out = out[:,np.where(bin_trim)[0]]
@@ -415,6 +416,11 @@ def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh ,
             pmf = pmf.data.cpu().numpy()
             out = out.data.cpu().numpy()
 
+            # print out.shape
+            # print np.min(out), np.max(out)
+            # print pmf
+            # print labels[idx_sample]
+            # raw_input()
             if first_thresh==-1:
                 bin_not_keep = labels[idx_sample].data.cpu().numpy()==0
             else:

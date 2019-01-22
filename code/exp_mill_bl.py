@@ -1,6 +1,7 @@
 from train_test_mill import *
 import models
-from criterions import *
+# from criterions import *
+import criterions
 import os
 from helpers import util,visualize
 from dataset import *
@@ -35,8 +36,8 @@ def get_data(dataset, limit, all_classes, just_primary, gt_vec, k_vec, test_pair
             post_pends = [pp+val for pp,val in zip(post_pends,['_just_primary','_just_primary','_just_primary'])]
         
         # post_pends = [pp+val for pp,val in zip(post_pends,['_corrected','_corrected','_corrected'])]
-        if not all_classes:
-            post_pends = [pp+val for pp,val in zip(post_pends,['_ultra_correct','_ultra_correct','_ultra_correct'])]
+        # if not all_classes:
+        #     post_pends = [pp+val for pp,val in zip(post_pends,['_ultra_correct','_ultra_correct','_ultra_correct'])]
                 
 
         if gt_vec:
@@ -81,7 +82,40 @@ def get_data(dataset, limit, all_classes, just_primary, gt_vec, k_vec, test_pair
 
     return train_data, test_train_data, test_data, n_classes, trim_preds
 
+def get_criterion(criterion_str,attention,class_weights_val,  loss_weights, multibranch):
 
+    args = {'class_weights' : class_weights_val, 
+            'loss_weights' : loss_weights, 
+            'num_branches' : multibranch} 
+
+    if criterion_str is None:
+        if attention:
+            criterion_str = 'MultiCrossEntropyMultiBranchWithL1'
+        elif multibranch>1:
+            criterion_str = 'MultiCrossEntropyMultiBranch'
+        else:
+            criterion_str = 'MultiCrossEntropy'
+    
+    criterion_class = getattr(criterions, criterion_str)
+    criterion = criterion_class(**args)
+
+    #       if attention:
+    #         if multibranch>1:
+    #             criterion = MultiCrossEntropyMultiBranchWithL1(class_weights= class_weights_val, loss_weights = loss_weights, num_branches = multibranch)
+    #             criterion_str = 'MultiCrossEntropyMultiBranchWithL1'
+    #         else:
+    #             criterion = MultiCrossEntropyMultiBranchWithL1(class_weights= class_weights_val, loss_weights = loss_weights, num_branches = 1)
+    #             criterion_str = 'MultiCrossEntropyMultiBranchWithL1'
+    #     else:
+    #     if multibranch>1:
+    #         criterion = MultiCrossEntropyMultiBranch(class_weights= class_weights_val, loss_weights = loss_weights, num_branches = multibranch)
+    #         criterion_str = 'MultiCrossEntropyMultiBranch'
+    #     else:
+    #         criterion = MultiCrossEntropy(class_weights= class_weights_val)
+    #         criterion_str = 'MultiCrossEntropy'
+    # else:
+
+    return criterion, criterion_str
 
 def train_simple_mill_all_classes(model_name,
                                     lr,
@@ -117,7 +151,8 @@ def train_simple_mill_all_classes(model_name,
                                     k_vec = None,
                                     attention = False,
                                     save_outfs = False,
-                                    test_pair = False):
+                                    test_pair = False, 
+                                    criterion_str= None):
 
     num_epochs = epoch_stuff[1]
 
@@ -147,20 +182,22 @@ def train_simple_mill_all_classes(model_name,
     else:
         class_weights_val = None
 
-    if attention:
-        if multibranch>1:
-            criterion = MultiCrossEntropyMultiBranchWithL1(class_weights= class_weights_val, loss_weights = loss_weights, num_branches = multibranch)
-            criterion_str = 'MultiCrossEntropyMultiBranchWithL1'
-        else:
-            criterion = MultiCrossEntropyMultiBranchWithL1(class_weights= class_weights_val, loss_weights = loss_weights, num_branches = 1)
-            criterion_str = 'MultiCrossEntropyMultiBranchWithL1'
-    else:
-        if multibranch>1:
-            criterion = MultiCrossEntropyMultiBranch(class_weights= class_weights_val, loss_weights = loss_weights, num_branches = multibranch)
-            criterion_str = 'MultiCrossEntropyMultiBranch'
-        else:
-            criterion = MultiCrossEntropy(class_weights= class_weights_val)
-            criterion_str = 'MultiCrossEntropy'
+    
+    criterion, criterion_str = get_criterion(criterion_str,attention,class_weights_val,  loss_weights, multibranch)
+    # if attention:
+    #     if multibranch>1:
+    #         criterion = MultiCrossEntropyMultiBranchWithL1(class_weights= class_weights_val, loss_weights = loss_weights, num_branches = multibranch)
+    #         criterion_str = 'MultiCrossEntropyMultiBranchWithL1'
+    #     else:
+    #         criterion = MultiCrossEntropyMultiBranchWithL1(class_weights= class_weights_val, loss_weights = loss_weights, num_branches = 1)
+    #         criterion_str = 'MultiCrossEntropyMultiBranchWithL1'
+    # else:
+    #     if multibranch>1:
+    #         criterion = MultiCrossEntropyMultiBranch(class_weights= class_weights_val, loss_weights = loss_weights, num_branches = multibranch)
+    #         criterion_str = 'MultiCrossEntropyMultiBranch'
+    #     else:
+    #         criterion = MultiCrossEntropy(class_weights= class_weights_val)
+    #         criterion_str = 'MultiCrossEntropy'
 
 
     # criterion = MCE_CenterLoss_Combo(n_classes, feat_dim = 2048, bg = True, lambda_param = 0.0, alpha_param = 0.5, class_weights= class_weights_val)
@@ -295,15 +332,15 @@ def train_simple_mill_all_classes(model_name,
                     branch_to_test =branch_to_test,
                     dataset = dataset)
             test_model(**test_params)
-            test_params = dict(out_dir_train = out_dir_train,
-                    model_num = model_num,
-                    test_data = test_data,
-                    batch_size_val = batch_size_val,
-                    gpu_id = gpu_id,
-                    num_workers = 0,
-                    second_thresh = second_thresh,
-                    first_thresh = first_thresh)
-            visualize_sim_mat(**test_params)
+            # test_params = dict(out_dir_train = out_dir_train,
+            #         model_num = model_num,
+            #         test_data = test_data,
+            #         batch_size_val = batch_size_val,
+            #         gpu_id = gpu_id,
+            #         num_workers = 0,
+            #         second_thresh = second_thresh,
+            #         first_thresh = first_thresh)
+            # visualize_sim_mat(**test_params)
 
 
 
@@ -1308,14 +1345,63 @@ def ens_experiments_pool():
                         k_vec = k_vec)
 
 
+def wsddn_simply_experiments():
+    torch.backends.cudnn.deterministic = True
+    torch.manual_seed(999)
+
+    model_name = 'wsddn_simple'
+    lr = [0.001, 0.001,0.001]
+    criterion_str = 'Wsddn_Loss'
+
+    epoch_stuff = [100,100]
+    retrain = True
+
+    dataset = 'ucf'
+    limit  = 500
+    save_after = 10
+    test_after = 5
+    class_weights = True
+
+
+    network_params = {}
+    network_params['deno'] = None
+    network_params['in_out'] = [2048,512]
+    post_pend = ''
+    test_post_pend = '_x_class'
+    test_mode = False
+    branch_to_test = -4
+    second_thresh = 0.5
+    first_thresh = 0.
+    model_nums = None
+    train_simple_mill_all_classes(model_name,
+                                    lr,
+                                    dataset,
+                                    network_params,
+                                    limit,
+                                    epoch_stuff=epoch_stuff,
+                                    class_weights = class_weights,
+                                    save_after = save_after,
+                                    test_after = test_after,
+                                    post_pend = post_pend,
+                                    branch_to_test = branch_to_test,
+                                    test_mode= test_mode,
+                                    second_thresh = second_thresh,
+                                    criterion_str = criterion_str,
+                                    retrain = retrain,
+                                    model_nums = model_nums,
+                                    test_post_pend = test_post_pend,
+                                    viz_mode = False)
+                                    
+
 def main():
-    # print 'hello hello baby'
+    print 'hello hello baby'
+    wsddn_simply_experiments()
     # scripts_comparative()
     
     # separate_supervision_experiment()
     # super_simple_experiment()
     # testing_exp()
-    ens_experiments()
+    # ens_experiments()
     # ens_Fperg_experiments()
     # ens_experiments_pool()
     # ens_moredepth_experiments()

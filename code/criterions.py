@@ -6,7 +6,7 @@ from helpers import util, visualize
 import torch.nn as nn
 
 class MultiCrossEntropy(nn.Module):
-    def __init__(self,class_weights=None):
+    def __init__(self,class_weights=None, loss_weights = None, num_branches = None):
         super(MultiCrossEntropy, self).__init__()
         self.LogSoftmax = nn.LogSoftmax(dim = 1)
         if class_weights is None:
@@ -24,6 +24,40 @@ class MultiCrossEntropy(nn.Module):
             loss = -1*gt* pred
 
         loss = torch.sum(loss, dim = 1)
+        loss = torch.mean(loss)
+        return loss
+
+
+class Wsddn_Loss(nn.Module):
+    def __init__(self,class_weights=None, loss_weights = None, num_branches = None):
+        super(Wsddn_Loss, self).__init__()
+        self.LogSoftmax = nn.LogSoftmax(dim = 1)
+        if class_weights is None:
+            self.class_weights = None
+        else: 
+            self.class_weights = nn.Parameter(torch.Tensor(class_weights[np.newaxis,:]), requires_grad = False)
+
+    def forward(self, gt, pred):
+        gt[gt>0]=1.
+        gt[gt<=0]=-1.
+
+        in_log_val = gt*(pred - 0.5)+0.5
+        # print torch.min(in_log_val), torch.max(in_log_val)
+        loss = -1*torch.log(in_log_val)
+        # print torch.min(loss), torch.max(loss)
+        # print loss.size()
+        # print self.class_weights.size()
+        # raw_input()
+        # assert torch.max(gt)==1
+
+        # pred = self.LogSoftmax(pred)
+
+        if self.class_weights is not None:
+            assert self.class_weights.size(1)==pred.size(1)
+            loss = self.class_weights*loss
+
+        loss = torch.sum(loss, dim = 1)
+        # print loss.size()
         loss = torch.mean(loss)
         return loss
 
@@ -63,6 +97,7 @@ class MultiCrossEntropyMultiBranch(nn.Module):
 
 class MultiCrossEntropyMultiBranchWithL1(MultiCrossEntropyMultiBranch):
     def __init__(self,class_weights=None, loss_weights = None, num_branches = 2, att_weight = 0.5):
+        num_branches = max(num_branches,1)
         super(MultiCrossEntropyMultiBranchWithL1, self).__init__(class_weights=class_weights, loss_weights = loss_weights[:-1], num_branches = num_branches)
         self.att_weight = loss_weights[-1]
         
