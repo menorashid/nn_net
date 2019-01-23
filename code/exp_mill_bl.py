@@ -1351,10 +1351,11 @@ def wsddn_simply_experiments():
 
     model_name = 'wsddn_simple'
     lr = [0.001, 0.001,0.001]
-    criterion_str = 'Wsddn_Loss'
+    criterion_str = 'Wsddn_Loss_WithL1'
+    loss_weights = [1,0.1]
 
     epoch_stuff = [100,100]
-    retrain = True
+    retrain = False
 
     dataset = 'ucf'
     limit  = 500
@@ -1365,14 +1366,15 @@ def wsddn_simply_experiments():
 
     network_params = {}
     network_params['deno'] = None
-    network_params['in_out'] = [2048,512]
-    post_pend = ''
+    network_params['in_out'] = [2048,256]
+    network_params['ret_fc'] = True
+    post_pend = 'loss_on_x_det'
     test_post_pend = '_x_class'
     test_mode = False
     branch_to_test = -4
     second_thresh = 0.5
     first_thresh = 0.
-    model_nums = None
+    model_nums = [29,49,69,99]
     train_simple_mill_all_classes(model_name,
                                     lr,
                                     dataset,
@@ -1390,7 +1392,8 @@ def wsddn_simply_experiments():
                                     retrain = retrain,
                                     model_nums = model_nums,
                                     test_post_pend = test_post_pend,
-                                    viz_mode = False)
+                                    viz_mode = False,
+                                    loss_weights = loss_weights)
                                     
 
 def main():

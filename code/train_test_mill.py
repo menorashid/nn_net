@@ -69,6 +69,7 @@ def test_model_core(model, test_dataloader, criterion, log_arr, multibranch = 1)
                 preds_mini = [[] for i in range(multibranch)]
             else:
                 preds_mini = []
+                att = []
 
             for idx_sample, sample in enumerate(samples):
                 if 'multi_video' in model_name:
@@ -95,7 +96,10 @@ def test_model_core(model, test_dataloader, criterion, log_arr, multibranch = 1)
                     out,pmf = model.forward([sample.cuda(),batch['gt_vec'][idx_sample].cuda()])
                 else:
                     out,pmf = model.forward(sample.cuda())
-            
+
+                if 'l1' in criterion_str:
+                    [pmf, att_curr] = pmf
+                    att.append(att_curr)
 
                 if multibranch>1:
                     preds.append(torch.nn.functional.softmax(pmf[0].unsqueeze(0)).data.cpu().numpy())
@@ -106,6 +110,7 @@ def test_model_core(model, test_dataloader, criterion, log_arr, multibranch = 1)
                 else:
                     preds.append(torch.nn.functional.softmax(pmf.unsqueeze(0)).data.cpu().numpy())
                     preds_mini.append(pmf.unsqueeze(0))
+
 
             if multibranch>1:
                 # print 'hello;',len(preds_mini[0]), len(preds_mini[1])
@@ -389,7 +394,7 @@ def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh ,
                             np.save(out_file_f,outf)
 
 
-            if 'l1' in criterion_str:
+            if 'l1' in criterion_str or 'wsddn' in criterion_str:
                 [pmf, att] = pmf
 
             # print out.size(),torch.min(out), torch.max(out)
@@ -908,6 +913,8 @@ def train_model(out_dir_train,
                 preds = []
                 if multibranch>1:
                     preds = [[] for i in range(multibranch)]
+                elif 'l1' in criterion_str:
+                    preds = [[],[]]
                 
                 for idx_sample, sample in enumerate(samples):
 
@@ -930,12 +937,16 @@ def train_model(out_dir_train,
                     if multibranch>1:
                         for idx in range(len(pmf)):
                             preds[idx].append(pmf[idx].unsqueeze(0))
+                    elif 'l1' in criterion_str:
+                        preds[0].append(pmf[0].unsqueeze(0))
+                        preds[1].append(pmf[1])
                     else:
                         preds.append(pmf.unsqueeze(0))
                 
 
                 if 'l1' in criterion_str:
                     [preds, att] = preds
+
 
                 if multibranch>1:
                     preds = [torch.cat(preds_curr,0) for preds_curr in preds]        

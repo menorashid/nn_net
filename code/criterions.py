@@ -31,7 +31,7 @@ class MultiCrossEntropy(nn.Module):
 class Wsddn_Loss(nn.Module):
     def __init__(self,class_weights=None, loss_weights = None, num_branches = None):
         super(Wsddn_Loss, self).__init__()
-        self.LogSoftmax = nn.LogSoftmax(dim = 1)
+        
         if class_weights is None:
             self.class_weights = None
         else: 
@@ -42,25 +42,68 @@ class Wsddn_Loss(nn.Module):
         gt[gt<=0]=-1.
 
         in_log_val = gt*(pred - 0.5)+0.5
-        # print torch.min(in_log_val), torch.max(in_log_val)
         loss = -1*torch.log(in_log_val)
-        # print torch.min(loss), torch.max(loss)
-        # print loss.size()
-        # print self.class_weights.size()
-        # raw_input()
-        # assert torch.max(gt)==1
-
-        # pred = self.LogSoftmax(pred)
-
+        
         if self.class_weights is not None:
             assert self.class_weights.size(1)==pred.size(1)
             loss = self.class_weights*loss
 
         loss = torch.sum(loss, dim = 1)
-        # print loss.size()
         loss = torch.mean(loss)
+        
         return loss
 
+
+class Wsddn_Loss_WithL1(Wsddn_Loss):
+    def __init__(self,class_weights=None, loss_weights = None, num_branches = None, window_size = 3):
+        num_branches = max(num_branches,1)
+        super(Wsddn_Loss_WithL1, self).__init__(class_weights=class_weights, loss_weights = loss_weights, num_branches = num_branches)
+        self.loss_weights = loss_weights
+        # self.att_weight = loss_weights[-1]
+        
+    def forward(self, gt, preds, att):
+        
+        loss_regular = super(Wsddn_Loss_WithL1,self).forward(gt, preds)
+        # max_preds = preds[
+
+        max_preds = torch.cat([max_pred_curr.unsqueeze(0) for max_pred_curr,_ in att],0)
+        dots = torch.cat([dot_curr.unsqueeze(0) for _,dot_curr in att],0)
+
+        max_preds = max_preds**2
+
+        loss_spatial = torch.sum(max_preds*dots)
+        # print loss_spatial
+        loss_spatial = loss_spatial/(max_preds.size(0)*max_preds.size(1))
+        # print loss_spatial
+
+        # print max_preds.size()
+        
+        # print att[0][0]
+        # print max_preds[0]
+
+        
+        # print dots.size()
+        # print att[0][1]
+        # print dots[0]
+
+
+        # for fc, max_idx in att:
+        #     print 'in loss'
+        #     print fc.size()
+        #     print max_idx.size()
+        #     print max_idx
+        
+
+        
+
+
+        # l1 = torch.mean(torch.abs(att))
+        # l1 = self.att_weight*l1
+        # loss_all = l1+loss_regular
+        
+        loss_all = self.loss_weights[0]*loss_regular + self.loss_weights[1]*loss_spatial
+        
+        return loss_all
 
 class MultiCrossEntropyMultiBranch(nn.Module):
     def __init__(self,class_weights=None, loss_weights = None, num_branches = 2):

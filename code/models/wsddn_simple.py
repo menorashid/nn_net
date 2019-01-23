@@ -12,12 +12,14 @@ class Wsddn(nn.Module):
     def __init__(self,
                 n_classes,
                 deno = None,
-                in_out = None):
+                in_out = None,
+                ret_fc = False):
         super(Wsddn, self).__init__()
         
         self.num_classes = n_classes
         self.deno = deno
-        
+        self.ret_fc = ret_fc
+
         if in_out is None:
             in_out = [2048,512]
         
@@ -33,16 +35,41 @@ class Wsddn(nn.Module):
 
     def forward(self, input):
         # print input.size()
+        is_cuda = next(self.parameters()).is_cuda
 
         x = self.linear_layer(input)
         
         x_class = self.class_branch(x) #n_instances x n_classes softmax along classes
         x_det = self.det_branch(x) #n_instances x n_classes softmax along instances
 
-        x = x_class*x_det
+        x_pred = x_class*x_det
 
-        pmf = self.make_pmf(x)
-        # print pmf.size()
+        pmf = self.make_pmf(x_pred)
+        
+        effective_window = 1
+        if self.ret_fc:
+            max_pred, idx_max = torch.max(x_det, dim = 0)
+            
+            lower_lim = torch.clamp(idx_max - effective_window, 1)
+            upper_lim = torch.clamp(idx_max + effective_window, max = x_pred.size(0))+1
+
+            diffs_vec = torch.zeros((self.num_classes,))
+            if is_cuda:
+                diffs_vec = diffs_vec.cuda()
+            
+            for class_num in range(self.num_classes):
+                
+                star_vec = x[idx_max[class_num]].unsqueeze(0)
+
+                r_vecs = x[lower_lim[class_num]:upper_lim[class_num],:]
+                diffs = star_vec - r_vecs
+                
+                diffs = torch.bmm(diffs.unsqueeze(1),diffs.unsqueeze(2))
+                diffs_vec[class_num] = torch.sum(diffs)
+                
+
+            pmf = [pmf, [max_pred, diffs_vec]]
+            
 
         return x_class, pmf
 
@@ -65,8 +92,8 @@ class Wsddn(nn.Module):
 
 
 class Network:
-    def __init__(self, n_classes, deno = None, in_out = None, init = False):
-        model = Wsddn(n_classes, deno,in_out)
+    def __init__(self, n_classes, deno = None, in_out = None, init = False, ret_fc = False):
+        model = Wsddn(n_classes, deno,in_out, ret_fc)
 
         self.model = model
 
