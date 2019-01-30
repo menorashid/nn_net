@@ -27,6 +27,28 @@ class MultiCrossEntropy(nn.Module):
         loss = torch.mean(loss)
         return loss
 
+class MultiCrossEntropy_noSoftmax(nn.Module):
+    def __init__(self,class_weights=None, loss_weights = None, num_branches = None):
+        super(MultiCrossEntropy_noSoftmax, self).__init__()
+        # self.Log = nn.Log(dim = 1)
+        if class_weights is None:
+            self.class_weights = None
+        else: 
+            self.class_weights = nn.Parameter(torch.Tensor(class_weights[np.newaxis,:]), requires_grad = False)
+
+    def forward(self, gt, pred):
+        pred = torch.log(pred)
+
+        if self.class_weights is not None:
+            assert self.class_weights.size(1)==pred.size(1)
+            loss = self.class_weights*-1*gt*pred
+        else:
+            loss = -1*gt* pred
+
+        loss = torch.sum(loss, dim = 1)
+        loss = torch.mean(loss)
+        return loss
+
 
 class Wsddn_Loss(nn.Module):
     def __init__(self,class_weights=None, loss_weights = None, num_branches = None):
@@ -69,7 +91,7 @@ class Wsddn_Loss_WithL1(Wsddn_Loss):
         max_preds = torch.cat([max_pred_curr.unsqueeze(0) for max_pred_curr,_ in att],0)
         dots = torch.cat([dot_curr.unsqueeze(0) for _,dot_curr in att],0)
 
-        max_preds = max_preds**2
+        max_preds = 0.5*(max_preds**2)
 
         loss_spatial = torch.sum(max_preds*dots)
         # print loss_spatial
@@ -100,6 +122,8 @@ class Wsddn_Loss_WithL1(Wsddn_Loss):
         # l1 = torch.mean(torch.abs(att))
         # l1 = self.att_weight*l1
         # loss_all = l1+loss_regular
+        # print loss_spatial
+        # print loss_regular
         
         loss_all = self.loss_weights[0]*loss_regular + self.loss_weights[1]*loss_spatial
         

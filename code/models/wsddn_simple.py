@@ -13,7 +13,7 @@ class Wsddn(nn.Module):
                 n_classes,
                 deno = None,
                 in_out = None,
-                ret_fc = False):
+                ret_fc = 0):
         super(Wsddn, self).__init__()
         
         self.num_classes = n_classes
@@ -26,14 +26,31 @@ class Wsddn(nn.Module):
         self.linear_layer = []
         # nn.Sequential(*)
         self.linear_layer.append(nn.Linear(in_out[0], in_out[1], bias = True))
-        self.linear_layer.append(nn.ReLU())
-        self.linear_layer.append(nn.Dropout(0.5))
+        # self.linear_layer.append(nn.ReLU())
+        # self.linear_layer.append(nn.Dropout(0.5))
         self.linear_layer = nn.Sequential(*self.linear_layer)
         
-        self.det_branch = nn.Sequential(*[nn.Linear(in_out[1],self.num_classes), nn.Softmax(dim=0)])
-        self.class_branch = nn.Sequential(*[nn.Linear(in_out[1],self.num_classes), nn.Softmax(dim=1)])
+        self.det_branch = []
+        self.class_branch = []
+        branches = [self.det_branch, self.class_branch]
+        for branch in branches:
+            branch.append(nn.ReLU())
+            branch.append(nn.Dropout(0.5))
+            branch.append(nn.Linear(in_out[1],self.num_classes))            
+        
+        [self.det_branch, self.class_branch] = branches
+        self.det_branch.append(nn.Softmax(dim=0))
+        self.class_branch.append(nn.Softmax(dim=1))
+
+        self.det_branch = nn.Sequential(*self.det_branch)
+        self.class_branch = nn.Sequential(*self.class_branch)
+
+        # self.det_branch = nn.Sequential(*[nn.Linear(in_out[1],self.num_classes), nn.Softmax(dim=0)])
+        # self.class_branch = nn.Sequential(*[nn.Linear(in_out[1],self.num_classes), nn.Softmax(dim=1)])
 
     def forward(self, input):
+        print self
+        raw_input()
         # print input.size()
         is_cuda = next(self.parameters()).is_cuda
 
@@ -46,9 +63,10 @@ class Wsddn(nn.Module):
 
         pmf = self.make_pmf(x_pred)
         
-        effective_window = 1
-        if self.ret_fc:
-            max_pred, idx_max = torch.max(x_det, dim = 0)
+        # effective_window = 1
+        if hasattr(self,'ret_fc') and self.ret_fc>0:
+            effective_window = self.ret_fc
+            max_pred, idx_max = torch.max(x_pred, dim = 0)
             
             lower_lim = torch.clamp(idx_max - effective_window, 1)
             upper_lim = torch.clamp(idx_max + effective_window, max = x_pred.size(0))+1
@@ -65,6 +83,8 @@ class Wsddn(nn.Module):
                 diffs = star_vec - r_vecs
                 
                 diffs = torch.bmm(diffs.unsqueeze(1),diffs.unsqueeze(2))
+                # print diffs
+                # raw_input()
                 diffs_vec[class_num] = torch.sum(diffs)
                 
 
@@ -92,7 +112,7 @@ class Wsddn(nn.Module):
 
 
 class Network:
-    def __init__(self, n_classes, deno = None, in_out = None, init = False, ret_fc = False):
+    def __init__(self, n_classes, deno = None, in_out = None, init = False, ret_fc = 0):
         model = Wsddn(n_classes, deno,in_out, ret_fc)
 
         self.model = model

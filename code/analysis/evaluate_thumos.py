@@ -209,6 +209,47 @@ def load_ucf_gt(train):
     gt_time_intervals = np.array([a[0] for a in gt_time_intervals])
     return gt_vid_names, gt_class_names, gt_time_intervals
 
+
+
+def print_overlap(aps,class_names,overlap_thresh_all, log_arr):
+    
+    # aps = np.array(aps)
+    # print aps.shape
+    assert aps.shape[0]==len(class_names)
+    assert aps.shape[1]==len(overlap_thresh_all)
+    
+    
+    str_print = '\t'.join(['Overlap\t']+['%.1f' % ov for ov in overlap_thresh_all])
+    print str_print
+    log_arr.append(str_print)
+
+    for idx_class_name, class_name in enumerate(class_names):
+        str_print = [class_name+'\t' if len(class_name)<8 else class_name]+['%.2f' % ap_curr for ap_curr in aps[idx_class_name,:]]
+        str_print = '\t'.join(str_print)
+    
+        print str_print
+        log_arr.append(str_print)
+    
+    # aps[-1,:]= np.mean(aps[:len(class_names),:],0)
+    # class_names_curr = class_names[:]
+    # class_names_curr.append('Average')
+    
+    # print aps
+    # str_print = '\t'.join(['%.1f' % ov for ov in overlap_thresh_all])
+    # log_arr.append(str_print)
+    # # print log_arr[-1]
+    # for idx_class_name, class_name in enumerate(class_names):
+    #     # if len(class_name)<8 and dataset=='ucf':
+    #     #     class_name +='\t'
+    #     str_print = [class_name]+['%.2f' % ap_curr for ap_curr in aps[idx_class_name,:]]
+    #     str_print = '\t'.join(str_print)
+    #     log_arr.append(str_print)
+    
+    # print log_arr[-1]
+
+    return aps
+
+
 def test_overlap(det_vid_names_all, det_conf_all, det_time_intervals_all, second_thresh, train=False, log_arr = [], dataset = 'ucf'):
     
     if dataset =='ucf':
@@ -419,6 +460,122 @@ def viz_overlap(out_dir_meta, det_vid_names, det_conf_all, det_time_intervals_al
             out_file_curr = os.path.join(out_dir,gt_vid_name+'.jpg')
 
             visualize.plotSimple([(det_times,det_vals),(det_times,gt_vals)],out_file = out_file_curr,title = 'det conf over time',xlabel = 'time',ylabel = 'det conf',legend_entries=['Det','GT'])
+        
+        visualize.writeHTMLForFolder(out_dir)
+
+
+def viz_overlap_multi(out_dir_meta, det_conf_all_dict, out_shapes, title= None):
+    print 'HELLO'
+
+    class_names = ['BaseballPitch', 'BasketballDunk', 'Billiards', 'CleanAndJerk', 'CliffDiving', 'CricketBowling', 'CricketShot', 'Diving', 'FrisbeeCatch', 'GolfSwing', 'HammerThrow', 'HighJump', 'JavelinThrow', 'LongJump', 'PoleVault', 'Shotput', 'SoccerPenalty', 'TennisSwing', 'ThrowDiscus', 'VolleyballSpiking']
+    class_names.sort()
+
+    aps = np.zeros((len(class_names)+1,5))
+    overlap_thresh_all = np.arange(0.1,0.6,0.1)
+    
+    for idx_class_name, class_name in enumerate(class_names):
+        # if idx_class_name<6:
+        #     continue
+        out_dir = os.path.join(out_dir_meta,class_name)
+        util.mkdir(out_dir)
+
+        mat_file = os.path.join('../TH14evalkit','mat_files', class_name+'_test.mat')
+
+        loaded = scipy.io.loadmat(mat_file)
+        
+        gt_vid_names_all = loaded['gtvideonames'][0]
+        gt_class_names = loaded['gt_events_class'][0]
+
+        gt_time_intervals = loaded['gt_time_intervals'][0]
+        
+        arr_meta = [gt_vid_names_all, gt_class_names]
+        arr_out = []
+        for arr_curr in arr_meta:
+            arr_curr = [str(a[0]) for a in arr_curr]
+            arr_out.append(arr_curr)
+
+        [gt_vid_names_all, gt_class_names] = arr_out
+        gt_time_intervals_all = np.array([a[0] for a in gt_time_intervals])
+
+        gt_vid_names = list( np.unique(np.array(gt_vid_names_all)[np.array(gt_class_names)==class_name]))
+        # det_vid_names = np.array(det_vid_names)
+        # print len(det_vid_names)
+        # print np.unique(det_vid_names).shape
+        # print gt_vid_name
+        # print len(gt_vid_names)
+
+        for gt_vid_name in gt_vid_names:
+
+            # det_conf_all_det_vid_names,
+
+            gt_time_intervals = gt_time_intervals_all[np.array(gt_vid_names_all)==gt_vid_name]
+            print 'gt',gt_time_intervals
+            # det_conf = det_conf_all[bin_keep]
+            # det_time_intervals = det_time_intervals_all [bin_keep,:]
+            out_shape_curr = out_shapes[gt_vid_name]
+            # out_shape_curr = out_shapes[bin_keep]
+            # assert len(np.unique(out_shape_curr))==1
+            # out_shape_curr = np.unique(out_shape_curr)[0]
+
+            # det_time_intervals_merged = det_time_intervals
+            # det_times = det_time_intervals[:,0]
+            det_times = np.array(range(0,out_shape_curr+1))*16./25.
+            gt_vals = np.zeros(det_times.shape)
+
+            plot_arr = []
+            legend_entries = []
+
+            max_det_conf = None
+            for k in det_conf_all_dict.keys():
+                
+
+                [det_conf_curr,det_time_intervals_all, det_events_class_all, det_vid_names] = det_conf_all_dict[k]
+                print det_conf_curr.shape, det_time_intervals_all.shape, det_events_class_all.shape, det_vid_names.shape
+
+                bin_keep = det_vid_names == gt_vid_name
+                
+                bin_keep = np.logical_and(bin_keep, det_events_class_all==idx_class_name)
+                if np.sum(bin_keep)==0:
+                    print 'Continuing'
+                    continue
+
+
+                # det_conf_curr = det_conf_all_dict[k][0]
+                det_time_intervals_merged = det_time_intervals_all[bin_keep,:]
+                det_conf_curr = det_conf_curr[bin_keep]
+                # print k, det_time_intervals_merged
+
+                if max_det_conf is None:
+                    max_det_conf = np.max(det_conf_curr)
+                else:
+                    max_det_conf = max(max_det_conf, np.max(det_conf_curr))
+
+                det_vals = np.zeros(det_times.shape)
+                for idx_det_time_curr, det_time_curr in enumerate(det_time_intervals_merged):
+                    idx_start = np.argmin(np.abs(det_times-det_time_curr[0]))
+                    idx_end = np.argmin(np.abs(det_times-det_time_curr[1]))
+                    det_vals[idx_start:idx_end] = det_conf_curr[idx_det_time_curr]
+
+                legend_entries.append(k)
+                plot_arr.append((det_times,det_vals))
+                
+            for gt_time_curr in gt_time_intervals:
+                idx_start = np.argmin(np.abs(det_times-gt_time_curr[0]))
+                idx_end = np.argmin(np.abs(det_times-gt_time_curr[1]))
+                gt_vals[idx_start:idx_end] = max_det_conf
+
+            plot_arr.append((det_times,gt_vals))
+            legend_entries.append('GT')
+
+            out_file_curr = os.path.join(out_dir,gt_vid_name+'.jpg')
+
+            if title is None:
+                title = 'det conf over time'
+            # print plot_arr
+
+            print out_file_curr
+            visualize.plotSimple(plot_arr,out_file = out_file_curr,title = title,xlabel = 'Time',ylabel = 'Detection Confidence',legend_entries=legend_entries)
+            raw_input()
         
         visualize.writeHTMLForFolder(out_dir)
 

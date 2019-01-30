@@ -16,6 +16,7 @@ import glob
 import sklearn.metrics
 import analysis.evaluate_thumos as et
 import debugging_graph as dg
+import wtalc
 
 class Exp_Lr_Scheduler:
     def __init__(self, optimizer,step_curr, init_lr, decay_rate, decay_steps, min_lr=1e-6):
@@ -223,11 +224,11 @@ def merge_detections(bin_keep, det_conf, det_time_intervals, merge_with = 'max')
     # raw_input()
     return det_conf_new, det_time_intervals_new
 
-def visualize_dets(model, test_dataloader, dir_viz, first_thresh , second_thresh, bin_trim = None,  det_class = -1, branch_to_test =-1):
+def visualize_dets(model, test_dataloader, dir_viz, first_thresh , second_thresh, bin_trim = None,  det_class = -1, branch_to_test =-1, criterion_str= None):
 
     model.eval()
     model_name = model.__class__.__name__.lower()
-
+    
     preds = []
     labels_all = []
 
@@ -237,14 +238,24 @@ def visualize_dets(model, test_dataloader, dir_viz, first_thresh , second_thresh
     min_all = None
     max_all = None
 
+    det_vid_names = []
     det_events_class = []
+
     det_time_intervals_all = []
     det_conf_all = []
-    det_vid_names = []
-    out_shapes = []
+
+    det_vid_names_merged = []
+    det_events_class_merged = []
+    
+    det_time_intervals_merged_all = []
+    det_conf_merged_all = []
+    
+    
+    out_shapes = {}
     idx_test = 0
 
     threshes_all = []
+    plot_dict = {}
     for num_iter_test,batch in enumerate(test_dataloader):
         samples = batch['features']
         labels = batch['label']
@@ -261,6 +272,11 @@ def visualize_dets(model, test_dataloader, dir_viz, first_thresh , second_thresh
                 out, pmf = model.forward(sample.cuda())
                 # , ret_bg = True)
             # out = out-bg
+
+            if 'l1' in criterion_str:
+                [pmf, att] = pmf
+
+
             if bin_trim is not None:
                 out = out[:,np.where(bin_trim)[0]]
                 pmf = pmf[np.where(bin_trim)[0]]
@@ -309,33 +325,67 @@ def visualize_dets(model, test_dataloader, dir_viz, first_thresh , second_thresh
             else:
                 thresh = np.max(det_conf)-(np.max(det_conf)-np.min(det_conf))*second_thresh
             bin_second_thresh = det_conf>thresh
-            
-            # det_conf, det_time_intervals = merge_detections(bin_second_thresh, det_conf, det_time_intervals_meta)
+
+            # print bin_second_thresh
+
+
+
+            det_conf_merged, det_time_intervals_merged = merge_detections(bin_second_thresh, det_conf, det_time_intervals_meta)
+            # if '0000324' in det_vid_names_ac[idx_test]:
+            #     # print det_conf
+            #     print det_conf_merged
+            #     print det_time_intervals_merged
+            #     print det_vid_names_ac[idx_test]
+
+            # raw_input()
+
+
             det_time_intervals = det_time_intervals_meta
 
             det_vid_names.extend([det_vid_names_ac[idx_test]]*det_conf.shape[0])
             det_events_class.extend([class_idx_gt]*det_conf.shape[0])
-            out_shapes.extend([out.shape[0]]*det_conf.shape[0])
+            # out_shapes.extend([out.shape[0]]*det_conf.shape[0])
+            out_shapes[det_vid_names_ac[idx_test]] = out.shape[0]
             
             det_conf_all.append(det_conf)
             det_time_intervals_all.append(det_time_intervals)
 
+            det_conf_merged_all.append(det_conf_merged)
+            det_time_intervals_merged_all.append(det_time_intervals_merged)
+            det_vid_names_merged.extend([det_vid_names_ac[idx_test]]*det_conf_merged.shape[0])
+            det_events_class_merged.extend([class_idx_gt]*det_conf_merged.shape[0])
+            # out_shapes_merged.extend([out.shape[0]]*det_conf_merged.shape[0])
+
             idx_test +=1
-            
+            # break
+    
 
     det_conf_all = np.concatenate(det_conf_all,axis =0)
     det_time_intervals_all = np.concatenate(det_time_intervals_all,axis = 0)
-    det_events_class_all = np.array(det_events_class)
-    out_shapes = np.array(out_shapes)
 
-    et.viz_overlap(dir_viz, det_vid_names, det_conf_all, det_time_intervals_all, det_events_class_all,out_shapes)
+    det_conf_merged_all = np.concatenate(det_conf_merged_all,axis =0)
+    det_time_intervals_merged_all = np.concatenate(det_time_intervals_merged_all,axis = 0)    
+
+    det_events_class_all = np.array(det_events_class)
+    
+    det_events_class_merged = np.array(det_events_class_merged)
+    det_vid_names_merged = np.array(det_vid_names_merged)
+
+    # out_shapes = np.array(out_shapes)
+
+    plot_dict = {}
+    plot_dict['Det'] = [det_conf_all,det_time_intervals_all, det_events_class_all, np.array(det_vid_names)]
+    plot_dict['Merged'] = [det_conf_merged_all,det_time_intervals_merged_all,det_events_class_merged, det_vid_names_merged]
+
+    # et.viz_overlap(dir_viz, det_vid_names, det_conf_all, det_time_intervals_all, det_events_class_all,out_shapes)
+    et.viz_overlap_multi(dir_viz,  plot_dict, out_shapes)
 
     # np.savez('../scratch/debug_det_graph.npz', det_vid_names = det_vid_names, det_conf = det_conf, det_time_intervals = det_time_intervals, det_events_class = det_events_class)
 
 
-def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh , second_thresh , bin_trim = None , multibranch =1, branch_to_test = -1,dataset = 'ucf', save_outfs = None):
+def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh , second_thresh , bin_trim = None , multibranch =1, branch_to_test = -1,dataset = 'ucf', save_outfs = None, test_method = 'original'):
 
-    # print 'FIRST THRESH', first_thresh
+
     # print 'SECOND THRESH', second_thresh
     # raw_input()
     # out_dir = '../scratch/graph_2_nononlin_b'
@@ -362,6 +412,8 @@ def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh ,
     det_conf_all = []
     det_vid_names = []
     idx_test = 0
+    predictions = []
+    pmfs = []
 
     threshes_all = []
     for num_iter_test,batch in enumerate(test_dataloader):
@@ -394,7 +446,7 @@ def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh ,
                             np.save(out_file_f,outf)
 
 
-            if 'l1' in criterion_str or 'wsddn' in criterion_str:
+            if 'l1' in criterion_str:
                 [pmf, att] = pmf
 
             # print out.size(),torch.min(out), torch.max(out)
@@ -411,6 +463,7 @@ def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh ,
                 # print out.size()
                 # raw_input()
             if second_thresh>=0 and branch_to_test!=-2 and branch_to_test!=-4 and branch_to_test!=-5:
+                # print 'smaxing'
                 out = torch.nn.functional.softmax(out,dim = 1)
 
             start_seq = np.array(range(0,out.shape[0]))*16./25.
@@ -420,62 +473,66 @@ def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh ,
 
             pmf = pmf.data.cpu().numpy()
             out = out.data.cpu().numpy()
-
-            # print out.shape
-            # print np.min(out), np.max(out)
-            # print pmf
-            # print labels[idx_sample]
-            # raw_input()
-            if first_thresh==-1:
-                bin_not_keep = labels[idx_sample].data.cpu().numpy()==0
+            if test_method =='wtalc':
+                det_vid_names.append(det_vid_names_ac[idx_test])
+                predictions.append(out)
+                pmfs.append(pmf)
             else:
-                bin_not_keep = pmf<first_thresh
-            
-            # print np.min(pmf), np.max(pmf)
-            # print bin_not_keep
-            # print labels[idx_sample]
-            # print pmf
-            # print first_thresh
-            # raw_input()
-
-            for class_idx in range(pmf.size):
-                if bin_not_keep[class_idx]:
-                    continue
-
-                det_conf = out[:,class_idx]
-                if second_thresh<0:
-                    thresh = 0
+                if first_thresh==-1:
+                    bin_not_keep = labels[idx_sample].data.cpu().numpy()==0
                 else:
-                    thresh = np.max(det_conf)-(np.max(det_conf)-np.min(det_conf))*second_thresh
-                bin_second_thresh = det_conf>thresh
-                # print thresh, np.sum(bin_second_thresh)
+                    bin_not_keep = pmf<first_thresh
+         
+                for class_idx in range(pmf.size):
+                    if bin_not_keep[class_idx]:
+                        continue
 
+                    det_conf = out[:,class_idx]
+                    if second_thresh<0:
+                        thresh = 0
+                    else:
+                        thresh = np.max(det_conf)-(np.max(det_conf)-np.min(det_conf))*second_thresh
+                    bin_second_thresh = det_conf>thresh
+         
 
-                det_conf, det_time_intervals = merge_detections(bin_second_thresh, det_conf, det_time_intervals_meta)
-                # print class_idx, labels[idx_sample][class_idx],np.min(det_conf), np.max(det_conf),len(det_time_intervals)
-
-                # det_time_intervals = det_time_intervals_meta
+                    det_conf, det_time_intervals = merge_detections(bin_second_thresh, det_conf, det_time_intervals_meta)
+                    
+                    det_vid_names.extend([det_vid_names_ac[idx_test]]*det_conf.shape[0])
+                    det_events_class.extend([class_idx]*det_conf.shape[0])
+                    det_conf_all.append(det_conf)
+                    det_time_intervals_all.append(det_time_intervals)
                 
-                det_vid_names.extend([det_vid_names_ac[idx_test]]*det_conf.shape[0])
-                det_events_class.extend([class_idx]*det_conf.shape[0])
-                det_conf_all.append(det_conf)
-                det_time_intervals_all.append(det_time_intervals)
-            
-            # raw_input()
-
             idx_test +=1
 
-    # threshes_all = np.concatenate(threshes_all,0)
-    det_conf = np.concatenate(det_conf_all,axis =0)
-    det_time_intervals = np.concatenate(det_time_intervals_all,axis = 0)
-    det_events_class = np.array(det_events_class)
-    # class_keep = np.argmax(det_conf , axis = 1)
-
-    # np.savez('../scratch/debug_det_graph.npz', det_vid_names = det_vid_names, det_conf = det_conf, det_time_intervals = det_time_intervals, det_events_class = det_events_class)
-    # raw_input()
-
-    aps = et.test_overlap(det_vid_names, det_conf, det_time_intervals,det_events_class,log_arr = log_arr, dataset = dataset)
     
+    if test_method=='wtalc':
+        aps, dmap, iou, class_names = wtalc.getDetectionMAP(predictions, pmfs, det_vid_names, first_thresh, second_thresh)
+        print len(aps), len(aps[0])
+
+        for idx_curr, arr_curr in enumerate(aps):
+            aps[idx_curr].append(dmap[idx_curr])
+        # aps = [arr_curr.append(dmap[idx_curr]) ]
+        aps = np.array(aps).T
+        aps[:-1,:] = aps[:-1,:]*100
+        
+        # for ap_curr in aps:
+        #     print len(ap_curr)
+
+        class_names.append('Average')
+        et.print_overlap(aps, class_names, iou, log_arr)
+
+    else:
+        # threshes_all = np.concatenate(threshes_all,0)
+        det_conf = np.concatenate(det_conf_all,axis =0)
+        det_time_intervals = np.concatenate(det_time_intervals_all,axis = 0)
+        det_events_class = np.array(det_events_class)
+        # class_keep = np.argmax(det_conf , axis = 1)
+
+        # np.savez('../scratch/debug_det_graph.npz', det_vid_names = det_vid_names, det_conf = det_conf, det_time_intervals = det_time_intervals, det_events_class = det_events_class)
+        # raw_input()
+
+        aps = et.test_overlap(det_vid_names, det_conf, det_time_intervals,det_events_class,log_arr = log_arr, dataset = dataset)
+        
     return aps
 
 
@@ -650,10 +707,12 @@ def test_model(out_dir_train,
                 branch_to_test = -1,
                 dataset = 'ucf',
                 save_outfs = None,
-                test_pair = False):
+                test_pair = False,
+                test_method = 'original'):
     
     out_dir_results = os.path.join(out_dir_train,'results_model_'+str(model_num)+post_pend+'_'+str(first_thresh)+'_'+str(second_thresh))
-    
+    criterion_str = criterion.__class__.__name__.lower()
+
     if branch_to_test!=-1:
         out_dir_results = out_dir_results +'_'+str(branch_to_test)
 
@@ -684,6 +743,7 @@ def test_model(out_dir_train,
     if multibranch==1 and branch_to_test>-1:
         model.focus = branch_to_test
     
+
 
     if batch_size_val is None:
         batch_size_val = len(test_data)
@@ -718,13 +778,13 @@ def test_model(out_dir_train,
             branch_to_test_pass = branch_to_test
         else:
             branch_to_test_pass = -1
-        visualize_dets(model, test_dataloader,  dir_viz,first_thresh = first_thresh, second_thresh = second_thresh,bin_trim = bin_trim,det_class = det_class, branch_to_test = branch_to_test_pass)
+        visualize_dets(model, test_dataloader,  dir_viz,first_thresh = first_thresh, second_thresh = second_thresh,bin_trim = bin_trim,det_class = det_class, branch_to_test = branch_to_test_pass, criterion_str = criterion_str)
     elif test_pair:
         aps = test_model_overlap_pairs(model, test_dataloader, criterion, log_arr ,first_thresh = first_thresh, second_thresh = second_thresh, bin_trim = bin_trim, multibranch = multibranch, branch_to_test = branch_to_test,dataset = dataset, save_outfs = save_outfs)
         np.save(out_file, aps)
         util.writeFile(log_file, log_arr)
     else:
-        aps = test_model_overlap(model, test_dataloader, criterion, log_arr ,first_thresh = first_thresh, second_thresh = second_thresh, bin_trim = bin_trim, multibranch = multibranch, branch_to_test = branch_to_test,dataset = dataset, save_outfs = save_outfs)
+        aps = test_model_overlap(model, test_dataloader, criterion, log_arr ,first_thresh = first_thresh, second_thresh = second_thresh, bin_trim = bin_trim, multibranch = multibranch, branch_to_test = branch_to_test,dataset = dataset, save_outfs = save_outfs, test_method = test_method)
         np.save(out_file, aps)
         util.writeFile(log_file, log_arr)
 

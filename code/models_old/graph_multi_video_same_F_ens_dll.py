@@ -253,7 +253,6 @@ class Graph_Multi_Video(nn.Module):
             x_all_all = x_all_all[0]
             pmf_all = pmf_all[0]
 
-
         if branch_to_test>-1:
             x_all_all = x_all_all[branch_to_test]
             pmf_all = pmf_all[branch_to_test]

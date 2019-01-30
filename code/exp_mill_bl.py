@@ -152,7 +152,8 @@ def train_simple_mill_all_classes(model_name,
                                     attention = False,
                                     save_outfs = False,
                                     test_pair = False, 
-                                    criterion_str= None):
+                                    criterion_str= None, 
+                                    test_method = 'original'):
 
     num_epochs = epoch_stuff[1]
 
@@ -312,7 +313,8 @@ def train_simple_mill_all_classes(model_name,
                 branch_to_test =branch_to_test,
                 dataset = dataset, 
                 save_outfs = save_outfs,
-                test_pair = test_pair)
+                test_pair = test_pair,
+                test_method = test_method)
         test_model(**test_params)
         if viz_mode:
             test_params = dict(out_dir_train = out_dir_train,
@@ -551,18 +553,23 @@ def ens_experiments():
     epoch_stuff = [100,100]
     dataset = 'ucf'
     limit  = 500
-    save_after = 50
+    save_after = 10
     
     test_mode = True
-
-    model_nums = range(save_after-1,epoch_stuff[1],save_after)
+    
+    # test_method = 'wtalc'
+    test_method = 'wtalc'
+    
+    test_post_pend = '_'+test_method+'_tp_fp_conf'
+    model_nums = [99]
+    # range(save_after-1,epoch_stuff[1],save_after)
     # 
     # [49,99]
     # 
     retrain = False
     viz_mode = False
     viz_sim = False
-    test_post_pend = '_rand20'
+    # test_post_pend = ''
 
     post_pend = ''
     
@@ -608,7 +615,7 @@ def ens_experiments():
                         limit = limit, 
                         epoch_stuff= epoch_stuff,
                         batch_size = 32,
-                        batch_size_val = 20,
+                        batch_size_val = 32,
                         save_after = save_after,
                         test_mode = test_mode,
                         class_weights = class_weights,
@@ -623,14 +630,16 @@ def ens_experiments():
                         det_class = det_class,
                         post_pend = post_pend,
                         viz_sim = viz_sim,
-                        test_post_pend = test_post_pend,
+                        # test_post_pend = test_post_pend,
                         gt_vec = gt_vec,
                         loss_weights = loss_weights,
                         multibranch = multibranch,
                         branch_to_test = branch_to_test,
                         k_vec = k_vec,
                         attention = attention,
-                        test_pair = True)
+                        test_pair = False,
+                        test_post_pend = test_post_pend,
+                        test_method = test_method)
 
 def ens_Fperg_experiments():
     model_name = 'graph_multi_video_Fperg_ens_dll_moredepth'
@@ -1350,9 +1359,13 @@ def wsddn_simply_experiments():
     torch.manual_seed(999)
 
     model_name = 'wsddn_simple'
-    lr = [0.001, 0.001,0.001]
-    criterion_str = 'Wsddn_Loss_WithL1'
-    loss_weights = [1,0.1]
+    lr = [0.001, 0.001, 0.001]
+    # criterion_str = 'Wsddn_Loss_WithL1'
+    # loss_weights = [1,1]
+    # epoch_stuff = [100,100]
+
+    criterion_str = 'Wsddn_Loss'
+    loss_weights = None
 
     epoch_stuff = [100,100]
     retrain = False
@@ -1360,21 +1373,23 @@ def wsddn_simply_experiments():
     dataset = 'ucf'
     limit  = 500
     save_after = 10
-    test_after = 5
+    test_after = 10
     class_weights = True
 
 
     network_params = {}
     network_params['deno'] = None
     network_params['in_out'] = [2048,256]
-    network_params['ret_fc'] = True
-    post_pend = 'loss_on_x_det'
+    # network_params['ret_fc'] = 1
+    # post_pend = '_test'
+    post_pend = ''
     test_post_pend = '_x_class'
-    test_mode = False
+    test_mode = True
+    viz_mode = False
     branch_to_test = -4
     second_thresh = 0.5
     first_thresh = 0.
-    model_nums = [29,49,69,99]
+    model_nums = None
     train_simple_mill_all_classes(model_name,
                                     lr,
                                     dataset,
@@ -1392,19 +1407,77 @@ def wsddn_simply_experiments():
                                     retrain = retrain,
                                     model_nums = model_nums,
                                     test_post_pend = test_post_pend,
-                                    viz_mode = False,
-                                    loss_weights = loss_weights)
+                                    viz_mode = viz_mode,
+                                    loss_weights = loss_weights,
+                                    first_thresh = first_thresh)
                                     
+
+def simple_just_mill_flexible():
+    torch.backends.cudnn.deterministic = True
+    torch.manual_seed(999)
+
+    model_name = 'just_mill_flexible'
+    lr = [0.0001, 0.0001]
+    
+    # criterion_str = 'Wsddn_Loss'
+    # loss_weights = [1,0.01]
+
+    # criterion_str = 'MultiCrossEntropy'
+    # loss_weights = None
+
+    epoch_stuff = [500,500]
+    retrain = False
+
+    dataset = 'ucf'
+    limit  = 750
+    save_after = 10
+    test_after = 5
+    class_weights = True
+
+
+    network_params = {}
+    network_params['deno'] = 8
+    network_params['layer_sizes'] = [2048,1024]
+    # network_params['ret_fc'] = True
+    post_pend = ''
+    test_post_pend = ''
+    test_mode = False
+    viz_mode = False
+    branch_to_test = -4
+    second_thresh = 0.5
+    first_thresh = 0.
+    model_nums = None
+    train_simple_mill_all_classes(model_name,
+                                    lr,
+                                    dataset,
+                                    network_params,
+                                    limit,
+                                    epoch_stuff=epoch_stuff,
+                                    class_weights = class_weights,
+                                    save_after = save_after,
+                                    test_after = test_after,
+                                    post_pend = post_pend,
+                                    branch_to_test = branch_to_test,
+                                    test_mode= test_mode,
+                                    second_thresh = second_thresh,
+                                    criterion_str = criterion_str,
+                                    retrain = retrain,
+                                    model_nums = model_nums,
+                                    test_post_pend = test_post_pend,
+                                    viz_mode = viz_mode,
+                                    loss_weights = loss_weights)
+
 
 def main():
     print 'hello hello baby'
-    wsddn_simply_experiments()
+    # simple_just_mill_flexible()
+    # wsddn_simply_experiments()
     # scripts_comparative()
     
     # separate_supervision_experiment()
     # super_simple_experiment()
     # testing_exp()
-    # ens_experiments()
+    ens_experiments()
     # ens_Fperg_experiments()
     # ens_experiments_pool()
     # ens_moredepth_experiments()

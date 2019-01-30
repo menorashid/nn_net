@@ -14,8 +14,9 @@ class Just_Mill(nn.Module):
         self.linear = nn.Linear(layer_sizes[0],layer_sizes[1], bias = False)
 
         self.features = []
-        self.features.append(nn.Hardtanh())
-        self.features.append(Normalize())
+        # self.features.append(nn.Hardtanh())
+        # self.features.append(Normalize())
+        self.features.append(nn.ReLU())
         self.features.append(nn.Dropout(0.5))
         self.features.append(nn.Linear(layer_sizes[1],n_classes))
         self.features = nn.Sequential(*self.features)
