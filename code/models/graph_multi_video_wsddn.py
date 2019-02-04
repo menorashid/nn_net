@@ -21,24 +21,22 @@ class Graph_Multi_Video(nn.Module):
                  aft_nonlin = 'RL',
                  sigmoid = False,
                  layer_bef = None,
-                 graph_sum = False,
-                 background = False,
-                 just_graph = False
+                 graph_sum = False
                  ):
         super(Graph_Multi_Video, self).__init__()
         
         self.num_classes = n_classes
-        self.background = background
+        # self.background = background
         
-        if self.background:
-            assert sigmoid
-            n_classes+=1
+        # if self.background:
+        #     assert sigmoid
+        #     n_classes+=1
 
         self.deno = deno
         self.graph_size = graph_size
         self.sparsify = sparsify
         self.graph_sum = graph_sum
-        self.just_graph = just_graph
+        # self.just_graph = just_graph
 
         if in_out is None:
             in_out = [2048,512]
@@ -61,6 +59,23 @@ class Graph_Multi_Video(nn.Module):
         
         self.graph_layer = Graph_Layer_Wrapper(in_out[0],n_out = in_out[1], non_lin = non_lin, method = method, aft_nonlin = aft_nonlin)
         
+
+        self.det_branch = []
+        self.class_branch = []
+        branches = [self.det_branch, self.class_branch]
+        for branch in branches:
+            # branch.append(nn.ReLU())
+            branch.append(nn.Dropout(0.5))
+            branch.append(nn.Linear(in_out[1],self.num_classes))            
+        
+        [self.det_branch, self.class_branch] = branches
+        self.det_branch.append(nn.Softmax(dim=0))
+        self.class_branch.append(nn.Softmax(dim=1))
+
+        self.det_branch = nn.Sequential(*self.det_branch)
+        self.class_branch = nn.Sequential(*self.class_branch)
+
+
         last_graph = []
         last_graph.append(nn.Dropout(0.5))
         last_graph.append(nn.Linear(in_out[-1],n_classes))
@@ -107,19 +122,9 @@ class Graph_Multi_Video(nn.Module):
             if is_cuda:
                 input = input.cuda()
             
-            # assert len(self.graph_layers)==(self.num_branches)
-            
-            # if hasattr(self, 'layer_bef') and self.layer_bef is not None:
-            #     input = self.layer_bef(input)
-
             feature_out = self.linear_layer(input)
-            # # for col_num in range(len(self.graph_layers)):
-            # print 'feature_out.size()',feature_out.size()
-
+            
             to_keep = self.sparsify
-                # if to_keep=='lin':
-            # out_graph = self.graph_layer(input)
-            #     else:             
             out_graph = self.graph_layer(input, feature_out, to_keep = to_keep, graph_sum = self.graph_sum, identity = identity, method = method)
             
             
@@ -127,14 +132,22 @@ class Graph_Multi_Video(nn.Module):
                 [out_graph, graph_sum] = out_graph       
                 graph_sums.append(graph_sum.unsqueeze(0))
 
+
+            x_class = self.class_branch(out_graph) #n_instances x n_classes softmax along classes
+            x_det = self.det_branch(out_graph) #n_instances x n_classes softmax along instances
+
+            x_pred = x_class*x_det
+
+            # pmf = self.make_pmf(x_pred)
+                
             # print 'out_graph.size()',out_graph.size()
         
-            out_col = self.last_graph(out_graph)
+            # out_col = self.last_graph(out_graph)
             # print 'out_col.size()',out_col.size()
-            x_all.append(out_col)
-
+            # x_preds.append(x_pred)
+            x_all.append(x_det)
     
-            x = x_all[-1]
+            # x = x_all[-1]
             
             for idx_sample in range(len(input_sizes)):
                 if idx_sample==0:
@@ -143,9 +156,10 @@ class Graph_Multi_Video(nn.Module):
                     start = sum(input_sizes[:idx_sample])
 
                 end = start+input_sizes[idx_sample]
-                x_curr = x[start:end,:]
+                x_curr = x_pred[start:end,:]
                 pmf_all += [self.make_pmf(x_curr).unsqueeze(0)]
-                
+        
+        # print len(x_all)
             
         if strip:
             # for idx_pmf, pmf in enumerate(pmf_all):
@@ -167,44 +181,22 @@ class Graph_Multi_Video(nn.Module):
         
 
     def make_pmf(self,x):
-        k = max(1,x.size(0)//self.deno)
+        if self.deno is None:
+            k = x.size(0)
+            pmf = x
+        else:
+            k = max(1,x.size(0)//self.deno)
+            pmf,_ = torch.sort(x, dim=0, descending=True)
+            pmf = pmf[:k,:]
         
-        pmf,_ = torch.sort(x, dim=0, descending=True)
-        pmf = pmf[:k,:]
-        
-        pmf = torch.sum(pmf[:k,:], dim = 0)/k
+        # print torch.min(x), torch.max(x)
+        pmf = torch.sum(pmf, dim = 0)
+        # print torch.min(pmf), torch.max(pmf)
+        # /k
+        # print pmf.size()
+        # raw_input()
         return pmf
 
-    def get_similarity(self,input,idx_graph_layer = 0,sparsify = False, nosum = False):
-
-        # if sparsify is None:
-        #     sparsify = self.sparsify
-
-        is_cuda = next(self.parameters()).is_cuda
-
-        input_sizes = [input_curr.size(0) for input_curr in input]
-        input = torch.cat(input,0)
-
-
-        if is_cuda:
-            input = input.cuda()
-        
-        assert idx_graph_layer<len(self.graph_layers)
-        
-        if hasattr(self, 'layer_bef') and self.layer_bef is not None:
-            input = self.layer_bef(input)
-
-        feature_out = self.linear_layer(input)
-        
-        if sparsify:
-            to_keep = self.sparsify[idx_graph_layer]                
-        else:
-            to_keep = None
-
-        sim_mat = self.graph_layers[idx_graph_layer].get_affinity(feature_out, to_keep = to_keep,nosum = nosum)
-
-        return sim_mat
-    
     def printGraphGrad(self):
         grad_rel = self.graph_layers[0].graph_layer.weight.grad
         print torch.min(grad_rel).data.cpu().numpy(), torch.max(grad_rel).data.cpu().numpy()
@@ -223,13 +215,11 @@ class Network:
                  aft_nonlin = 'RL',
                  sigmoid = False,
                  layer_bef = None,
-                 graph_sum = False,
-                 background = False,
-                 just_graph = False
+                 graph_sum = False
                  ):
 
-        print 'network graph_size', graph_size
-        self.model = Graph_Multi_Video(n_classes, deno, in_out,feat_dim, graph_size, method, sparsify, non_lin, aft_nonlin,sigmoid, layer_bef, graph_sum, background, just_graph)
+        # print 'network graph_size', graph_size
+        self.model = Graph_Multi_Video(n_classes, deno, in_out,feat_dim, graph_size, method, sparsify, non_lin, aft_nonlin,sigmoid, layer_bef, graph_sum)
         print self.model
         raw_input()
 
@@ -242,28 +232,11 @@ class Network:
         # if self.model.layer_bef is not None:
         #     modules.append(self.model.layer_bef)
 
-        modules+=[self.model.linear_layer, self.model.graph_layer, self.model.last_graph]
+        modules+=[self.model.linear_layer, self.model.graph_layer, self.model.class_branch, self.model.det_branch]
 
         for i,module in enumerate(modules):
             print i, lr[i]
             lr_list+= [{'params': [p for p in module.parameters() if p.requires_grad], 'lr': lr[i]}]
-
-        # i = 0
-        # if self.model.layer_bef is not None:
-        #     print lr[i]
-        #     lr_list+= [{'params': [p for p in self.model.layer_bef.parameters() if p.requires_grad], 'lr': lr[i]}]
-        #     i+=1
-
-        # print lr[i]
-        # lr_list+= [{'params': [p for p in self.model.linear_layer.parameters() if p.requires_grad], 'lr': lr[i]}]
-        # i+=1
-
-        # print lr[i]
-        # lr_list+= [{'params': [p for p in self.model.graph_layers.parameters() if p.requires_grad], 'lr': lr[i]}]        
-        # i+=1
-
-        # print lr[i]
-        # lr_list+= [{'params': [p for p in self.model.last_graphs.parameters() if p.requires_grad], 'lr': lr[i]}]
 
         return lr_list
 

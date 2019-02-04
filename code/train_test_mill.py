@@ -1,6 +1,6 @@
 from helpers import util, visualize
 import random
-
+import globals as globs
 import torch.utils
 import torch.nn as nn
 import torch.optim as optim
@@ -282,6 +282,7 @@ def visualize_dets(model, test_dataloader, dir_viz, first_thresh , second_thresh
                 pmf = pmf[np.where(bin_trim)[0]]
 
             # out = torch.nn.functional.softmax(out,dim = 1)
+            # print 'not smaxing'
 
             start_seq = np.array(range(0,out.shape[0]))*16./25.
             end_seq = np.array(range(1,out.shape[0]+1))*16./25.
@@ -290,7 +291,8 @@ def visualize_dets(model, test_dataloader, dir_viz, first_thresh , second_thresh
 
             pmf = pmf.data.cpu().numpy()
             out = out.data.cpu().numpy()
-
+            # print det_class
+            # raw_input()
             if det_class==-1:
                 class_idx = np.where(labels[idx_sample].numpy())[0][0]
                 class_idx_gt = class_idx
@@ -314,10 +316,11 @@ def visualize_dets(model, test_dataloader, dir_viz, first_thresh , second_thresh
                 # print class_idx
                 # raw_input()
                 # for class_idx in range(pmf.size):
-                if bin_not_keep[class_idx]:
-                    idx_test +=1
-                    print 'PROBLEM'
-                    continue
+
+                # if bin_not_keep[class_idx]:
+                #     idx_test +=1
+                #     print 'PROBLEM'
+                #     continue
             
             det_conf = out[:,class_idx]
             if second_thresh<0:
@@ -372,10 +375,11 @@ def visualize_dets(model, test_dataloader, dir_viz, first_thresh , second_thresh
     det_vid_names_merged = np.array(det_vid_names_merged)
 
     # out_shapes = np.array(out_shapes)
-
+    # print np.min(det_conf_all), np.max(det_conf_all)
+    # raw_input()
     plot_dict = {}
     plot_dict['Det'] = [det_conf_all,det_time_intervals_all, det_events_class_all, np.array(det_vid_names)]
-    plot_dict['Merged'] = [det_conf_merged_all,det_time_intervals_merged_all,det_events_class_merged, det_vid_names_merged]
+    # plot_dict['Merged'] = [det_conf_merged_all,det_time_intervals_merged_all,det_events_class_merged, det_vid_names_merged]
 
     # et.viz_overlap(dir_viz, det_vid_names, det_conf_all, det_time_intervals_all, det_events_class_all,out_shapes)
     et.viz_overlap_multi(dir_viz,  plot_dict, out_shapes)
@@ -470,10 +474,16 @@ def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh ,
             end_seq = np.array(range(1,out.shape[0]+1))*16./25.
             det_time_intervals_meta = np.concatenate([start_seq[:,np.newaxis],end_seq[:,np.newaxis]],axis=1)
             
-
+            # print pmf.size()
+            pmf = torch.nn.functional.softmax(pmf)
             pmf = pmf.data.cpu().numpy()
+            # print pmf.shape
+            # pmf = softmax(pmf)
+            # print pmf.shape
+            # raw_input()
+
             out = out.data.cpu().numpy()
-            if test_method =='wtalc':
+            if test_method is not 'original':
                 det_vid_names.append(det_vid_names_ac[idx_test])
                 predictions.append(out)
                 pmfs.append(pmf)
@@ -520,6 +530,37 @@ def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh ,
 
         class_names.append('Average')
         et.print_overlap(aps, class_names, iou, log_arr)
+    elif test_method.startswith('top'):
+        num_top = int(test_method.split('_')[1])
+        # print len(predictions), type(predictions), type(predictions[0]), predictions[0].shape
+        # print len(det_vid_names)
+        # predictions = np.array(predictions)
+        # det_vid_names = np.array(det_vid_names)
+        # np.savez('../scratch/temp.npz',predictions = predictions, det_vid_names= det_vid_names)
+        # raw_input()
+        if dataset=='ucf':
+            class_list = globs.class_names
+
+        precisions, ap, class_names = wtalc.getTopKPrecRecall(num_top, predictions, det_vid_names, class_list)
+        iou = [1., 1.]
+        for idx,p in enumerate(precisions):
+            p.append(ap[idx]) 
+        aps = np.array(precisions).T
+        aps[:-1,:] = aps[:-1,:]*100
+        class_names.append('Average')
+        et.print_overlap(aps, class_names, iou, log_arr)
+
+        # iou = [1.]
+        # precisions.append(ap)
+        # aps = np.array(precisions)[np.newaxis,:]
+        # aps[:-1,:] = aps[:-1,:]*100
+        # class_names.append('Average')
+        # et.print_overlap(aps, class_names, iou, log_arr)
+
+        # for c, p, r in zip(precision, recall, class_names):
+        #     str_print = c+'\t%.2f\t%.2f' % (precision, recall)
+        #     print str_print
+        # raw_input()
 
     else:
         # threshes_all = np.concatenate(threshes_all,0)

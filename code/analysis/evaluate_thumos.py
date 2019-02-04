@@ -465,7 +465,7 @@ def viz_overlap(out_dir_meta, det_vid_names, det_conf_all, det_time_intervals_al
 
 
 def viz_overlap_multi(out_dir_meta, det_conf_all_dict, out_shapes, title= None):
-    print 'HELLO'
+    # print 'HELLO'
 
     class_names = ['BaseballPitch', 'BasketballDunk', 'Billiards', 'CleanAndJerk', 'CliffDiving', 'CricketBowling', 'CricketShot', 'Diving', 'FrisbeeCatch', 'GolfSwing', 'HammerThrow', 'HighJump', 'JavelinThrow', 'LongJump', 'PoleVault', 'Shotput', 'SoccerPenalty', 'TennisSwing', 'ThrowDiscus', 'VolleyballSpiking']
     class_names.sort()
@@ -509,9 +509,12 @@ def viz_overlap_multi(out_dir_meta, det_conf_all_dict, out_shapes, title= None):
             # det_conf_all_det_vid_names,
 
             gt_time_intervals = gt_time_intervals_all[np.array(gt_vid_names_all)==gt_vid_name]
-            print 'gt',gt_time_intervals
+            # print 'gt',gt_time_intervals
             # det_conf = det_conf_all[bin_keep]
             # det_time_intervals = det_time_intervals_all [bin_keep,:]
+            if gt_vid_name not in list(out_shapes.keys()):
+                continue
+
             out_shape_curr = out_shapes[gt_vid_name]
             # out_shape_curr = out_shapes[bin_keep]
             # assert len(np.unique(out_shape_curr))==1
@@ -530,13 +533,13 @@ def viz_overlap_multi(out_dir_meta, det_conf_all_dict, out_shapes, title= None):
                 
 
                 [det_conf_curr,det_time_intervals_all, det_events_class_all, det_vid_names] = det_conf_all_dict[k]
-                print det_conf_curr.shape, det_time_intervals_all.shape, det_events_class_all.shape, det_vid_names.shape
+                # print det_conf_curr.shape, det_time_intervals_all.shape, det_events_class_all.shape, det_vid_names.shape
 
                 bin_keep = det_vid_names == gt_vid_name
                 
                 bin_keep = np.logical_and(bin_keep, det_events_class_all==idx_class_name)
                 if np.sum(bin_keep)==0:
-                    print 'Continuing'
+                    # print 'Continuing'
                     continue
 
 
@@ -573,9 +576,9 @@ def viz_overlap_multi(out_dir_meta, det_conf_all_dict, out_shapes, title= None):
                 title = 'det conf over time'
             # print plot_arr
 
-            print out_file_curr
+            # print out_file_curr
             visualize.plotSimple(plot_arr,out_file = out_file_curr,title = title,xlabel = 'Time',ylabel = 'Detection Confidence',legend_entries=legend_entries)
-            raw_input()
+            # raw_input()
         
         visualize.writeHTMLForFolder(out_dir)
 

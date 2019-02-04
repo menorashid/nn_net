@@ -63,7 +63,7 @@ class Wsddn_Loss(nn.Module):
         gt[gt>0]=1.
         gt[gt<=0]=-1.
 
-        in_log_val = gt*(pred - 0.5)+0.5
+        in_log_val = torch.clamp(gt*(pred - 0.5)+0.5,1e-10,1)
         loss = -1*torch.log(in_log_val)
         
         if self.class_weights is not None:
@@ -72,7 +72,14 @@ class Wsddn_Loss(nn.Module):
 
         loss = torch.sum(loss, dim = 1)
         loss = torch.mean(loss)
-        
+        if loss.eq(float('-inf')).any() or loss.eq(float('inf')).any():
+            print torch.min(pred), torch.max(pred)
+            print torch.min(in_log_val), torch.max(in_log_val)
+            print torch.log(torch.min(in_log_val)),torch.log(torch.max(in_log_val))
+
+            raw_input()
+
+
         return loss
 
 

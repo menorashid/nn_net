@@ -1382,11 +1382,12 @@ def wsddn_simply_experiments():
     network_params['in_out'] = [2048,256]
     # network_params['ret_fc'] = 1
     # post_pend = '_test'
-    post_pend = ''
-    test_post_pend = '_x_class'
+    post_pend = 'det_bottleneck_16'
+    test_method = 'top_1'
+    test_post_pend = '_x_det'+'_'+test_method
     test_mode = True
     viz_mode = False
-    branch_to_test = -4
+    branch_to_test = -2
     second_thresh = 0.5
     first_thresh = 0.
     model_nums = None
@@ -1409,7 +1410,8 @@ def wsddn_simply_experiments():
                                     test_post_pend = test_post_pend,
                                     viz_mode = viz_mode,
                                     loss_weights = loss_weights,
-                                    first_thresh = first_thresh)
+                                    first_thresh = first_thresh,
+                                    test_method = test_method)
                                     
 
 def simple_just_mill_flexible():
@@ -1467,17 +1469,231 @@ def simple_just_mill_flexible():
                                     viz_mode = viz_mode,
                                     loss_weights = loss_weights)
 
+def graph_l1_experiment():
+    model_name = 'graph_multi_video_with_L1'
+    
+    lr = [0.001,0.001, 0.001]
+    multibranch = 1
+    loss_weights = [1,1]
+    
+    branch_to_test = -1
+    attention = False
+
+    k_vec = None
+
+    gt_vec = False
+    just_primary = False
+
+    torch.backends.cudnn.deterministic = True
+    torch.manual_seed(999)
+    
+    epoch_stuff = [200,200]
+    dataset = 'ucf'
+    limit  = 500
+    save_after = 10
+    
+    test_mode = False
+    
+    # test_method = 'wtalc'
+    # test_method = 'wtalc'
+    # test_post_pend = '_'+test_method+'_tp_fp_conf'
+
+    test_method = 'original'
+    test_post_pend = '_'+test_method+'_softmaxpmf'
+
+    model_nums = [99,199]
+
+    retrain = False
+    viz_mode = True
+    viz_sim = False
+
+    post_pend = ''
+    
+    network_params = {}
+    network_params['deno'] = 8
+    network_params['in_out'] = [2048,512]
+    network_params['feat_dim'] = [2048,1024]
+    network_params['graph_size'] = 1
+    network_params['method'] = 'cos_zero_self'
+    network_params['sparsify'] = 0.5
+    network_params['graph_sum'] = attention
+    network_params['non_lin'] = 'HT'
+    network_params['aft_nonlin']='HT_L2'
+    network_params['sigmoid'] = False
+    post_pend = 'ABS_bias'
+    first_thresh=0.1
+    class_weights = True
+    test_after = 5
+    all_classes = False
+    
+    second_thresh = 0.5
+    det_class = -1
+    train_simple_mill_all_classes (model_name = model_name,
+                        lr = lr,
+                        dataset = dataset,
+                        network_params = network_params,
+                        limit = limit, 
+                        epoch_stuff= epoch_stuff,
+                        batch_size = 32,
+                        batch_size_val = 32,
+                        save_after = save_after,
+                        test_mode = test_mode,
+                        class_weights = class_weights,
+                        test_after = test_after,
+                        all_classes = all_classes,
+                        just_primary = just_primary,
+                        model_nums = model_nums,
+                        retrain = retrain,
+                        viz_mode = viz_mode,
+                        second_thresh = second_thresh,
+                        first_thresh = first_thresh,
+                        det_class = det_class,
+                        post_pend = post_pend,
+                        viz_sim = viz_sim,
+                        gt_vec = gt_vec,
+                        loss_weights = loss_weights,
+                        multibranch = multibranch,
+                        branch_to_test = branch_to_test,
+                        k_vec = k_vec,
+                        attention = attention,
+                        test_pair = False,
+                        test_post_pend = test_post_pend,
+                        test_method = test_method)
+
+def graph_wsddn_experiment():
+    model_name = 'graph_multi_video_wsddn'
+    criterion_str = 'Wsddn_Loss'
+    loss_weights = None
+
+    lr = [0.001, 0.001,0.001, 0.001]
+    multibranch = 1
+    # loss_weights = [1,1]
+    
+    branch_to_test = -2
+    # attention = True
+
+    k_vec = None
+
+    gt_vec = False
+    just_primary = False
+
+    torch.backends.cudnn.deterministic = True
+    torch.manual_seed(999)
+    
+    epoch_stuff = [500,500]
+    dataset = 'ucf'
+    limit  = 500
+    save_after = 50
+    
+    test_mode = True
+    
+    # test_method = 'wtalc'
+    # test_method = 'wtalc'
+    # test_post_pend = '_'+test_method+'_tp_fp_conf'
+
+    test_method = 'original'
+    test_post_pend = '_'+test_method+'_x_det'
+
+    model_nums = [199]
+    # [99,199,299,399,499]
+
+    retrain = False
+    viz_mode = True
+    viz_sim = False
+
+    post_pend = ''
+    
+    network_params = {}
+    network_params['deno'] = None
+    network_params['in_out'] = [2048,512]
+    network_params['feat_dim'] = [2048,1024]
+    network_params['graph_size'] = 1
+    network_params['method'] = 'cos_zero_self'
+    network_params['sparsify'] = 0.5
+    # network_params['graph_sum'] = attention
+    network_params['non_lin'] = 'HT'
+    network_params['aft_nonlin']='HT_L2'
+    network_params['sigmoid'] = False
+    post_pend = 'ABS_bias'
+    first_thresh=0.
+    class_weights = True
+    test_after = 5
+    all_classes = False
+    
+    second_thresh = 0.5
+    det_class = -1
+    train_simple_mill_all_classes (model_name = model_name,
+                        lr = lr,
+                        dataset = dataset,
+                        network_params = network_params,
+                        limit = limit, 
+                        epoch_stuff= epoch_stuff,
+                        batch_size = 32,
+                        batch_size_val = 32,
+                        save_after = save_after,
+                        test_mode = test_mode,
+                        class_weights = class_weights,
+                        test_after = test_after,
+                        all_classes = all_classes,
+                        just_primary = just_primary,
+                        model_nums = model_nums,
+                        retrain = retrain,
+                        viz_mode = viz_mode,
+                        second_thresh = second_thresh,
+                        first_thresh = first_thresh,
+                        det_class = det_class,
+                        post_pend = post_pend,
+                        viz_sim = viz_sim,
+                        gt_vec = gt_vec,
+                        loss_weights = loss_weights,
+                        multibranch = multibranch,
+                        branch_to_test = branch_to_test,
+                        k_vec = k_vec,
+                        # attention = attention,
+                        test_pair = False,
+                        test_post_pend = test_post_pend,
+                        test_method = test_method,
+                        criterion_str = criterion_str)
+
+
 
 def main():
-    print 'hello hello baby'
-    # simple_just_mill_flexible()
-    # wsddn_simply_experiments()
-    # scripts_comparative()
     
+
+    print 'hello hello baby'
+    # loaded = np.load('../scratch/temp.npz')
+    # predictions = list(loaded['predictions'])
+    # det_vid_names = list(loaded['det_vid_names'])
+
+    # print len(predictions), type(predictions), type(predictions[0]), predictions[0].shape
+    
+    # import wtalc
+    # # print wtalc.getTopKPrecRecall(1, predictions, det_vid_names, class_names_ucf)
+    # class_list = class_names_ucf
+    # precisions, ap, class_names = wtalc.getTopKPrecRecall(1, predictions, det_vid_names, class_list)
+    # iou = [1., 1.]
+    # for idx,p in enumerate(precisions):
+    #     p.append(ap[idx]) 
+
+    # aps = np.array(precisions).T
+    # print aps
+    # print class_names
+
+    # aps[:-1,:] = aps[:-1,:]*100
+    # class_names.append('Average')
+    # et.print_overlap(aps, class_names, iou, [])
+
+        
+    # graph_wsddn_experiment()
+    # graph_l1_experiment()
+
+    # simple_just_mill_flexible()
+    wsddn_simply_experiments()
+    # scripts_comparative()
     # separate_supervision_experiment()
     # super_simple_experiment()
     # testing_exp()
-    ens_experiments()
+    # ens_experiments()
     # ens_Fperg_experiments()
     # ens_experiments_pool()
     # ens_moredepth_experiments()

@@ -39,7 +39,15 @@ class Wsddn(nn.Module):
             branch.append(nn.Linear(in_out[1],self.num_classes))            
         
         [self.det_branch, self.class_branch] = branches
-        self.det_branch.append(nn.Softmax(dim=0))
+        
+        self.det_branch = [nn.Dropout(0.5),
+                            nn.Linear(in_out[1],16),
+                            nn.ReLU(),
+                            nn.Linear(16,self.num_classes),
+                            nn.Softmax(dim=0)]
+
+        # self.det_branch.append(nn.Softmax(dim=0))
+        
         self.class_branch.append(nn.Softmax(dim=1))
 
         self.det_branch = nn.Sequential(*self.det_branch)
@@ -49,8 +57,8 @@ class Wsddn(nn.Module):
         # self.class_branch = nn.Sequential(*[nn.Linear(in_out[1],self.num_classes), nn.Softmax(dim=1)])
 
     def forward(self, input):
-        print self
-        raw_input()
+        # print self
+        # raw_input()
         # print input.size()
         is_cuda = next(self.parameters()).is_cuda
 
@@ -91,7 +99,7 @@ class Wsddn(nn.Module):
             pmf = [pmf, [max_pred, diffs_vec]]
             
 
-        return x_class, pmf
+        return x_det, pmf
 
     def make_pmf(self, x):
         if self.deno is None:

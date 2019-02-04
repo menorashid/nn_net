@@ -4,6 +4,7 @@ from scipy.signal import savgol_filter
 import sys
 import scipy.io as sio 
 from analysis import evaluate_thumos as et
+import sklearn.metrics
 
 def str2ind(categoryname,classlist):
    return [i for i in range(len(classlist)) if categoryname==classlist[i]][0]
@@ -119,11 +120,11 @@ def getLocMAP(predictions, pmfs, vid_names,first_thresh, second_thresh, th, anno
       gtpos = len(segment_gt)
 
       # Compare predictions and gt
-      # tp, fp = [], []
+      tp, fp = [], []
 
-      list_taken = np.zeros((segment_predict.shape[0]))
-      tp = np.zeros((segment_predict.shape[0]))
-      fp = np.zeros((segment_predict.shape[0]))
+      # list_taken = np.zeros((segment_predict.shape[0]))
+      # tp = np.zeros((segment_predict.shape[0]))
+      # fp = np.zeros((segment_predict.shape[0]))
       
 
       for i in range(len(segment_predict)):
@@ -148,17 +149,18 @@ def getLocMAP(predictions, pmfs, vid_names,first_thresh, second_thresh, th, anno
                if IoU >= th:
                   # print IoU, IoU_new
                   # raw_input()
-                  # flag = 1.
-                  flag = segment_predict[i][3]
-                  list_taken[i]=1
-                  tp[i]= flag
-                  # fp[i] = 1-flag
+                  flag = 1.
+           
+                  # flag = segment_predict[i][3]
+                  # list_taken[i]=1
+                  # tp[i]= flag
                   del segment_gt[j]
                   break
-         # fp.append(1.-flag)
+         tp.append(flag)
+         fp.append(1.-flag)
       # tp[list_taken==1] = segment_predict[list_taken==1,3]
       # tp[list_taken==0] = 1-segment_predict[list_taken==0,3]
-      fp[list_taken==0] = segment_predict[list_taken==0,3]
+      # fp[list_taken==0] = segment_predict[list_taken==0,3]
       # print sum(tp==0), sum(fp==0), len(segment_predict)
       # raw_input()
       tp_c = np.cumsum(tp)
@@ -172,6 +174,151 @@ def getLocMAP(predictions, pmfs, vid_names,first_thresh, second_thresh, th, anno
 
    return ap, 100*np.mean(ap), class_names_chosen
   
+
+
+def getTopKPrecRecall(num_top, predictions, vid_names, classlist, annotation_path = 'Thumos14reduced-Annotations/'):
+   # print num_top, predictions, vid_names, annotation_path
+   gtsegments = np.load(annotation_path + '/segments.npy')
+   gtlabels = np.load(annotation_path + '/labels.npy')
+   # gtlabels = np.load(annotation_path + '/labels.npy')
+   videoname = np.load(annotation_path + '/videoname.npy'); videoname = np.array([v.decode('utf-8') for v in videoname])
+   subset = np.load(annotation_path + '/subset.npy'); subset = np.array([s.decode('utf-8') for s in subset])
+   # classlist = np.load(annotation_path + '/classlist.npy'); classlist = np.array([c.decode('utf-8') for c in classlist])
+   duration = np.load(annotation_path + '/duration.npy')
+   ambilist = annotation_path + '/Ambiguous_test.txt'
+
+   ambilist = list(open(ambilist,'r'))
+   ambilist = [a.strip('\n').split(' ') for a in ambilist]
+   # print (ambilist)
+
+   # # keep training gtlabels for plotting
+   gtltr = []
+   for i,s in enumerate(subset):
+      if subset[i]=='validation' and len(gtsegments[i]):
+         gtltr.append(gtlabels[i])
+   gtlabelstr = gtltr
+   
+   
+   # bin_keep = np.in1d(videoname, vid_names)
+   
+   videoname_list = list(videoname)
+   idx_vid_names = []
+   for vid_name in vid_names:
+      idx_vid_names.append(videoname_list.index(vid_name))
+
+   videoname = videoname[idx_vid_names]
+   gtsegments = [gtsegments[idx] for idx in idx_vid_names]
+   gtlabels = [gtlabels[idx] for idx in idx_vid_names]
+   # videoname = videoname[bin_keep]
+   
+   for idx in range(len(videoname)):
+      assert videoname[idx]==vid_names[idx]
+   
+
+   # # which categories have temporal labels ?
+   # templabelcategories = sorted(list(set([l for gtl in gtlabels for l in gtl])))
+
+   # the number index for those categories.
+   # templabelidx = []
+   # for t in templabelcategories:
+   #    templabelidx.append(str2ind(t,classlist))
+   # class_names_chosen = [str(val) for val in np.array(classlist)[templabelidx]]
+
+   # match test class idx with gt class idx
+
+
+   # get gt_idx and segments
+   
+   gt_segments_bin = []
+   for idx_vid,gt_segment in enumerate(gtsegments):
+      gt_labels_curr = np.array(gtlabels[idx_vid])
+      gt_segment = np.array(gt_segment)
+      labels_idx = []
+      gt_segments_bin_curr = []
+      for class_curr in np.unique(gt_labels_curr):
+         gt_segment_rel = gt_segment[class_curr==gt_labels_curr,:]
+         gt_segment_rel = np.round(gt_segment_rel*25/16).astype(int)
+         gt_segment_bin = np.zeros(predictions[idx_vid].shape[0])
+         for seg_curr in gt_segment_rel:
+            gt_segment_bin[seg_curr[0]:seg_curr[1]]=1
+
+         gt_segments_bin_curr.append(gt_segment_bin)
+         labels_idx.append(str2ind(class_curr, classlist))
+
+      gt_segments_bin_curr = np.array(gt_segments_bin_curr)
+      labels_idx = np.array(labels_idx)
+      gt_segments_bin.append([labels_idx,gt_segments_bin_curr])
+
+
+   # process the predictions such that classes having greater than a certain threshold are detected only
+   
+
+   predictions_arr = []
+   gt_arr = []
+   classes_arr = []
+   rec = 0
+   for idx_segment_predict, segment_predict in enumerate(predictions):
+
+      # get gt classes to keep
+      gt_classes = gt_segments_bin[idx_segment_predict][0]
+      segment_predict = segment_predict[:,gt_classes]
+      
+      # get top k values of gt classes
+      idx_sort = np.argsort(segment_predict,axis = 0)[::-1,:]
+      
+      idx_sort = idx_sort[:num_top,:]
+      
+      # set the rest to zeros
+      segment_predict = segment_predict*0
+      for idx_idx_sort, idx_sort_curr in enumerate(idx_sort.T):
+         segment_predict[list(idx_sort_curr),idx_idx_sort] = 1
+      
+      # add to array
+      classes_arr_curr = np.ones(segment_predict.shape)
+      classes_arr_curr = gt_classes[np.newaxis,:]*classes_arr_curr
+      classes_arr.append(classes_arr_curr)
+      # print classes_arr_curr.shape
+      # print classes_arr_curr[:10,:]
+
+      predictions_arr.append(segment_predict)
+      gt_arr.append(gt_segments_bin[idx_segment_predict][1].T)
+      rec += segment_predict.size
+
+   # flatten arrays
+   gt_arr = np.concatenate([arr.flatten() for arr in gt_arr],axis = 0)
+   predictions_arr = np.concatenate([arr.flatten() for arr in predictions_arr], axis = 0)
+   classes_arr = np.concatenate([arr.flatten() for arr in classes_arr],axis = 0)
+   
+   precisions = []
+   recalls = []
+
+   for c in np.unique(classes_arr):
+      rel_bin = classes_arr==c
+
+      precision = sklearn.metrics.precision_score(gt_arr[rel_bin], predictions_arr[rel_bin])
+      recall = sklearn.metrics.recall_score(gt_arr[rel_bin], predictions_arr[rel_bin])
+      precisions.append(precision)
+      recalls.append(recall)
+
+   precisions = [precisions,recalls]
+   # print precisions
+   # print recalls
+   # print np.mean(precisions), np.mean(recalls)
+
+
+   # tp = np.sum(np.logical_and(gt_arr == predictions_arr,gt_arr==1))
+   # print tp/float(np.sum(predictions_arr))
+
+   # print tp/float(np.sum(gt_arr))
+
+
+   # print precision
+   # print recall
+
+   
+
+   return precisions, [100*np.mean(precisions[0]),100*np.mean(precisions[1])], classlist
+
 
 def getDetectionMAP(predictions, pmfs, vid_names, first_thresh, second_thresh, annotation_path = 'Thumos14reduced-Annotations/'):
    iou_list = [0.1, 0.2, 0.3, 0.4, 0.5]
