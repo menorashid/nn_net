@@ -24,29 +24,30 @@ class Wsddn(nn.Module):
             in_out = [2048,512]
         
         self.linear_layer = []
-        # nn.Sequential(*)
         self.linear_layer.append(nn.Linear(in_out[0], in_out[1], bias = True))
-        # self.linear_layer.append(nn.ReLU())
-        # self.linear_layer.append(nn.Dropout(0.5))
+        self.linear_layer.append(nn.ReLU())
+        self.linear_layer.append(nn.Dropout(0.5))
         self.linear_layer = nn.Sequential(*self.linear_layer)
         
         self.det_branch = []
         self.class_branch = []
-        branches = [self.det_branch, self.class_branch]
-        for branch in branches:
-            branch.append(nn.ReLU())
-            branch.append(nn.Dropout(0.5))
-            branch.append(nn.Linear(in_out[1],self.num_classes))            
+        # branches = [self.det_branch, self.class_branch]
+        # for branch in branches:
+        #     branch.append(nn.ReLU())
+        #     branch.append(nn.Dropout(0.5))
+            # branch.append(nn.Linear(in_out[1],self.num_classes))            
         
-        [self.det_branch, self.class_branch] = branches
+        # [self.det_branch, self.class_branch] = branches
         
-        # self.det_branch = [nn.Dropout(0.5),
-        #                     nn.Linear(in_out[1],16),
-        #                     nn.ReLU(),
-        #                     nn.Linear(16,self.num_classes),
-        #                     nn.Softmax(dim=0)]
+        self.det_branch.append(nn.Linear(in_out[1],1))            
+        self.class_branch.append(nn.Linear(in_out[1],self.num_classes))            
 
-        self.det_branch.append(nn.Hardtanh())
+        # #                     nn.Linear(in_out[1],16),
+        # #                     nn.ReLU(),
+        # #                     nn.Linear(16,self.num_classes),
+        # #                     nn.Softmax(dim=0)]
+
+        # self.det_branch.append(nn.Hardtanh())
         self.det_branch.append(nn.Softmax(dim=0))
         
         self.class_branch.append(nn.Softmax(dim=1))
@@ -62,14 +63,22 @@ class Wsddn(nn.Module):
         # raw_input()
         # print input.size()
         is_cuda = next(self.parameters()).is_cuda
-
+        # print input.size()
+        input = input[:,:1024]
+        # print input.size()
+        # raw_input()
         x = self.linear_layer(input)
         
         x_class = self.class_branch(x) #n_instances x n_classes softmax along classes
         x_det = self.det_branch(x) #n_instances x n_classes softmax along instances
+        # print x_det.size()
+        # print x_class.size()
 
+        x_det = x_det.repeat(1,x_class.size(1))
+        # print x_det.size()
+        # raw_input()
         x_pred = x_class*x_det
-
+        
         pmf = self.make_pmf(x_pred)
         
         # effective_window = 1
@@ -92,14 +101,12 @@ class Wsddn(nn.Module):
                 diffs = star_vec - r_vecs
                 
                 diffs = torch.bmm(diffs.unsqueeze(1),diffs.unsqueeze(2))
-                # print diffs
-                # raw_input()
                 diffs_vec[class_num] = torch.sum(diffs)
                 
 
             pmf = [pmf, [max_pred, diffs_vec]]
 
-        return x_pred, pmf
+        return x_det, pmf
 
     def make_pmf(self, x):
         if self.deno is None:

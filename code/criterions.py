@@ -91,7 +91,10 @@ class Wsddn_Loss_WithL1(Wsddn_Loss):
         # self.att_weight = loss_weights[-1]
         
     def forward(self, gt, preds, att):
-        
+        # print gt.size()
+        # print preds.size()
+        # print att.size()
+        # raw_input()
         loss_regular = super(Wsddn_Loss_WithL1,self).forward(gt, preds)
         # max_preds = preds[
 

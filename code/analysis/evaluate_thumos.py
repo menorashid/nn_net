@@ -259,11 +259,18 @@ def test_overlap(det_vid_names_all, det_conf_all, det_time_intervals_all, second
         gt_vid_names, gt_class_names, gt_time_intervals = load_ucf_gt(train)
         aps = np.zeros((len(class_names)+1,5))
         overlap_thresh_all = np.arange(0.1,0.6,0.1)
+        fps_stuff = 16./25.
     elif dataset =='activitynet':
         class_names = globals.class_names_activitynet
         gt_vid_names, gt_class_names, gt_time_intervals = load_activitynet_gt(train)
         overlap_thresh_all = np.array([0.5,0.75,0.95])
         aps = np.zeros((len(class_names)+1,overlap_thresh_all.size))
+    elif dataset=='ucf_untf':
+        class_names = globals.class_names_ucf
+        gt_vid_names, gt_class_names, gt_time_intervals = load_ucf_gt(train)
+        aps = np.zeros((len(class_names)+1,5))
+        overlap_thresh_all = np.arange(0.1,0.6,0.1)
+        fps_stuff = 10./30.
     else:
         Exception('Problem. '+dataset+' not valid')
 
@@ -464,9 +471,9 @@ def viz_overlap(out_dir_meta, det_vid_names, det_conf_all, det_time_intervals_al
         visualize.writeHTMLForFolder(out_dir)
 
 
-def viz_overlap_multi(out_dir_meta, det_conf_all_dict, out_shapes, title= None):
+def viz_overlap_multi(out_dir_meta, det_conf_all_dict, out_shapes, fps_stuff, title= None):
     # print 'HELLO'
-
+    # fps_stuff = 1./10.
     class_names = ['BaseballPitch', 'BasketballDunk', 'Billiards', 'CleanAndJerk', 'CliffDiving', 'CricketBowling', 'CricketShot', 'Diving', 'FrisbeeCatch', 'GolfSwing', 'HammerThrow', 'HighJump', 'JavelinThrow', 'LongJump', 'PoleVault', 'Shotput', 'SoccerPenalty', 'TennisSwing', 'ThrowDiscus', 'VolleyballSpiking']
     class_names.sort()
 
@@ -522,7 +529,14 @@ def viz_overlap_multi(out_dir_meta, det_conf_all_dict, out_shapes, title= None):
 
             # det_time_intervals_merged = det_time_intervals
             # det_times = det_time_intervals[:,0]
-            det_times = np.array(range(0,out_shape_curr+1))*16./25.
+            det_times = np.array(range(0,out_shape_curr+1))*fps_stuff
+            # print out_shape_curr
+            # print det_times
+            # print out_shape_curr+1
+            # print fps_stuff
+            # print out_shape_curr*fps_stuff
+            # print gt_time_intervals
+            # raw_input()
             gt_vals = np.zeros(det_times.shape)
 
             plot_arr = []
@@ -576,9 +590,9 @@ def viz_overlap_multi(out_dir_meta, det_conf_all_dict, out_shapes, title= None):
                 title = 'det conf over time'
             # print plot_arr
 
-            # print out_file_curr
+            
             visualize.plotSimple(plot_arr,out_file = out_file_curr,title = title,xlabel = 'Time',ylabel = 'Detection Confidence',legend_entries=legend_entries)
-            # raw_input()
+            
         
         visualize.writeHTMLForFolder(out_dir)
 

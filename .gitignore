@@ -49,3 +49,4 @@ kinetics-i3d-master/data
 writing
 *.docx
 *.mat
+*.npy

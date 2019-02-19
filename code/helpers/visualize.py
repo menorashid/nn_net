@@ -296,7 +296,7 @@ def plotGroupBar(out_file,dict_vals,xtick_labels,legend_vals,colors,xlabel='',yl
     
     ax.set_xticks([p + len(legend_vals)/2.0 * width for p in pos])
     # print 'xticks' ,[p + len(legend_vals)/2.0 * width for p in pos]
-    ax.set_xticklabels(xtick_labels,rotation=0)
+    ax.set_xticklabels(xtick_labels,rotation=90)
     # ax.legend( legend_vals,loc=loc)
     if loc>5:
         plt.legend(legend_vals,bbox_to_anchor=(0., 0, 1., 1), ncol=2);

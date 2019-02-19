@@ -69,7 +69,9 @@ class Graph_Multi_Video(nn.Module):
             branch.append(nn.Linear(in_out[1],self.num_classes))            
         
         [self.det_branch, self.class_branch] = branches
-        self.det_branch.append(nn.Softmax(dim=0))
+        self.det_branch.append(nn.Hardtanh())
+        self.det_branch_smax = nn.Softmax(dim=0)
+
         self.class_branch.append(nn.Softmax(dim=1))
 
         self.det_branch = nn.Sequential(*self.det_branch)
@@ -135,6 +137,22 @@ class Graph_Multi_Video(nn.Module):
 
             x_class = self.class_branch(out_graph) #n_instances x n_classes softmax along classes
             x_det = self.det_branch(out_graph) #n_instances x n_classes softmax along instances
+
+            if len(input_sizes)>1:
+                x_det_arr = []
+                for idx_sample in range(len(input_sizes)):
+                    if idx_sample==0:
+                        start = 0
+                    else:
+                        start = sum(input_sizes[:idx_sample])
+                    end = start+input_sizes[idx_sample]
+                    x_det_arr.append(self.det_branch_smax(x_det[start:end,:])) 
+                    # print x_det_arr[-1].size()
+                x_det = torch.cat(x_det_arr, dim = 0)
+                # print x_det.size()
+                # raw_input()
+            else:
+                x_det = self.det_branch_smax(x_det)
 
             x_pred = x_class*x_det
 

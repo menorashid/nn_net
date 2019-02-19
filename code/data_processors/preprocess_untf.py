@@ -37,14 +37,14 @@ def save_npy():
 		out_file_feat = os.path.join(out_dir_feat, vid_name+'.npy')
 		out_file_time = os.path.join(out_dir_time, vid_name+'.npy')
 
-		if os.path.exists(out_file_feat):
-			continue
+		# if os.path.exists(out_file_feat):
+		# 	continue
 
 		try:
 			feature_curr = pickle.load(open(feat_file,'r'))
 		except:
 			print 'ERROR', feat_file
-			continue
+			raw_input()
 
 		
 		rgb = feature_curr['rgb_features']
@@ -53,6 +53,13 @@ def save_npy():
 		fps = feature_curr['extracted_fps']
 		o_fps = feature_curr['original_fps']
 		
+		print fps,o_fps
+		print feature_curr.keys()
+		print flow.shape
+		print feature_curr['video_duration']
+		raw_input()
+
+
 		rgb_time = feature_curr['rgb_frame_timestamps']
 		flow_time = feature_curr['flow_frame_timestamps']
 
@@ -61,8 +68,8 @@ def save_npy():
 
 		out_feat = np.concatenate([rgb,flow],axis = 0).T
 
-		print out_feat.shape
-		print out_file_feat
+		# print out_feat.shape
+		# print out_file_feat
 		np.save(out_file_feat, out_feat)
 
 		out_time = rgb_time
@@ -72,10 +79,47 @@ def save_npy():
 
 
 def write_train_test_files():
-	pass
+	post_pend = '_untf.txt'
+	data_dir = '../data/ucf101/train_test_files'
+	
+	new_data_path = '../data/untf/npy'
+	
+
+	# old_data_path = '../data/i3d_features/Thumos14-I3D-JOINTFeatures_val'
+	# train_file = os.path.join(data_dir, 'train.txt')
+	old_data_path = '../data/i3d_features/Thumos14-I3D-JOINTFeatures_test'
+	train_file = os.path.join(data_dir, 'test.txt')
+
+	replace_str = [old_data_path, new_data_path]
+
+	out_file = train_file[:train_file.rindex('.')]+post_pend
+	lines = util.readLinesFromFile(train_file)
+	new_lines = []
+	for idx_line, line in enumerate(lines):
+		# print line
+		line = line.replace(replace_str[0], replace_str[1])
+		# print line
+		# raw_input()
+		npy_file = line.split(' ')[0]
+		if not os.path.exists(npy_file):
+			print 'skipping', idx_line, npy_file
+			continue
+
+		assert os.path.exists(npy_file)
+		# raw_input()
+		new_lines.append(line)
+
+	print out_file, len(new_lines), len(lines)
+	util.writeFile(out_file,new_lines)
+
+	# print len(lines)
+	# print lines[0]
+
+	
 
 def main():
-	pass
+	save_npy()
+	# write_train_test_files()
 	
 
 

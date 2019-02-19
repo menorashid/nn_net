@@ -152,7 +152,7 @@ class Graph_Multi_Video(nn.Module):
             #     assert len(pmf)==1
             pmf_all = pmf_all[0].squeeze()
             # print torch.min(pmf_all), torch.max(pmf_all)
-            
+
 
         # for idx_x, x in enumerate(x_all):
         x_all = torch.cat(x_all,dim=0)
@@ -208,6 +208,22 @@ class Graph_Multi_Video(nn.Module):
     def printGraphGrad(self):
         grad_rel = self.graph_layers[0].graph_layer.weight.grad
         print torch.min(grad_rel).data.cpu().numpy(), torch.max(grad_rel).data.cpu().numpy()
+
+    def out_f(self, input):
+        # is_cuda = next(self.parameters()).is_cuda
+        # if is_cuda:
+        #     input = input.cuda()
+        
+        identity = False
+        method = None
+        feature_out = self.linear_layer(input)
+        to_keep = self.sparsify
+        out_graph = self.graph_layer(input, feature_out, to_keep = to_keep, graph_sum = self.graph_sum, identity = identity, method = method)
+        
+        if self.graph_sum:
+            [out_graph, graph_sum] = out_graph       
+        
+        return out_graph
 
 
 class Network:

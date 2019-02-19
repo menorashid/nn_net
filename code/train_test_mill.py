@@ -224,8 +224,18 @@ def merge_detections(bin_keep, det_conf, det_time_intervals, merge_with = 'max')
     # raw_input()
     return det_conf_new, det_time_intervals_new
 
-def visualize_dets(model, test_dataloader, dir_viz, first_thresh , second_thresh, bin_trim = None,  det_class = -1, branch_to_test =-1, criterion_str= None):
+def visualize_dets(model, test_dataloader, dir_viz, first_thresh , second_thresh, bin_trim = None,  det_class = -1, branch_to_test =-1, criterion_str= None, dataset = 'ucf'):
 
+    if dataset=='ucf_untf':
+        fps_stuff = 0.1
+    else:
+        fps_stuff = 16./25.
+
+    print fps_stuff
+
+    # fps_stuff = 1./10.
+
+    # 10./30.
     model.eval()
     model_name = model.__class__.__name__.lower()
     
@@ -284,8 +294,8 @@ def visualize_dets(model, test_dataloader, dir_viz, first_thresh , second_thresh
             # out = torch.nn.functional.softmax(out,dim = 1)
             # print 'not smaxing'
 
-            start_seq = np.array(range(0,out.shape[0]))*16./25.
-            end_seq = np.array(range(1,out.shape[0]+1))*16./25.
+            start_seq = np.array(range(0,out.shape[0]))*fps_stuff
+            end_seq = np.array(range(1,out.shape[0]+1))*fps_stuff
             det_time_intervals_meta = np.concatenate([start_seq[:,np.newaxis],end_seq[:,np.newaxis]],axis=1)
             
 
@@ -382,13 +392,21 @@ def visualize_dets(model, test_dataloader, dir_viz, first_thresh , second_thresh
     # plot_dict['Merged'] = [det_conf_merged_all,det_time_intervals_merged_all,det_events_class_merged, det_vid_names_merged]
 
     # et.viz_overlap(dir_viz, det_vid_names, det_conf_all, det_time_intervals_all, det_events_class_all,out_shapes)
-    et.viz_overlap_multi(dir_viz,  plot_dict, out_shapes)
+    et.viz_overlap_multi(dir_viz,  plot_dict, out_shapes, fps_stuff)
 
     # np.savez('../scratch/debug_det_graph.npz', det_vid_names = det_vid_names, det_conf = det_conf, det_time_intervals = det_time_intervals, det_events_class = det_events_class)
 
 
-def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh , second_thresh , bin_trim = None , multibranch =1, branch_to_test = -1,dataset = 'ucf', save_outfs = None, test_method = 'original'):
+def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh , second_thresh , bin_trim = None , multibranch =1, branch_to_test = -1,dataset = 'ucf', save_outfs = None, test_method = 'original', fps_stuff = 16./25.):
+    # if dataset=='ucf':
+    #     fps_stuff = 16./25.
+    if dataset=='ucf_untf':
+        fps_stuff = 0.1
+    else:
+        fps_stuff = 16./25.
 
+    print fps_stuff
+    # 10./25.
 
     # print 'SECOND THRESH', second_thresh
     # raw_input()
@@ -418,7 +436,7 @@ def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh ,
     idx_test = 0
     predictions = []
     pmfs = []
-
+    out_fs = []
     threshes_all = []
     for num_iter_test,batch in enumerate(test_dataloader):
         samples = batch['features']
@@ -448,6 +466,8 @@ def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh ,
                             vid_name = det_vid_names_ac[idx_test]
                             out_file_f = os.path.join(save_outfs,vid_name+'.npy')
                             np.save(out_file_f,outf)
+                        elif test_method=='best_worst_dot':
+                            out_fs.append(model.out_f(sample.cuda()).data.cpu().numpy())
 
 
             if 'l1' in criterion_str:
@@ -463,15 +483,17 @@ def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh ,
                 out = out[:,np.where(bin_trim)[0]]
                 pmf = pmf[np.where(bin_trim)[0]]
 
-
-                # print out.size()
-                # raw_input()
+            # print det_vid_names_ac[idx_test]
+            # print out.size()
+            # raw_input()
             if second_thresh>=0 and branch_to_test!=-2 and branch_to_test!=-4 and branch_to_test!=-5:
                 # print 'smaxing'
                 out = torch.nn.functional.softmax(out,dim = 1)
 
-            start_seq = np.array(range(0,out.shape[0]))*16./25.
-            end_seq = np.array(range(1,out.shape[0]+1))*16./25.
+            start_seq = np.array(range(0,out.shape[0]))*fps_stuff
+            # print start_seq
+            end_seq = np.array(range(1,out.shape[0]+1))*fps_stuff
+            # raw_input()
             det_time_intervals_meta = np.concatenate([start_seq[:,np.newaxis],end_seq[:,np.newaxis]],axis=1)
             
             # print pmf.size()
@@ -561,7 +583,17 @@ def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh ,
         #     str_print = c+'\t%.2f\t%.2f' % (precision, recall)
         #     print str_print
         # raw_input()
-
+    elif test_method =='best_worst_dot':
+        print len(predictions), type(predictions), type(predictions[0]), predictions[0].shape
+        print len(det_vid_names)
+        print len(out_fs), type(out_fs[0]), out_fs[0].shape
+        predictions = np.array(predictions)
+        det_vid_names = np.array(det_vid_names)
+        out_fs = np.array(out_fs)
+        out_file_feats = '../scratch/graph_nosparse_feats.npz'
+        np.savez(out_file_feats ,predictions = predictions, det_vid_names= det_vid_names, out_fs = out_fs)
+        print 'saved', out_file_feats
+        raw_input()
     else:
         # threshes_all = np.concatenate(threshes_all,0)
         det_conf = np.concatenate(det_conf_all,axis =0)
@@ -578,7 +610,7 @@ def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh ,
 
 
 def test_model_overlap_pairs(model, test_dataloader, criterion, log_arr,first_thresh , second_thresh , bin_trim = None , multibranch =1, branch_to_test = -1,dataset = 'ucf', save_outfs = None):
-
+    fps_stuff = 10./30.
     # print 'FIRST THRESH', first_thresh
     # print 'SECOND THRESH', second_thresh
     # raw_input()
@@ -668,8 +700,8 @@ def test_model_overlap_pairs(model, test_dataloader, criterion, log_arr,first_th
             if second_thresh>=0 and branch_to_test!=-2 and branch_to_test!=-4 and branch_to_test!=-5:
                 out = torch.nn.functional.softmax(out,dim = 1)
 
-            start_seq = np.array(range(0,out.shape[0]))*16./25.
-            end_seq = np.array(range(1,out.shape[0]+1))*16./25.
+            start_seq = np.array(range(0,out.shape[0]))*fps_stuff
+            end_seq = np.array(range(1,out.shape[0]+1))*fps_stuff
             det_time_intervals_meta = np.concatenate([start_seq[:,np.newaxis],end_seq[:,np.newaxis]],axis=1)
             
 
@@ -819,7 +851,7 @@ def test_model(out_dir_train,
             branch_to_test_pass = branch_to_test
         else:
             branch_to_test_pass = -1
-        visualize_dets(model, test_dataloader,  dir_viz,first_thresh = first_thresh, second_thresh = second_thresh,bin_trim = bin_trim,det_class = det_class, branch_to_test = branch_to_test_pass, criterion_str = criterion_str)
+        visualize_dets(model, test_dataloader,  dir_viz,first_thresh = first_thresh, second_thresh = second_thresh,bin_trim = bin_trim,det_class = det_class, branch_to_test = branch_to_test_pass, criterion_str = criterion_str,dataset = dataset)
     elif test_pair:
         aps = test_model_overlap_pairs(model, test_dataloader, criterion, log_arr ,first_thresh = first_thresh, second_thresh = second_thresh, bin_trim = bin_trim, multibranch = multibranch, branch_to_test = branch_to_test,dataset = dataset, save_outfs = save_outfs)
         np.save(out_file, aps)

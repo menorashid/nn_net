@@ -175,9 +175,130 @@ def getLocMAP(predictions, pmfs, vid_names,first_thresh, second_thresh, th, anno
    return ap, 100*np.mean(ap), class_names_chosen
   
 
+def getBestWorstDot( out_fs, predictions, vid_names, classlist, annotation_path = 'Thumos14reduced-Annotations/'):
+   
+   gtsegments = np.load(annotation_path + '/segments.npy')
+   gtlabels = np.load(annotation_path + '/labels.npy')
+   videoname = np.load(annotation_path + '/videoname.npy'); videoname = np.array([v.decode('utf-8') for v in videoname])
+   subset = np.load(annotation_path + '/subset.npy'); subset = np.array([s.decode('utf-8') for s in subset])
+   duration = np.load(annotation_path + '/duration.npy')
+   ambilist = annotation_path + '/Ambiguous_test.txt'
+
+   ambilist = list(open(ambilist,'r'))
+   ambilist = [a.strip('\n').split(' ') for a in ambilist]
+   
+   # # keep training gtlabels for plotting
+   gtltr = []
+   for i,s in enumerate(subset):
+      if subset[i]=='validation' and len(gtsegments[i]):
+         gtltr.append(gtlabels[i])
+   gtlabelstr = gtltr
+   
+   
+   # bin_keep = np.in1d(videoname, vid_names)
+   
+   videoname_list = list(videoname)
+   idx_vid_names = []
+   for vid_name in vid_names:
+      idx_vid_names.append(videoname_list.index(vid_name))
+
+   videoname = videoname[idx_vid_names]
+   gtsegments = [gtsegments[idx] for idx in idx_vid_names]
+   gtlabels = [gtlabels[idx] for idx in idx_vid_names]
+   
+   for idx in range(len(videoname)):
+      assert videoname[idx]==vid_names[idx]
+   
+
+   # get gt_idx and segments
+   
+   # gt_labels_transformed = 
+   # for idx_vid,gt_segment in enumerate(gtsegments):
+   #    gt_labels_curr = np.array(gtlabels[idx_vid])
+   #    gt_labels_
+   
+   gt_segments_bin = []
+   for idx_vid,gt_segment in enumerate(gtsegments):
+      gt_labels_curr = np.array(gtlabels[idx_vid])
+      gt_segment = np.array(gt_segment)
+      labels_idx = []
+      gt_segments_bin_curr = []
+      for class_curr in np.unique(gt_labels_curr):
+         gt_segment_rel = gt_segment[class_curr==gt_labels_curr,:]
+         gt_segment_rel = np.round(gt_segment_rel*25/16).astype(int)
+         gt_segment_bin = np.zeros(predictions[idx_vid].shape[0])
+         for seg_curr in gt_segment_rel:
+            gt_segment_bin[seg_curr[0]:seg_curr[1]]=1
+
+         gt_segments_bin_curr.append(gt_segment_bin)
+         labels_idx.append(str2ind(class_curr, classlist))
+
+      gt_segments_bin_curr = np.array(gt_segments_bin_curr)
+      labels_idx = np.array(labels_idx)
+      gt_segments_bin.append([labels_idx,gt_segments_bin_curr])
+
+
+   # process the predictions such that classes having greater than a certain threshold are detected only
+   
+   predictions_arr = []
+   gt_arr = []
+   classes_arr = []
+   rec = 0
+   dot_records = {}
+   for class_curr in classlist:
+      dot_records[class_curr] = []
+
+   for idx_segment_predict, segment_predict in enumerate(predictions):
+
+      # get gt classes to keep
+      gt_classes = gt_segments_bin[idx_segment_predict][0]
+      out_f = out_fs[idx_segment_predict]
+      
+      bin_keep = np.linalg.norm(out_f,axis=1)!=0
+      print np.sum(bin_keep), bin_keep.shape[0]
+
+      print segment_predict.shape
+      segment_predict = segment_predict[:,gt_classes]
+      segment_predict = segment_predict[bin_keep,:]
+      print segment_predict.shape
+      print '___'
+      # raw_input()
+      out_f = out_f[bin_keep,:]
+      
+      idx_sort = np.argsort(segment_predict,axis = 0)[::-1,:]      
+      idx_sort = idx_sort[[0,idx_sort.shape[0]-1],:].T
+      
+      for idx_idx_sort, idx_sort_curr in enumerate(idx_sort):
+         # print idx_idx_sort, idx_sort_curr
+         max_val = out_f[idx_sort_curr[0],:]
+         min_val = out_f[idx_sort_curr[1],:]
+         min_max = out_f[idx_sort_curr,:]
+         # print min_max.shape
+         norm = np.linalg.norm(min_max,axis = 1, keepdims = True)
+         # print norm
+         min_max = min_max/norm
+         # print np.linalg.norm(min_max,axis = 1, keepdims = True)
+         cos_it = np.sum(min_max[0]*min_max[1])
+         # print cos_it
+         if np.isnan(cos_it):
+            print min_max
+            print norm
+            print max_val, min_val
+            cos_it = 2
+            raw_input()
+         # print cos_it
+         gt_class_curr = gt_classes[idx_idx_sort]
+         class_curr = classlist[gt_class_curr]
+         dot_records[class_curr].append(cos_it)
+
+
+   return dot_records
+
+
+
 
 def getTopKPrecRecall(num_top, predictions, vid_names, classlist, annotation_path = 'Thumos14reduced-Annotations/'):
-   # print num_top, predictions, vid_names, annotation_path
+   
    gtsegments = np.load(annotation_path + '/segments.npy')
    gtlabels = np.load(annotation_path + '/labels.npy')
    # gtlabels = np.load(annotation_path + '/labels.npy')
@@ -264,9 +385,16 @@ def getTopKPrecRecall(num_top, predictions, vid_names, classlist, annotation_pat
       segment_predict = segment_predict[:,gt_classes]
       
       # get top k values of gt classes
-      idx_sort = np.argsort(segment_predict,axis = 0)[::-1,:]
-      
-      idx_sort = idx_sort[:num_top,:]
+      if num_top==0:
+         idx_sort = np.random.randint(0, segment_predict.shape[0], (1,segment_predict.shape[1]))
+         # print num_top, idx_sort.shape
+         # raw_input()
+      else:
+         idx_sort = np.argsort(segment_predict,axis = 0)[::-1,:]      
+         idx_sort = idx_sort[:num_top,:]
+         # print num_top, idx_sort.shape
+         # raw_input()
+
       
       # set the rest to zeros
       segment_predict = segment_predict*0

@@ -79,7 +79,27 @@ def get_data(dataset, limit, all_classes, just_primary, gt_vec, k_vec, test_pair
         train_data = UCF_dataset(train_file, limit)
         test_train_data = UCF_dataset(test_train_file, limit)
         test_data = UCF_dataset(test_file, None)
+    elif dataset =='ucf_untf':
+        dir_files = '../data/ucf101/train_test_files'
+        n_classes = 20
+        trim_preds = None
+        post_pends = ['','','']
+        train_file = os.path.join(dir_files, 'train_untf')
+        test_train_file = os.path.join(dir_files, 'test_untf')
+        test_file = os.path.join(dir_files, 'test_untf')
+        
+        files = [train_file, test_train_file, test_file]
 
+        
+        post_pends = [pp+'.txt' for pp in post_pends]
+        files = [file_curr+pp for file_curr,pp in zip(files,post_pends)]
+        
+        train_file, test_train_file, test_file = files
+        train_data = UCF_dataset(train_file, limit)
+        test_train_data = UCF_dataset(test_train_file, limit)
+        test_data = UCF_dataset(test_file, None)
+    print train_file, test_file
+    # raw_input()
     return train_data, test_train_data, test_data, n_classes, trim_preds
 
 def get_criterion(criterion_str,attention,class_weights_val,  loss_weights, multibranch):
@@ -1358,19 +1378,19 @@ def wsddn_simply_experiments():
     torch.backends.cudnn.deterministic = True
     torch.manual_seed(999)
 
-    model_name = 'wsddn_simple'
+    model_name = 'wsddn_just_rgb'
     lr = [0.001, 0.001, 0.001]
-    # criterion_str = 'Wsddn_Loss_WithL1'
-    # loss_weights = [1,1]
-    # epoch_stuff = [100,100]
-
     criterion_str = 'Wsddn_Loss'
-    loss_weights = None
-
+    loss_weights = [1,1]
     epoch_stuff = [100,100]
+
+    # criterion_str = 'Wsddn_Loss'
+    # loss_weights = None
+
+    epoch_stuff = [10,10]
     retrain = False
 
-    dataset = 'ucf'
+    dataset = 'ucf_untf'
     limit  = 500
     save_after = 10
     test_after = 10
@@ -1379,14 +1399,14 @@ def wsddn_simply_experiments():
 
     network_params = {}
     network_params['deno'] = None
-    network_params['in_out'] = [2048,256]
-    # network_params['ret_fc'] = 1
-    # post_pend = '_test'
-    post_pend = 'det_bottleneck_16'
-    test_method = 'top_1'
+    network_params['in_out'] = [1024,256]
+    network_params['ret_fc'] = 0
+    post_pend = ''
+    # post_pend = ''
+    test_method = 'original'
     test_post_pend = '_x_det'+'_'+test_method
     test_mode = True
-    viz_mode = False
+    viz_mode = True
     branch_to_test = -2
     second_thresh = 0.5
     first_thresh = 0.
@@ -1419,19 +1439,19 @@ def simple_just_mill_flexible():
     torch.manual_seed(999)
 
     model_name = 'just_mill_flexible'
-    lr = [0.0001, 0.0001]
+    lr = [0.001, 0.001]
     
     # criterion_str = 'Wsddn_Loss'
     # loss_weights = [1,0.01]
 
-    # criterion_str = 'MultiCrossEntropy'
-    # loss_weights = None
+    criterion_str = 'MultiCrossEntropy'
+    loss_weights = None
 
-    epoch_stuff = [500,500]
+    epoch_stuff = [100,100]
     retrain = False
 
     dataset = 'ucf'
-    limit  = 750
+    limit  = 500
     save_after = 10
     test_after = 5
     class_weights = True
@@ -1439,13 +1459,14 @@ def simple_just_mill_flexible():
 
     network_params = {}
     network_params['deno'] = 8
-    network_params['layer_sizes'] = [2048,1024]
+    network_params['layer_sizes'] = [2048,2048]
     # network_params['ret_fc'] = True
     post_pend = ''
-    test_post_pend = ''
-    test_mode = False
+    test_method = 'original'
+    test_post_pend = '_'+test_method
+    test_mode = True
     viz_mode = False
-    branch_to_test = -4
+    branch_to_test = -1
     second_thresh = 0.5
     first_thresh = 0.
     model_nums = None
@@ -1467,7 +1488,8 @@ def simple_just_mill_flexible():
                                     model_nums = model_nums,
                                     test_post_pend = test_post_pend,
                                     viz_mode = viz_mode,
-                                    loss_weights = loss_weights)
+                                    loss_weights = loss_weights,
+                                    test_method = test_method)
 
 def graph_l1_experiment():
     model_name = 'graph_multi_video_with_L1'
@@ -1477,7 +1499,7 @@ def graph_l1_experiment():
     loss_weights = [1,1]
     
     branch_to_test = -1
-    attention = False
+    attention = True
 
     k_vec = None
 
@@ -1490,21 +1512,21 @@ def graph_l1_experiment():
     epoch_stuff = [200,200]
     dataset = 'ucf'
     limit  = 500
-    save_after = 10
+    save_after = 50
     
-    test_mode = False
+    test_mode = True
     
     # test_method = 'wtalc'
     # test_method = 'wtalc'
     # test_post_pend = '_'+test_method+'_tp_fp_conf'
 
-    test_method = 'original'
+    test_method = 'best_worst_dot'
     test_post_pend = '_'+test_method+'_softmaxpmf'
 
-    model_nums = [99,199]
+    model_nums = [199]
 
     retrain = False
-    viz_mode = True
+    viz_mode = False
     viz_sim = False
 
     post_pend = ''
@@ -1515,13 +1537,13 @@ def graph_l1_experiment():
     network_params['feat_dim'] = [2048,1024]
     network_params['graph_size'] = 1
     network_params['method'] = 'cos_zero_self'
-    network_params['sparsify'] = 0.5
+    network_params['sparsify'] = None
     network_params['graph_sum'] = attention
     network_params['non_lin'] = 'HT'
     network_params['aft_nonlin']='HT_L2'
     network_params['sigmoid'] = False
     post_pend = 'ABS_bias'
-    first_thresh=0.1
+    first_thresh=0.
     class_weights = True
     test_after = 5
     all_classes = False
@@ -1569,7 +1591,7 @@ def graph_wsddn_experiment():
     multibranch = 1
     # loss_weights = [1,1]
     
-    branch_to_test = -2
+    branch_to_test = -1
     # attention = True
 
     k_vec = None
@@ -1580,7 +1602,7 @@ def graph_wsddn_experiment():
     torch.backends.cudnn.deterministic = True
     torch.manual_seed(999)
     
-    epoch_stuff = [500,500]
+    epoch_stuff = [200,200]
     dataset = 'ucf'
     limit  = 500
     save_after = 50
@@ -1594,14 +1616,14 @@ def graph_wsddn_experiment():
     test_method = 'original'
     test_post_pend = '_'+test_method+'_x_det'
 
-    model_nums = [199]
+    model_nums = [49]
     # [99,199,299,399,499]
 
     retrain = False
-    viz_mode = True
+    viz_mode = False
     viz_sim = False
 
-    post_pend = ''
+    post_pend = 'det_HT'
     
     network_params = {}
     network_params['deno'] = None
@@ -1656,19 +1678,64 @@ def graph_wsddn_experiment():
                         criterion_str = criterion_str)
 
 
+def comparing_best_worst():
+    # print 'hello hello baby'
+    # loaded = np.load('../scratch/graph_nol1_feats.npz')
+    loaded = np.load('../scratch/graph_nosparse_feats.npz')
+    predictions = list(loaded['predictions'])
+    det_vid_names = list(loaded['det_vid_names'])
+    out_fs = list(loaded['out_fs'])
+    dot_records_l1 =  wtalc.getBestWorstDot( out_fs,predictions, det_vid_names,  class_names_ucf)
+    
+    loaded = np.load('../scratch/just_mill_feats.npz')
+    predictions = list(loaded['predictions'])
+    det_vid_names = list(loaded['det_vid_names'])
+    out_fs = list(loaded['out_fs'])
+    dot_records_mill =  wtalc.getBestWorstDot( out_fs,predictions, det_vid_names,  class_names_ucf)
+        
+    classes = list(dot_records_l1.keys())
+    
+    out_dir = '../scratch/best_worst_dot_nosparse'
+    util.mkdir(out_dir)
+    inc = 0.1
+    for class_curr in classes:
+        l1_vals = dot_records_l1[class_curr]
+        mill_vals = dot_records_mill[class_curr]
+        min_val = min(np.min(l1_vals), np.min(mill_vals))
+        max_val = max(np.max(l1_vals), np.max(mill_vals))
+
+        bins = np.arange(min_val, max_val+inc, inc)
+
+        l1_vals,_ = np.histogram(l1_vals, bins)
+        mill_vals,_ = np.histogram(mill_vals, bins)
+        print l1_vals.shape
+        print mill_vals.shape
+        print bins.shape
+        # l1_vals = [np.histogram(dot_records_l1[label_curr],bins) for label_curr in xtick_labels]
+        # mill_vals = [np.histogram(dot_records_mill[label_curr],bins) for label_curr in xtick_labels]
+        xtick_labels = ['%.2f'%val for val in bins[:-1]]
+        dict_vals = {}
+        dict_vals['Graph']=l1_vals
+        dict_vals['FC']= mill_vals
+        
+        legend_vals = ['Graph','FC']
+        xlabel = 'Class'
+        ylabel = 'Frequency of Cosine Sim Result'
+        out_file = os.path.join(out_dir,class_curr+'.jpg')
+        colors = ['b','g']
+        title = 'Comparing Best Worst Distance'
+        visualize.plotGroupBar(out_file,dict_vals,xtick_labels,legend_vals,colors, xlabel=xlabel,ylabel=ylabel,title=title,width=0.5,ylim=None,loc=None)
+        print out_file
+
+    visualize.writeHTMLForFolder(out_dir)
 
 def main():
     
 
-    print 'hello hello baby'
-    # loaded = np.load('../scratch/temp.npz')
-    # predictions = list(loaded['predictions'])
-    # det_vid_names = list(loaded['det_vid_names'])
+    # comparing_best_worst()
 
-    # print len(predictions), type(predictions), type(predictions[0]), predictions[0].shape
-    
-    # import wtalc
-    # # print wtalc.getTopKPrecRecall(1, predictions, det_vid_names, class_names_ucf)
+    # numpy.histogram(a, bins=10, range=None, normed=None, weights=None, density=None)
+
     # class_list = class_names_ucf
     # precisions, ap, class_names = wtalc.getTopKPrecRecall(1, predictions, det_vid_names, class_list)
     # iou = [1., 1.]
@@ -1683,7 +1750,7 @@ def main():
     # class_names.append('Average')
     # et.print_overlap(aps, class_names, iou, [])
 
-        
+    # simple_just_mill_flexible()
     # graph_wsddn_experiment()
     # graph_l1_experiment()
 
