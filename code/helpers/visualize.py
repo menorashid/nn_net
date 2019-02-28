@@ -103,8 +103,56 @@ def createScatterOfDiffsAndDistances(diffs,title,xlabel,ylabel,out_file,dists=No
     plt.close();
 
 
-def saveMatAsImage(mat,out_file):
-    fig = plt.figure()    
+def plotMultiHist(out_file, vals, num_bins, title='',xlabel='',ylabel='',legend_entries=None, loc=0,outside=False,logscale=False,colors=None,xticks=None,ylim=None, align = 'right', density = False):
+
+    plt.title(title);
+    plt.grid(1);
+    plt.xlabel(xlabel);
+    plt.ylabel(ylabel);
+    if logscale:
+        plt.gca().set_xscale('log')
+    # assert len(xs)==len(ys)
+    alpha = 1/float(len(vals))
+    handles = []
+    for idx_val,val in enumerate(vals):
+        if legend_entries is not None:
+            handle = plt.hist(val, num_bins[idx_val], alpha=alpha, label=legend_entries[idx_val], align = align, density = density)
+            # handles.append(handle)
+        else:
+            handle = plt.hist(val, num_bins[idx_val], alpha=alpha, align = align, density = density)
+        handles.append(handle)
+
+    if legend_entries is not None:
+        if outside:
+            lgd=plt.legend(loc=loc,bbox_to_anchor=(1.05, 1),borderaxespad=0.)
+        else:
+            lgd=plt.legend(loc=loc)    
+
+
+    if xticks is not None:
+        ax = plt.gca()
+        ax.set_xticks(num_bins[0])
+        if len(xticks)>13:
+            ax.set_xticklabels(xticks, fontsize = 'small')
+        else:
+            ax.set_xticklabels(xticks,rotation=90)
+        
+
+    if ylim is not None:
+        plt.ylim([ylim[0],ylim[1]]);
+
+    if legend_entries is not None:
+        plt.savefig(out_file,bbox_extra_artists=(lgd,), bbox_inches='tight')
+    else:
+        plt.savefig(out_file);
+
+    plt.close();
+
+
+
+def saveMatAsImage(mat,out_file,title = ''):
+    fig = plt.figure()  
+    plt.title(title)
     ax = fig.add_subplot(111)
     cax = ax.matshow(mat, interpolation='nearest')
     fig.colorbar(cax)

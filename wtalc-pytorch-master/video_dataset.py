@@ -27,6 +27,7 @@ class Dataset():
         self.testidx = []
         self.classwiseidx = []
         self.currenttestidx = 0
+        self.currenttrainidx = 0
         self.labels_multihot = [utils.strlist2multihot(labs,self.classlist) for labs in self.labels]
 
         self.train_test_idx()
@@ -50,7 +51,62 @@ class Dataset():
             self.classwiseidx.append(idx)
 
 
+    def load_test_data(self):
+        # if train_test ==True:
+        features = []
+        labels = []
+        idx = []
+
+        # Load similar pairs
+        # rand_classid = np.random.choice(len(self.classwiseidx), size=n_similar)
+        # for rid in rand_classid:
+        #     rand_sampleid = np.random.choice(len(self.classwiseidx[rid]), size=2)
+        #     idx.append(self.classwiseidx[rid][rand_sampleid[0]])
+        #     idx.append(self.classwiseidx[rid][rand_sampleid[1]])
+
+        # Load rest pairs
+        rand_sampleid = np.random.choice(len(self.testidx), size=self.batch_size)
+        for r in rand_sampleid:
+            idx.append(self.testidx[r])
+      
+        return np.array([utils.process_feat(self.features[i], self.t_max) for i in idx]), np.array([self.labels_multihot[i] for i in idx])
+
+    def load_train_data_for_test(self):
+        
+
+        # if is_training==True:
+        #     features = []
+        #     labels = []
+        #     idx = []
+
+        #     # Load similar pairs
+        #     rand_classid = np.random.choice(len(self.classwiseidx), size=n_similar)
+        #     for rid in rand_classid:
+        #         rand_sampleid = np.random.choice(len(self.classwiseidx[rid]), size=2)
+        #         idx.append(self.classwiseidx[rid][rand_sampleid[0]])
+        #         idx.append(self.classwiseidx[rid][rand_sampleid[1]])
+
+        #     # Load rest pairs
+        #     rand_sampleid = np.random.choice(len(self.trainidx), size=self.batch_size-2*n_similar)
+        #     for r in rand_sampleid:
+        #         idx.append(self.trainidx[r])
+          
+        #     return np.array([utils.process_feat(self.features[i], self.t_max) for i in idx]), np.array([self.labels_multihot[i] for i in idx])
+        # else:
+        labs = self.labels_multihot[self.trainidx[self.currenttrainidx]]
+        feat = self.features[self.trainidx[self.currenttrainidx]]
+        vid_name = self.videoname[self.trainidx[self.currenttrainidx]]
+
+        if self.currenttrainidx == len(self.trainidx)-1:
+            done = True; self.currenttrainidx = 0
+        else:
+            done = False; self.currenttrainidx += 1
+     
+        return np.array(feat), np.array(labs), vid_name, done
+
     def load_data(self, n_similar=3, is_training=True):
+        
+
         if is_training==True:
             features = []
             labels = []
@@ -69,7 +125,6 @@ class Dataset():
                 idx.append(self.trainidx[r])
           
             return np.array([utils.process_feat(self.features[i], self.t_max) for i in idx]), np.array([self.labels_multihot[i] for i in idx])
-
         else:
             labs = self.labels_multihot[self.testidx[self.currenttestidx]]
             feat = self.features[self.testidx[self.currenttestidx]]

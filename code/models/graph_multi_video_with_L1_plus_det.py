@@ -7,7 +7,6 @@ from graph_layer_flexible import Graph_Layer_Wrapper
 from normalize import Normalize
 import random
 import numpy as np
-import time
 
 class Graph_Multi_Video(nn.Module):
     def __init__(self,
@@ -64,9 +63,15 @@ class Graph_Multi_Video(nn.Module):
         
         last_graph = []
         last_graph.append(nn.Dropout(0.5))
-        last_graph.append(nn.Linear(in_out[-1],n_classes, bias = True))
-        
+        last_graph.append(nn.Linear(in_out[-1],n_classes))
         self.last_graph = nn.Sequential(*last_graph)
+
+        det_branch = []
+        det_branch.append(nn.Dropout(0.5))
+        det_branch.append(nn.Linear(in_out[-1],n_classes))
+        det_branch.append(nn.Softmax(dim=0))
+        self.det_branch = nn.Sequential(*det_branch)
+        
         
     def forward(self, input, epoch_num = None, ret_bg =False, branch_to_test = -1):
         
@@ -78,31 +83,25 @@ class Graph_Multi_Video(nn.Module):
         identity = False
         method = None
         
-        # print 'self.graph_size' , self.graph_size
-        if not self.training:
-            graph_size = 1
+        if self.graph_size is None:
+            graph_size = len(input)
+        elif self.graph_size=='rand':
+            graph_size = random.randint(1,len(input))
+        elif type(self.graph_size)==str and self.graph_size.startswith('randupto'):
+            graph_size = int(self.graph_size.split('_')[1])
+            graph_size = random.randint(1,min(graph_size, len(input)))
         else:
-            if self.graph_size is None:
-                graph_size = len(input)
-            elif self.graph_size=='rand':
-                graph_size = random.randint(1,len(input))
-            elif type(self.graph_size)==str and self.graph_size.startswith('randupto'):
-                graph_size = int(self.graph_size.split('_')[1])
-                graph_size = random.randint(1,min(graph_size, len(input)))
-            else:
-                graph_size = min(self.graph_size, len(input))
+            graph_size = min(self.graph_size, len(input))
 
-        # print 'graph_size', graph_size, self.training
         
         input_chunks = [input[i:i + graph_size] for i in xrange(0, len(input), graph_size)]
 
         is_cuda = next(self.parameters()).is_cuda
-        # print 'Graph branch'
         
-        # pmf_all = [[] for i in range(self.num_branches)]
-        # x_all_all = [[] for i in range(self.num_branches)]
         pmf_all = []
-        x_all = []
+        x_class = []
+        x_det = []
+        x_pred = []
         graph_sums = []
 
         for input in input_chunks:
@@ -112,19 +111,9 @@ class Graph_Multi_Video(nn.Module):
             if is_cuda:
                 input = input.cuda()
             
-            # assert len(self.graph_layers)==(self.num_branches)
-            
-            # if hasattr(self, 'layer_bef') and self.layer_bef is not None:
-            #     input = self.layer_bef(input)
-
             feature_out = self.linear_layer(input)
-            # # for col_num in range(len(self.graph_layers)):
-            # print 'feature_out.size()',feature_out.size()
-
             to_keep = self.sparsify
-                # if to_keep=='lin':
-            # out_graph = self.graph_layer(input)
-            #     else:             
+            
             out_graph = self.graph_layer(input, feature_out, to_keep = to_keep, graph_sum = self.graph_sum, identity = identity, method = method)
             
             
@@ -133,13 +122,12 @@ class Graph_Multi_Video(nn.Module):
                 graph_sums.append(graph_sum.unsqueeze(0))
 
             # print 'out_graph.size()',out_graph.size()
-        
-            out_col = self.last_graph(out_graph)
-            # print 'out_col.size()',out_col.size()
-            x_all.append(out_col)
+
+            # out_col = self.last_graph(out_graph)
+            # x_all.append(out_col)
 
     
-            x = x_all[-1]
+            # x = x_all[-1]
             
             for idx_sample in range(len(input_sizes)):
                 if idx_sample==0:
@@ -148,36 +136,44 @@ class Graph_Multi_Video(nn.Module):
                     start = sum(input_sizes[:idx_sample])
 
                 end = start+input_sizes[idx_sample]
-                x_curr = x[start:end,:]
-                pmf_all += [self.make_pmf(x_curr).unsqueeze(0)]
+                out_graph_curr = out_graph[start:end,:]
+
+                out_class = self.last_graph(out_graph_curr)
+                out_det = self.det_branch(out_graph_curr)
+                out_pred = out_class * out_det
+                x_class.append(out_class)
+                x_det.append(out_det)
+                x_pred.append(out_pred)
+                # print 'x_curr.size()',x_curr.size()
+                pmf_all += [self.make_pmf(out_pred).unsqueeze(0)]
                 
             
         if strip:
-            # for idx_pmf, pmf in enumerate(pmf_all):
-            #     assert len(pmf)==1
             pmf_all = pmf_all[0].squeeze()
-            # print torch.min(pmf_all), torch.max(pmf_all)
-
-
-        # for idx_x, x in enumerate(x_all):
-        x_all = torch.cat(x_all,dim=0)
+            
+        x_class = torch.cat(x_class,dim=0)
+        x_det = torch.cat(x_det,dim=0)
+        x_pred = torch.cat(x_pred,dim=0)
         
         if self.graph_sum:
             pmf_all = [pmf_all, torch.cat(graph_sums,dim = 0)]
 
         if ret_bg:
-            return x_all, pmf_all, None
+            return x_class, pmf_all, None
         else:
-            return x_all, pmf_all
+            return x_class, pmf_all
         
 
     def make_pmf(self,x):
-        k = max(1,x.size(0)//self.deno)
         
-        pmf,_ = torch.sort(x, dim=0, descending=True)
-        pmf = pmf[:k,:]
-        
-        pmf = torch.sum(pmf[:k,:], dim = 0)/k
+        if self.deno is None:
+            pmf = torch.sum(x, dim = 0)
+        else:    
+            k = max(1,x.size(0)//self.deno)
+            pmf,_ = torch.sort(x, dim=0, descending=True)
+            pmf = pmf[:k,:]
+            pmf = torch.sum(pmf[:k,:], dim = 0)
+
         return pmf
 
     def get_similarity(self,input,idx_graph_layer = 0,sparsify = False, nosum = False):
@@ -230,21 +226,6 @@ class Graph_Multi_Video(nn.Module):
         
         return out_graph
 
-    def out_f_f(self, input):
-        # is_cuda = next(self.parameters()).is_cuda
-        # if is_cuda:
-        #     input = input.cuda()
-        
-        identity = False
-        method = None
-        feature_out = self.linear_layer(input)
-        # to_keep = self.sparsify
-        # out_graph = self.graph_layer(input, feature_out, to_keep = to_keep, graph_sum = self.graph_sum, identity = identity, method = method)
-        
-        # if self.graph_sum:
-        #     [out_graph, graph_sum] = out_graph       
-        
-        return feature_out
 
 class Network:
     def __init__(self,
@@ -267,8 +248,7 @@ class Network:
         print 'network graph_size', graph_size
         self.model = Graph_Multi_Video(n_classes, deno, in_out,feat_dim, graph_size, method, sparsify, non_lin, aft_nonlin,sigmoid, layer_bef, graph_sum, background, just_graph)
         print self.model
-        time.sleep(4)
-        # raw_input()
+        raw_input()
 
     def get_lr_list(self, lr):
         
@@ -276,31 +256,11 @@ class Network:
         lr_list = []
 
         modules = []
-        # if self.model.layer_bef is not None:
-        #     modules.append(self.model.layer_bef)
-
-        modules+=[self.model.linear_layer, self.model.graph_layer, self.model.last_graph]
+        modules+=[self.model.linear_layer, self.model.graph_layer, self.model.last_graph, self.model.det_branch]
 
         for i,module in enumerate(modules):
             print i, lr[i]
             lr_list+= [{'params': [p for p in module.parameters() if p.requires_grad], 'lr': lr[i]}]
-
-        # i = 0
-        # if self.model.layer_bef is not None:
-        #     print lr[i]
-        #     lr_list+= [{'params': [p for p in self.model.layer_bef.parameters() if p.requires_grad], 'lr': lr[i]}]
-        #     i+=1
-
-        # print lr[i]
-        # lr_list+= [{'params': [p for p in self.model.linear_layer.parameters() if p.requires_grad], 'lr': lr[i]}]
-        # i+=1
-
-        # print lr[i]
-        # lr_list+= [{'params': [p for p in self.model.graph_layers.parameters() if p.requires_grad], 'lr': lr[i]}]        
-        # i+=1
-
-        # print lr[i]
-        # lr_list+= [{'params': [p for p in self.model.last_graphs.parameters() if p.requires_grad], 'lr': lr[i]}]
 
         return lr_list
 

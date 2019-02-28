@@ -9,6 +9,7 @@ import numpy as np
 from torch.autograd import Variable
 from classificationMAP import getClassificationMAP as cmAP
 from detectionMAP import getDetectionMAP as dmAP
+from detectionMAP import getDetectionMAPTrain as dmAPTrain
 import scipy.io as sio
 torch.set_default_tensor_type('torch.cuda.FloatTensor')
 
@@ -59,7 +60,9 @@ def test(itr, dataset, args, model, logger, device):
     dmap, iou = dmAP(element_logits_stack, vid_names_stack, dataset.path_to_annotations)
     
     if args.dataset_name == 'Thumos14':
+        a = sio.loadmat('test_set_meta.mat')
         test_set = sio.loadmat('test_set_meta.mat')['test_videos'][0]
+
         for i in range(np.shape(labels_stack)[0]):
             if test_set[i]['background_video'] == 'YES':
                 labels_stack[i,:] = np.zeros_like(labels_stack[i,:])
@@ -75,6 +78,73 @@ def test(itr, dataset, args, model, logger, device):
     logger.log_value('Test Classification mAP', cmap, itr)
     for item in list(zip(dmap,iou)):
     	logger.log_value('Test Detection mAP @ IoU = ' + str(item[1]), item[0], itr)
+
+    utils.write_to_file(args.dataset_name, dmap, cmap, itr)
+
+def testTrain(itr, dataset, args, model, logger, device):
+    print ('HELLOOOO Test on train here!!!!'    )
+    done = False
+    instance_logits_stack = []
+    element_logits_stack = []
+    labels_stack = []
+    vid_names_stack = []
+    while not done:
+        if dataset.currenttrainidx % 100 ==0:
+            print('Testing test data point %d of %d' %(dataset.currenttrainidx, len(dataset.trainidx)))
+
+        features, labels, vid_name, done = dataset.load_train_data_for_test()
+        
+        features = torch.from_numpy(features).float().to(device)
+        
+
+        
+        with torch.no_grad():
+           _, element_logits = model(Variable(features), is_training=False)
+
+        # print ('labels',labels.shape, np.min(labels), np.max(labels))
+        # print ('features',features.size())
+
+        # print ('element_logits.size()',element_logits.size())
+
+
+        tmp = F.softmax(torch.mean(torch.topk(element_logits, k=int(np.ceil(len(features)/8)), dim=0)[0], dim=0), dim=0).cpu().data.numpy()
+        element_logits = element_logits.cpu().data.numpy()
+
+
+        
+
+        # input()
+
+        instance_logits_stack.append(tmp)
+        element_logits_stack.append(element_logits)
+        labels_stack.append(labels)
+        vid_names_stack.append(vid_name)
+
+    instance_logits_stack = np.array(instance_logits_stack)
+    labels_stack = np.array(labels_stack)
+    vid_names_stack = np.array(vid_names_stack)
+
+    dmap, iou = dmAPTrain(element_logits_stack, vid_names_stack, dataset.path_to_annotations)
+    
+    if args.dataset_name == 'Thumos14':
+        a = sio.loadmat('test_set_meta.mat')
+        test_set = sio.loadmat('test_set_meta.mat')['test_videos'][0]
+
+        for i in range(np.shape(labels_stack)[0]):
+            if test_set[i]['background_video'] == 'YES':
+                labels_stack[i,:] = np.zeros_like(labels_stack[i,:])
+
+    cmap = cmAP(instance_logits_stack, labels_stack)
+    print('Classification map %f' %cmap)
+    print('Detection map @ %f = %f' %(iou[0], dmap[0]))
+    print('Detection map @ %f = %f' %(iou[1], dmap[1]))
+    print('Detection map @ %f = %f' %(iou[2], dmap[2]))
+    print('Detection map @ %f = %f' %(iou[3], dmap[3]))
+    print('Detection map @ %f = %f' %(iou[4], dmap[4]))
+        
+    logger.log_value('Test Classification mAP', cmap, itr)
+    for item in list(zip(dmap,iou)):
+        logger.log_value('Test Detection mAP @ IoU = ' + str(item[1]), item[0], itr)
 
     utils.write_to_file(args.dataset_name, dmap, cmap, itr)
 

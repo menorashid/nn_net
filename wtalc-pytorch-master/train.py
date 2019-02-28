@@ -35,13 +35,13 @@ def CASL(x, element_logits, seq_len, n_similar, labels, device):
         labels should be a numpy array of dimension (B, n_class) of 1 or 0 '''
 
     
-    print ('x', x.size())
-    print ('element_logits', element_logits.size())
-    print ('seq_len', seq_len)
-    print ('n_similar', n_similar)
-    print ('labels', labels.size())
-    print ('device',device)
-    print (labels)
+    # print ('x', x.size())
+    # print ('element_logits', element_logits.size())
+    # print ('seq_len', seq_len)
+    # print ('n_similar', n_similar)
+    # print ('labels', labels.size())
+    # print ('device',device)
+    # print (labels)
 
 
 
@@ -50,7 +50,7 @@ def CASL(x, element_logits, seq_len, n_similar, labels, device):
     for i in range(0, n_similar*2, 2):
         atn1 = F.softmax(element_logits[i][:seq_len[i]], dim=0)
         atn2 = F.softmax(element_logits[i+1][:seq_len[i+1]], dim=0)
-        print (atn1.size(), atn2.size())
+        # print (atn1.size(), atn2.size())
 
         n1 = torch.FloatTensor([np.maximum(seq_len[i]-1, 1)]).to(device)
         n2 = torch.FloatTensor([np.maximum(seq_len[i+1]-1, 1)]).to(device)
@@ -59,26 +59,26 @@ def CASL(x, element_logits, seq_len, n_similar, labels, device):
         Lf1 = torch.mm(torch.transpose(x[i][:seq_len[i]], 1, 0), (1 - atn1)/n1)
         Lf2 = torch.mm(torch.transpose(x[i+1][:seq_len[i+1]], 1, 0), (1 - atn2)/n2)
 
-        print ('n1',n1.size())
-        print ('n2',n2.size())
-        print ('Hf1',Hf1.size())
-        print ('Hf2',Hf2.size())
-        print ('Lf1',Lf1.size())
-        print ('Lf2',Lf2.size())
+        # print ('n1',n1.size())
+        # print ('n2',n2.size())
+        # print ('Hf1',Hf1.size())
+        # print ('Hf2',Hf2.size())
+        # print ('Lf1',Lf1.size())
+        # print ('Lf2',Lf2.size())
 
         d1 = 1 - torch.sum(Hf1*Hf2, dim=0) / (torch.norm(Hf1, 2, dim=0) * torch.norm(Hf2, 2, dim=0))
         d2 = 1 - torch.sum(Hf1*Lf2, dim=0) / (torch.norm(Hf1, 2, dim=0) * torch.norm(Lf2, 2, dim=0))
         d3 = 1 - torch.sum(Hf2*Lf1, dim=0) / (torch.norm(Hf2, 2, dim=0) * torch.norm(Lf1, 2, dim=0))
 
-        print ('d1',d1.size())
-        print ('d2',d2.size())
-        print ('d3',d3.size())
+        # print ('d1',d1.size())
+        # print ('d2',d2.size())
+        # print ('d3',d3.size())
 
         sim_loss = sim_loss + 0.5*torch.sum(torch.max(d1-d2+0.5, torch.FloatTensor([0.]).to(device))*Variable(labels[i,:])*Variable(labels[i+1,:]))
         sim_loss = sim_loss + 0.5*torch.sum(torch.max(d1-d3+0.5, torch.FloatTensor([0.]).to(device))*Variable(labels[i,:])*Variable(labels[i+1,:]))
         n_tmp = n_tmp + torch.sum(Variable(labels[i,:])*Variable(labels[i+1,:]))
 
-        input()
+        # input()
 
     sim_loss = sim_loss / n_tmp
     return sim_loss
@@ -148,7 +148,7 @@ def MyLoss(x, element_logits, seq_len, n_similar, labels, device):
     return sim_loss
 
 
-def MyLoss_triple(x, element_logits, seq_len, n_similar, labels, device):
+def MyLoss_triple(x, element_logits, seq_len, n_similar, labels, device, debug = False, type_loss = 'original'):
     ''' x is the torch tensor of feature from the last layer of model of dimension (n_similar, n_element, n_feature), 
         element_logits should be torch tensor of dimension (n_similar, n_element, n_class) 
         seq_len should be numpy array of dimension (B,)
@@ -192,11 +192,21 @@ def MyLoss_triple(x, element_logits, seq_len, n_similar, labels, device):
                 continue
 
             labels_curr = [labels[idx,:] for idx in ssd]
+            # print (labels_curr)
+
             alpha = [element_logits[idx][:seq_len[idx]] for idx in ssd]
             x_curr = [x[idx][:seq_len[idx]] for idx in ssd]
             n_tmp +=1
 
-            sim_loss += single_triplet_loss(alpha, labels_curr, x_curr)
+            if type_loss =='new_triple':
+                sim_loss += single_triplet_loss_new(alpha, labels_curr, x_curr, debug = debug)
+            elif type_loss =='casl_us':
+                sim_loss += single_casl_loss(alpha, labels_curr, x_curr, debug = debug)
+                break
+            elif type_loss =='new_loss':
+                sim_loss += single_new_loss(alpha, labels_curr, x_curr, debug = debug)
+            else:
+                sim_loss += single_triplet_loss(alpha, labels_curr, x_curr, debug = debug)
         
         # input()
     # print (n_tmp, sim_loss)
@@ -215,41 +225,162 @@ def single_double_loss(alpha, labels, x, delta = 0.5, margin = 0.5):
 
     assert len(alpha)==len(labels)==len(x)==2
 
-    atns = [F.softmax(alpha_curr, dim = 0) for alpha_curr in alpha]
+    atns = [F.softmax(alpha_curr, dim = 1) for alpha_curr in alpha]
     Hfs = [torch.mm(torch.transpose(x_curr, 1, 0), atns[idx_x_curr])[:,labels[idx_x_curr]>0] for idx_x_curr, x_curr in enumerate(x)]
     Lfs = [torch.mm(torch.transpose(x_curr, 1, 0), 1-atns[idx_x_curr])[:,labels[idx_x_curr]>0] for idx_x_curr, x_curr in enumerate(x)]
     
     h1h2 = cos_sim(Hfs)
-    
-    h1l1 = cos_sim([Hfs[0], Lfs[0]])
-    h2l2 = cos_sim([Hfs[1], Lfs[1]])
+    h1l1 = torch.diag(cos_sim([Hfs[0], Lfs[0]])).unsqueeze(1)
+    h2l2 = torch.diag(cos_sim([Hfs[1], Lfs[1]])).unsqueeze(0)
     
     first_terms = [h1h2, h1h2]
     second_terms = [h1l1, h2l2]
+
+    first_term_strs = ['h1h2', 'h1h2']
+    second_term_strs = ['h1l1', 'h2l2']
     assert len(first_terms)==len(second_terms)
 
     loss = 0
     for idx_term, first_term in enumerate(first_terms):
         second_term = second_terms[idx_term]
+
         relud = torch.nn.functional.relu(first_term - second_term + margin)
+
+        # print (first_term_strs[idx_term],first_term.size())
+        # print (second_term_strs[idx_term],second_term.size())
+        # print ('relud', relud.size())
+        
         loss+= 1./len(first_terms)*torch.mean(relud)
-    
+        # input()
     return loss
     
-
-def single_triplet_loss(alpha, labels, x, delta = 0.5, margin = 0.5):
+def single_casl_loss(alpha, labels, x, delta = 0.5, margin = 0.5, debug = False):
+    # print (alpha[0].size())
 
     atns = [F.softmax(alpha_curr, dim = 0) for alpha_curr in alpha]
     Hfs = [torch.mm(torch.transpose(x_curr, 1, 0), atns[idx_x_curr])[:,labels[idx_x_curr]>0] for idx_x_curr, x_curr in enumerate(x)]
-    Lfs = [torch.mm(torch.transpose(x_curr, 1, 0), 1-atns[idx_x_curr])[:,labels[idx_x_curr]>0] for idx_x_curr, x_curr in enumerate(x)]
+    # print (x[0].size())
+    Lfs = [torch.mm(torch.transpose(x_curr, 1, 0), (1-atns[idx_x_curr]))[:,labels[idx_x_curr]>0] for idx_x_curr, x_curr in enumerate(x)]
     
-    h1h1 = cos_sim(Hfs[:2])
+    h_norms = [torch.norm(vec_curr,2,dim = 0, keepdim = True) for vec_curr in Hfs]
+    l_norms = [torch.norm(vec_curr,2,dim = 0, keepdim = True) for vec_curr in Lfs]
+
+    h1h1 = torch.diag(cos_sim(Hfs[:2])).unsqueeze(1)
+
+    # h1l1a = torch.diag(cos_sim([Hfs[0], Lfs[0]])).unsqueeze(1)
+    # h1l1b = torch.diag(cos_sim([Hfs[1], Lfs[1]])).unsqueeze(1)
+
+    h1l1ab = torch.diag(cos_sim([Hfs[0], Lfs[1]])).unsqueeze(1)
+    h1l1ba = torch.diag(cos_sim([Hfs[1], Lfs[0]])).unsqueeze(1)
+
+    # h2l2 =  torch.diag(cos_sim([Hfs[2], Lfs[2]])).unsqueeze(0)
+
+    # h1h2a = cos_sim([Hfs[0], Hfs[2]])
+    # h1h2b = cos_sim([Hfs[1], Hfs[2]])
+
+    # h1l1a = torch.diag(cos_sim([Hfs[0], Lfs[0]])).unsqueeze(1)
+    # h1l1b = torch.diag(cos_sim([Hfs[1], Lfs[1]])).unsqueeze(1)
+    # h2l2 =  torch.diag(cos_sim([Hfs[2], Lfs[2]])).unsqueeze(0)
+
+    # lab12a = (labels[0]+labels[2])>0
+    # lab12b = (labels[1]+labels[2])>0
+    # lab11 = (labels[0]+labels[1])>0
+
+    first_terms = [ h1h1, h1h1]
+    second_terms = [h1l1ab, h1l1ba]
+
+    first_term_strs =  ['h1h1', 'h1h1']
+    second_term_strs =  ['h1l1ab', 'h1l1ba']
+    assert len(first_terms)==len(second_terms)
+
+    loss = 0
+    for idx_term, first_term in enumerate(first_terms):
+        # print (h_norms)
+        # print (l_norms)
+        second_term = second_terms[idx_term]
+        # print (first_term.size(), second_term.size())
+        
+
+        relud = torch.nn.functional.relu(first_term - second_term + margin)
+        # print ('relud', relud.size())
+
+        loss+= 1./len(first_terms)*torch.mean(relud)
+
+        if debug:
+            print (first_term_strs[idx_term],first_term)
+            print (second_term_strs[idx_term],second_term)
+            print (loss, torch.mean(relud))
+            input()
+    return loss
+    
+def single_new_loss(alpha, labels, x, delta = 0.5, margin = 0., debug = False):
+    # print (alpha[0].size())
+
+    atns = [F.softmax(alpha_curr, dim = 0) for alpha_curr in alpha]
+    Hfs = [torch.mm(torch.transpose(x_curr, 1, 0), atns[idx_x_curr])[:,labels[idx_x_curr]>0] for idx_x_curr, x_curr in enumerate(x)]
+    # print (x[0].size())
+    Lfs = [torch.mm(torch.transpose(x_curr, 1, 0), (1-atns[idx_x_curr]))[:,labels[idx_x_curr]>0] for idx_x_curr, x_curr in enumerate(x)]
+    
+    h_norms = [torch.norm(vec_curr,2,dim = 0, keepdim = True) for vec_curr in Hfs]
+    l_norms = [torch.norm(vec_curr,2,dim = 0, keepdim = True) for vec_curr in Lfs]
+
+    h1h1 = torch.diag(cos_sim(Hfs[:2])).unsqueeze(1)
+
+    h1l1ab = torch.diag(cos_sim([Hfs[0], Lfs[1]])).unsqueeze(1)
+    h1l1ba = torch.diag(cos_sim([Hfs[1], Lfs[0]])).unsqueeze(1)
+
     h1h2a = cos_sim([Hfs[0], Hfs[2]])
     h1h2b = cos_sim([Hfs[1], Hfs[2]])
 
-    h1l1a = cos_sim([Hfs[0], Lfs[0]])
-    h1l1b = cos_sim([Hfs[1], Lfs[1]])
-    h2l2 =  cos_sim([Hfs[2], Lfs[2]])
+    # first_terms = [h1h2a, h1h2a, h1h2b, h1h2b, h1h1, h1h1]
+    # second_terms = [h1l1ab, h1l1ba, h1l1ab, h1l1ba, h1h2a, h1h2b]
+
+    first_terms = [h1h2a,  h1h2b,  h1h1, h1h1]
+    second_terms = [h1l1ab,   h1l1ba, h1h2a, h1h2b]
+
+
+    # first_term_strs = ['h1h2a', 'h1h2a', 'h1h2b', 'h1h2b', 'h1h1', 'h1h1']
+    # second_term_strs =  ['h1l1ab', 'h1l1ba', 'h1l1ab', 'h1l1ba', 'h1h2a', 'h1h2b']
+    assert len(first_terms)==len(second_terms)
+
+    loss = 0
+    for idx_term, first_term in enumerate(first_terms):
+        # print (h_norms)
+        # print (l_norms)
+        second_term = second_terms[idx_term]
+        # print (first_term.size(), second_term.size())
+        
+
+        relud = torch.nn.functional.relu(first_term - second_term + margin)
+        # print ('relud', relud.size())
+
+        loss+= 1./len(first_terms)*torch.mean(relud)
+
+        if debug:
+            print (first_term_strs[idx_term],first_term)
+            print (second_term_strs[idx_term],second_term)
+            print (loss, torch.mean(relud))
+            input()
+    return loss
+    
+def single_triplet_loss(alpha, labels, x, delta = 0.5, margin = 0.5, debug = False):
+    # print (alpha[0].size())
+
+    atns = [F.softmax(alpha_curr, dim = 1) for alpha_curr in alpha]
+    Hfs = [torch.mm(torch.transpose(x_curr, 1, 0), atns[idx_x_curr])[:,labels[idx_x_curr]>0] for idx_x_curr, x_curr in enumerate(x)]
+    # print (x[0].size())
+    Lfs = [torch.mm(torch.transpose(x_curr, 1, 0), (1-atns[idx_x_curr]))[:,labels[idx_x_curr]>0] for idx_x_curr, x_curr in enumerate(x)]
+    
+    h_norms = [torch.norm(vec_curr,2,dim = 0, keepdim = True) for vec_curr in Hfs]
+    l_norms = [torch.norm(vec_curr,2,dim = 0, keepdim = True) for vec_curr in Lfs]
+
+    h1h1 = torch.diag(cos_sim(Hfs[:2])).unsqueeze(1)
+    h1h2a = cos_sim([Hfs[0], Hfs[2]])
+    h1h2b = cos_sim([Hfs[1], Hfs[2]])
+
+    h1l1a = torch.diag(cos_sim([Hfs[0], Lfs[0]])).unsqueeze(1)
+    h1l1b = torch.diag(cos_sim([Hfs[1], Lfs[1]])).unsqueeze(1)
+    h2l2 =  torch.diag(cos_sim([Hfs[2], Lfs[2]])).unsqueeze(0)
 
     # lab12a = (labels[0]+labels[2])>0
     # lab12b = (labels[1]+labels[2])>0
@@ -257,24 +388,128 @@ def single_triplet_loss(alpha, labels, x, delta = 0.5, margin = 0.5):
 
     first_terms = [h1h2a, h1h2a, h1h2b, h1h2b, h1h1, h1h1]
     second_terms = [h1l1a, h2l2, h1l1b, h2l2, h1h2a, h1h2b]
+
+    first_term_strs = ['h1h2a', 'h1h2a', 'h1h2b', 'h1h2b', 'h1h1', 'h1h1']
+    second_term_strs = ['h1l1a', 'h2l2', 'h1l1b', 'h2l2', 'h1h2a', 'h1h2b']
     assert len(first_terms)==len(second_terms)
 
     loss = 0
     for idx_term, first_term in enumerate(first_terms):
+        # print (h_norms)
+        # print (l_norms)
         second_term = second_terms[idx_term]
         # print (first_term.size(), second_term.size())
+        
+
         relud = torch.nn.functional.relu(first_term - second_term + margin)
-        # print (relud)
+        # print ('relud', relud.size())
+
         loss+= 1./len(first_terms)*torch.mean(relud)
-        # print (loss, torch.mean(relud))
-        # input()
+
+        if debug:
+            print (first_term_strs[idx_term],first_term)
+            print (second_term_strs[idx_term],second_term)
+            print (loss, torch.mean(relud))
+            input()
     return loss
     
+def single_triplet_loss_new(alpha, labels, x, delta = 0.5, margin = 0.5, debug = False):
+    # print (alpha[0].size())
+
+    atns = [F.softmax(alpha_curr, dim = 1) for alpha_curr in alpha]
+    Hfs = [torch.mm(torch.transpose(x_curr, 1, 0), atns[idx_x_curr])[:,labels[idx_x_curr]>0] for idx_x_curr, x_curr in enumerate(x)]
+    # print (x[0].size())
+    Lfs = [torch.mm(torch.transpose(x_curr, 1, 0), (1-atns[idx_x_curr]))[:,labels[idx_x_curr]>0] for idx_x_curr, x_curr in enumerate(x)]
+    
+    h_norms = [torch.norm(vec_curr,2,dim = 0, keepdim = True) for vec_curr in Hfs]
+    l_norms = [torch.norm(vec_curr,2,dim = 0, keepdim = True) for vec_curr in Lfs]
+
+    h1h1 = torch.diag(cos_sim(Hfs[:2])).unsqueeze(1)
+    h1h2a = cos_sim([Hfs[0], Hfs[2]])
+    h1h2b = cos_sim([Hfs[1], Hfs[2]])
+
+    h1l1a = torch.diag(cos_sim([Hfs[0], Lfs[0]])).unsqueeze(1)
+    h1l1b = torch.diag(cos_sim([Hfs[1], Lfs[1]])).unsqueeze(1)
+
+    h1l1ab = torch.diag(cos_sim([Hfs[0], Lfs[1]])).unsqueeze(1)
+    h1l1ba = torch.diag(cos_sim([Hfs[1], Lfs[0]])).unsqueeze(1)
+
+    h2l2 =  torch.diag(cos_sim([Hfs[2], Lfs[2]])).unsqueeze(0)
+
+    # lab12a = (labels[0]+labels[2])>0
+    # lab12b = (labels[1]+labels[2])>0
+    # lab11 = (labels[0]+labels[1])>0
+
+    # first_terms = [h1h2a, h1h2a, h1h2b, h1h2b, h1h1, h1h1]
+    # second_terms = [h1l1a, h2l2, h1l1b, h2l2, h1h2a, h1h2b]
+
+    first_terms = [h1h1, h1h1, h1h1, h1h1, h1h1, h1h1]
+    second_terms = [h1l1a, h1l1ab, h1l1b, h1l1ba, h1h2a, h1h2b]
+
+    first_term_strs = ['h1h1', 'h1h1', 'h1h1', 'h1h1', 'h1h1', 'h1h1']
+    second_term_strs = ['h1l1a', 'h1l1ab', 'h1l1b', 'h1l1ba', 'h1h2a', 'h1h2b']
+    assert len(first_terms)==len(second_terms)
+    # print ('NEW GUY')
 
 
+    loss = 0
+    for idx_term, first_term in enumerate(first_terms):
+        # print (h_norms)
+        # print (l_norms)
+        second_term = second_terms[idx_term]
+        # print (first_term.size(), second_term.size())
+        
 
+        relud = torch.nn.functional.relu(first_term - second_term + margin)
+        # print ('relud', relud.size())
 
-def train(itr, dataset, args, model, optimizer, logger, device):
+        loss+= 1./len(first_terms)*torch.mean(relud)
+
+        if debug:
+            print (first_term_strs[idx_term],first_term)
+            print (second_term_strs[idx_term],second_term)
+            print (loss, torch.mean(relud))
+            input()
+    return loss
+
+def train_debug(itr, dataset, args, model, optimizer, logger, device):
+    
+    features, labels = dataset.load_data(n_similar=args.num_similar)
+    # features, labels = dataset.load_test_data()
+    # print (features.size())
+    # input()
+    seq_len = np.sum(np.max(np.abs(features), axis=2) > 0, axis=1)
+    features = features[:,:np.max(seq_len),:]
+
+    features = torch.from_numpy(features).float().to(device)
+    labels = torch.from_numpy(labels).float().to(device)
+
+    final_features, element_logits = model(Variable(features))
+        
+    milloss = MILL(element_logits, seq_len, args.batch_size, labels, device)
+    if args.loss_type=='regular':
+        casloss = CASL(final_features, element_logits, seq_len, args.num_similar, labels, device)
+    elif args.loss_type=='double':
+        casloss = MyLoss(final_features, element_logits, seq_len, args.num_similar, labels, device)        
+    elif args.loss_type=='triple':
+        casloss = MyLoss_triple(final_features, element_logits, seq_len, args.num_similar, labels, device, debug = True)
+    else:
+        raise ValueError('loss type is not right')
+
+    total_loss = args.Lambda * milloss + (1-args.Lambda) * casloss
+    
+    logger.log_value('milloss', milloss, itr)
+    logger.log_value('tripletloss', casloss, itr)
+    logger.log_value('total_loss', total_loss, itr)
+
+    print('Iteration: %d, Loss: %.3f' %(itr, total_loss.data.cpu().numpy()))
+
+    # optimizer.zero_grad()
+    # total_loss.backward()
+    #torch.nn.utils.clip_grad_norm_(model.parameters(), args.max_grad_norm)
+    # optimizer.step()
+
+def train(itr, dataset, args, model, optimizer, logger, device, debug = False):
 
     features, labels = dataset.load_data(n_similar=args.num_similar)
     seq_len = np.sum(np.max(np.abs(features), axis=2) > 0, axis=1)
@@ -286,10 +521,32 @@ def train(itr, dataset, args, model, optimizer, logger, device):
     final_features, element_logits = model(Variable(features))
         
     milloss = MILL(element_logits, seq_len, args.batch_size, labels, device)
-    casloss = MyLoss(final_features, element_logits, seq_len, args.num_similar, labels, device)
+    if args.loss_type=='regular':
+        casloss = CASL(final_features, element_logits, seq_len, args.num_similar, labels, device)
+    elif args.loss_type=='zero':
+        casloss = 0
+    elif args.loss_type=='double':
+        casloss = MyLoss(final_features, element_logits, seq_len, args.num_similar, labels, device)        
+    elif args.loss_type=='triple':
+        casloss = MyLoss_triple(final_features, element_logits, seq_len, args.num_similar, labels, device)
+    elif args.loss_type=='triple_new':
+        casloss = MyLoss_triple(final_features, element_logits, seq_len, args.num_similar, labels, device, type_loss = args.loss_type)
+    elif args.loss_type=='casl_us':
+        casloss = MyLoss_triple(final_features, element_logits, seq_len, args.num_similar, labels, device, type_loss = args.loss_type)
+    elif args.loss_type=='new_loss':
+        casloss = MyLoss_triple(final_features, element_logits, seq_len, args.num_similar, labels, device, type_loss = args.loss_type)
+    elif args.loss_type == 'combo':
+        ac_casloss = CASL(final_features, element_logits, seq_len, args.num_similar, labels, device) 
+        casloss = MyLoss_triple(final_features, element_logits, seq_len, args.num_similar, labels, device)
+    else:
+        raise ValueError('loss type is not right')
 
-    total_loss = args.Lambda * milloss + (1-args.Lambda) * casloss
-        
+    if args.loss_type!='combo':
+        total_loss = args.Lambda * milloss + (1-args.Lambda) * casloss
+    else:
+        total_loss = args.Lambda * milloss + args.Lambda * ac_casloss + args.Lambda * casloss
+        logger.log_value('casloss', ac_casloss, itr)
+
     logger.log_value('milloss', milloss, itr)
     logger.log_value('tripletloss', casloss, itr)
     logger.log_value('total_loss', total_loss, itr)

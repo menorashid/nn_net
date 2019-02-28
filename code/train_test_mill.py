@@ -398,6 +398,22 @@ def visualize_dets(model, test_dataloader, dir_viz, first_thresh , second_thresh
 
 
 def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh , second_thresh , bin_trim = None , multibranch =1, branch_to_test = -1,dataset = 'ucf', save_outfs = None, test_method = 'original', fps_stuff = 16./25.):
+
+    # model, 
+    # print 'test_dataloader ',test_dataloader 
+    # print 'criterion ',criterion 
+    # print 'log_arr',log_arr
+    # print 'first_thresh  ',first_thresh  
+    # print 'second_thresh  ',second_thresh  
+    # print 'bin_trim',bin_trim
+    # print 'multibranch',multibranch
+    # print 'branch_to_test',branch_to_test
+    # print 'dataset',dataset
+    # print 'save_outfs',save_outfs
+    # print 'test_method',test_method
+    # print 'fps_stuff',fps_stuff
+
+
     # if dataset=='ucf':
     #     fps_stuff = 16./25.
     if dataset=='ucf_untf':
@@ -405,7 +421,7 @@ def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh ,
     else:
         fps_stuff = 16./25.
 
-    print fps_stuff
+    # print fps_stuff
     # 10./25.
 
     # print 'SECOND THRESH', second_thresh
@@ -416,7 +432,13 @@ def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh ,
     # raw_input()
 
     model.eval()
-    model = model.cuda()
+    limit_bef =  test_dataloader.dataset.feature_limit
+    test_dataloader.dataset.feature_limit = None
+
+    is_cuda = next(model.parameters()).is_cuda
+    if not is_cuda:
+        model = model.cuda()
+
     model_name = model.__class__.__name__.lower()
     criterion_str = criterion.__class__.__name__.lower()
 
@@ -454,6 +476,7 @@ def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh ,
                         out, pmf = model.forward([sample.cuda(),batch['gt_vec'][idx_sample].cuda()], branch_to_test = branch_to_test)
                     else:
                         out, pmf = model.forward(sample.cuda(), branch_to_test = branch_to_test)
+                    
                 else:
                     if 'perfectg' in model_name or 'cooc' in model_name:
                         out,pmf = model.forward([sample.cuda(),batch['gt_vec'][idx_sample].cuda()])
@@ -466,9 +489,11 @@ def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh ,
                             vid_name = det_vid_names_ac[idx_test]
                             out_file_f = os.path.join(save_outfs,vid_name+'.npy')
                             np.save(out_file_f,outf)
-                        elif test_method=='best_worst_dot':
-                            out_fs.append(model.out_f(sample.cuda()).data.cpu().numpy())
+                        # elif test_method=='best_worst_dot':
+                        #     out_fs.append(model.out_f(sample.cuda()).data.cpu().numpy())
 
+                if test_method=='best_worst_dot':
+                    out_fs.append(model.out_f_f(sample.cuda()).data.cpu().numpy())
 
             if 'l1' in criterion_str:
                 [pmf, att] = pmf
@@ -488,7 +513,20 @@ def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh ,
             # raw_input()
             if second_thresh>=0 and branch_to_test!=-2 and branch_to_test!=-4 and branch_to_test!=-5:
                 # print 'smaxing'
+                out_temp = out.data.cpu().numpy()
+                idx_interesting = np.where(np.sum(out_temp,axis = 1)==0)[0]
+                # print idx_interesting
+                # print out_temp[idx_interesting,:]
+                # print torch.sum(torch.sum(out,dim =1 )==0)
+
                 out = torch.nn.functional.softmax(out,dim = 1)
+                out[idx_interesting,:] = 0.
+                out_temp = out.data.cpu().numpy()
+                # print np.sum(np.isnan(out_temp)), out_temp.size
+                
+                # print out_temp[idx_interesting,:]
+
+                # raw_input()
 
             start_seq = np.array(range(0,out.shape[0]))*fps_stuff
             # print start_seq
@@ -514,7 +552,7 @@ def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh ,
                     bin_not_keep = labels[idx_sample].data.cpu().numpy()==0
                 else:
                     bin_not_keep = pmf<first_thresh
-         
+                # print 'in overlap',det_vid_names_ac[idx_test]
                 for class_idx in range(pmf.size):
                     if bin_not_keep[class_idx]:
                         continue
@@ -590,8 +628,11 @@ def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh ,
         predictions = np.array(predictions)
         det_vid_names = np.array(det_vid_names)
         out_fs = np.array(out_fs)
-        out_file_feats = '../scratch/graph_nosparse_feats.npz'
-        np.savez(out_file_feats ,predictions = predictions, det_vid_names= det_vid_names, out_fs = out_fs)
+        out_file_feats = '../scratch/graph_l1_supervise_W_outF.npz'
+        # graph_l1_graphOut_noZero.npz'
+        # check_best_worst.npz'
+        # graph_nosparse_feats.npz'
+        np.savez_compressed(out_file_feats ,predictions = predictions, det_vid_names= det_vid_names, out_fs = out_fs)
         print 'saved', out_file_feats
         raw_input()
     else:
@@ -605,7 +646,11 @@ def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh ,
         # raw_input()
 
         aps = et.test_overlap(det_vid_names, det_conf, det_time_intervals,det_events_class,log_arr = log_arr, dataset = dataset)
-        
+    
+    model.train()
+    
+    test_dataloader.dataset.feature_limit = limit_bef
+    
     return aps
 
 
@@ -782,7 +827,6 @@ def test_model(out_dir_train,
                 save_outfs = None,
                 test_pair = False,
                 test_method = 'original'):
-    
     out_dir_results = os.path.join(out_dir_train,'results_model_'+str(model_num)+post_pend+'_'+str(first_thresh)+'_'+str(second_thresh))
     criterion_str = criterion.__class__.__name__.lower()
 

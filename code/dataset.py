@@ -28,7 +28,7 @@ class UCF_dataset(Dataset):
         label = label/np.sum(label)
 
         sample = np.load(train_file_curr)
-        
+        # print 'in dataset',train_file_curr
         if sample.shape[0]>self.feature_limit and self.feature_limit is not None:
             idx_start = sample.shape[0] - self.feature_limit
             idx_start = np.random.randint(idx_start+1)

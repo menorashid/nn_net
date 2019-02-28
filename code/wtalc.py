@@ -175,7 +175,7 @@ def getLocMAP(predictions, pmfs, vid_names,first_thresh, second_thresh, th, anno
    return ap, 100*np.mean(ap), class_names_chosen
   
 
-def getBestWorstDot( out_fs, predictions, vid_names, classlist, annotation_path = 'Thumos14reduced-Annotations/'):
+def getBestWorstDot( out_fs, predictions, vid_names, classlist, annotation_path = 'Thumos14reduced-Annotations/',type_dist = 'best_worst'):
    
    gtsegments = np.load(annotation_path + '/segments.npy')
    gtlabels = np.load(annotation_path + '/labels.npy')
@@ -245,8 +245,10 @@ def getBestWorstDot( out_fs, predictions, vid_names, classlist, annotation_path 
    classes_arr = []
    rec = 0
    dot_records = {}
+   max_dots = {}
    for class_curr in classlist:
       dot_records[class_curr] = []
+      max_dots[class_curr] = []
 
    for idx_segment_predict, segment_predict in enumerate(predictions):
 
@@ -255,7 +257,10 @@ def getBestWorstDot( out_fs, predictions, vid_names, classlist, annotation_path 
       out_f = out_fs[idx_segment_predict]
       
       bin_keep = np.linalg.norm(out_f,axis=1)!=0
-      print np.sum(bin_keep), bin_keep.shape[0]
+      # print np.sum(bin_keep), bin_keep.shape[0]
+      # print segment_predict.shape
+      # print segment_predict[~bin_keep,:]
+      # raw_input()
 
       print segment_predict.shape
       segment_predict = segment_predict[:,gt_classes]
@@ -266,7 +271,11 @@ def getBestWorstDot( out_fs, predictions, vid_names, classlist, annotation_path 
       out_f = out_f[bin_keep,:]
       
       idx_sort = np.argsort(segment_predict,axis = 0)[::-1,:]      
-      idx_sort = idx_sort[[0,idx_sort.shape[0]-1],:].T
+      if type_dist=='best_second_best':
+         idx_sort = idx_sort[[0,1],:].T
+      else:
+         idx_sort = idx_sort[[0,idx_sort.shape[0]-1],:].T
+      
       
       for idx_idx_sort, idx_sort_curr in enumerate(idx_sort):
          # print idx_idx_sort, idx_sort_curr
@@ -283,16 +292,43 @@ def getBestWorstDot( out_fs, predictions, vid_names, classlist, annotation_path 
          if np.isnan(cos_it):
             print min_max
             print norm
-            print max_val, min_val
+            print max_val, min_val, idx_sort_curr[0], idx_sort_curr[1], videoname[idx_segment_predict]
             cos_it = 2
             raw_input()
          # print cos_it
          gt_class_curr = gt_classes[idx_idx_sort]
          class_curr = classlist[gt_class_curr]
          dot_records[class_curr].append(cos_it)
+         max_dots[class_curr].append(max_val)
+
+   for class_curr in max_dots.keys():
+      max_vals = max_dots[class_curr]
+      dots = []
+      for idx_a in range(len(max_vals)):
+         a = max_vals[idx_a]
+         # print a.shape
+         a = a/np.linalg.norm(a)
+         # print a.shape, np.linalg.norm(a)
+         
+         for idx_b in range(idx_a+1, len(max_vals)):
+            b = max_vals[idx_b]
+            # print b.shape
+            b = b/np.linalg.norm(b)
+            dot_curr = np.sum(a*b)
+            dots.append(dot_curr)
+            # print 'hello'
+
+      max_dots[class_curr] = dots
 
 
-   return dot_records
+   # if type_dist=='best_worst':
+      
+   if type_dist=='best_best':
+      return max_dots
+   else:
+      return dot_records
+   # 
+   # 
 
 
 

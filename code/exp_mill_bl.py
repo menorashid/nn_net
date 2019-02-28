@@ -1,4 +1,5 @@
-from train_test_mill import *
+# from train_test_mill import *
+from train_model_new import *
 import models
 # from criterions import *
 import criterions
@@ -205,26 +206,7 @@ def train_simple_mill_all_classes(model_name,
 
     
     criterion, criterion_str = get_criterion(criterion_str,attention,class_weights_val,  loss_weights, multibranch)
-    # if attention:
-    #     if multibranch>1:
-    #         criterion = MultiCrossEntropyMultiBranchWithL1(class_weights= class_weights_val, loss_weights = loss_weights, num_branches = multibranch)
-    #         criterion_str = 'MultiCrossEntropyMultiBranchWithL1'
-    #     else:
-    #         criterion = MultiCrossEntropyMultiBranchWithL1(class_weights= class_weights_val, loss_weights = loss_weights, num_branches = 1)
-    #         criterion_str = 'MultiCrossEntropyMultiBranchWithL1'
-    # else:
-    #     if multibranch>1:
-    #         criterion = MultiCrossEntropyMultiBranch(class_weights= class_weights_val, loss_weights = loss_weights, num_branches = multibranch)
-    #         criterion_str = 'MultiCrossEntropyMultiBranch'
-    #     else:
-    #         criterion = MultiCrossEntropy(class_weights= class_weights_val)
-    #         criterion_str = 'MultiCrossEntropy'
-
-
-    # criterion = MCE_CenterLoss_Combo(n_classes, feat_dim = 2048, bg = True, lambda_param = 0.0, alpha_param = 0.5, class_weights= class_weights_val)
-    # criterion_str = 'Multi_Center_Combo'
-
-
+    
     init = False
     
 
@@ -267,23 +249,20 @@ def train_simple_mill_all_classes(model_name,
     else:
         print 'not skipping', final_model_file
 
-
-    # network_params = dict(n_classes=n_classes,deno = deno)
-
-    # if 'alt_train' in model_name:
-    #     network_params['num_switch'] = num_switch
-    # if in_out is not None:
-    #     network_params['in_out'] = in_out
-    # if graph_size is not None:
-    #     network_params['graph_size'] = graph_size
-    
-    # print network_params
-    # raw_input()
-        
-
+    test_params_core = dict(
+                trim_preds = trim_preds,
+                second_thresh = second_thresh,
+                first_thresh = 0,
+                multibranch = multibranch,
+                branch_to_test = branch_to_test,
+                dataset = dataset, 
+                test_pair = test_pair,
+                save_outfs = False,
+                test_method = test_method)
     train_params = dict(out_dir_train = out_dir_train,
                 train_data = train_data,
                 test_data = test_train_data,
+                test_args = test_params_core,
                 batch_size = batch_size,
                 batch_size_val = batch_size_val,
                 num_epochs = num_epochs,
@@ -301,9 +280,10 @@ def train_simple_mill_all_classes(model_name,
                 epoch_start = epoch_start,
                 network_params = network_params, 
                 multibranch = multibranch)
+    
 
     if not test_mode:
-        train_model(**train_params)
+        train_model_new(**train_params)
     
     if model_nums is None :
         model_nums = [num_epochs-1] 
@@ -1492,13 +1472,15 @@ def simple_just_mill_flexible():
                                     test_method = test_method)
 
 def graph_l1_experiment():
+    # print 'hey girl'
+    # raw_input()
     model_name = 'graph_multi_video_with_L1'
     
     lr = [0.001,0.001, 0.001]
     multibranch = 1
     loss_weights = [1,1]
     
-    branch_to_test = -1
+    branch_to_test = -2
     attention = True
 
     k_vec = None
@@ -1506,46 +1488,53 @@ def graph_l1_experiment():
     gt_vec = False
     just_primary = False
 
+    seed = 999
     torch.backends.cudnn.deterministic = True
-    torch.manual_seed(999)
+    random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
     
-    epoch_stuff = [200,200]
+    
+    
+    epoch_stuff = [100,100]
     dataset = 'ucf'
-    limit  = 500
+    limit  = None
     save_after = 50
     
-    test_mode = True
+    test_mode = False
     
     # test_method = 'wtalc'
     # test_method = 'wtalc'
     # test_post_pend = '_'+test_method+'_tp_fp_conf'
 
-    test_method = 'best_worst_dot'
-    test_post_pend = '_'+test_method+'_softmaxpmf'
+    # test_method = 'best_worst_dot'
+    # test_post_pend = '_'+test_method
+    test_method = 'original'
+    test_post_pend = '_'+test_method+'_class'
 
-    model_nums = [199]
-
+    model_nums = None
     retrain = False
     viz_mode = False
     viz_sim = False
 
-    post_pend = ''
+    # post_pend = '_noBiasLastLayer'
     
     network_params = {}
     network_params['deno'] = 8
     network_params['in_out'] = [2048,512]
     network_params['feat_dim'] = [2048,1024]
-    network_params['graph_size'] = 1
-    network_params['method'] = 'cos_zero_self'
-    network_params['sparsify'] = None
+    network_params['graph_size'] = 2
+    network_params['method'] = 'cos'
+    network_params['sparsify'] = 0.5
     network_params['graph_sum'] = attention
     network_params['non_lin'] = 'HT'
     network_params['aft_nonlin']='HT_L2'
     network_params['sigmoid'] = False
-    post_pend = 'ABS_bias'
+    post_pend = '_noZeroSelf'
     first_thresh=0.
     class_weights = True
-    test_after = 5
+    test_after = 10
     all_classes = False
     
     second_thresh = 0.5
@@ -1681,21 +1670,40 @@ def graph_wsddn_experiment():
 def comparing_best_worst():
     # print 'hello hello baby'
     # loaded = np.load('../scratch/graph_nol1_feats.npz')
-    loaded = np.load('../scratch/graph_nosparse_feats.npz')
+    # loaded = np.load('../scratch/graph_nosparse_feats.npz')
+    # loaded = np.load('../scratch/check_best_worst.npz')
+    # loaded = np.load('../scratch/graph_l1_graph_out.npz')
+    # loaded = np.load('../scratch/graph_l1_graphOut_noZero.npz')
+
+    type_dist = 'best_second_best'
+
+    loaded = np.load('../scratch/graph_l1_supervise_W_outW.npz')
+    print loaded.keys()
     predictions = list(loaded['predictions'])
     det_vid_names = list(loaded['det_vid_names'])
     out_fs = list(loaded['out_fs'])
     dot_records_l1 =  wtalc.getBestWorstDot( out_fs,predictions, det_vid_names,  class_names_ucf)
     
-    loaded = np.load('../scratch/just_mill_feats.npz')
+    # raw_input()
+
+    # loaded = np.load('../scratch/just_mill_feats.npz')
+    # loaded = np.load('../scratch/graph_l1_feature_noZero.npz')
+    loaded = np.load('../scratch/graph_l1_supervise_W_outF.npz')
     predictions = list(loaded['predictions'])
     det_vid_names = list(loaded['det_vid_names'])
     out_fs = list(loaded['out_fs'])
-    dot_records_mill =  wtalc.getBestWorstDot( out_fs,predictions, det_vid_names,  class_names_ucf)
+    dot_records_mill =  wtalc.getBestWorstDot( out_fs,predictions, det_vid_names,  class_names_ucf,type_dist = type_dist)
         
     classes = list(dot_records_l1.keys())
     
-    out_dir = '../scratch/best_worst_dot_nosparse'
+    # out_dir = '../scratch/best_worst_dot_nosparse'
+    out_dir = '../scratch/graph_l1_supervise_W_F_W_comp_'+type_dist
+    title = 'Comparing '+type_dist+' Distance'
+    legend_vals = ['W','F']
+
+    # out_dir = '../scratch/best_second_best_f_dot_out_noZero'
+    # title = 'Comparing Best Second Best Distance'
+
     util.mkdir(out_dir)
     inc = 0.1
     for class_curr in classes:
@@ -1715,24 +1723,244 @@ def comparing_best_worst():
         # mill_vals = [np.histogram(dot_records_mill[label_curr],bins) for label_curr in xtick_labels]
         xtick_labels = ['%.2f'%val for val in bins[:-1]]
         dict_vals = {}
-        dict_vals['Graph']=l1_vals
-        dict_vals['FC']= mill_vals
+        dict_vals[legend_vals[0]]=l1_vals
+        dict_vals[legend_vals[1]]= mill_vals
         
-        legend_vals = ['Graph','FC']
+        
         xlabel = 'Class'
         ylabel = 'Frequency of Cosine Sim Result'
         out_file = os.path.join(out_dir,class_curr+'.jpg')
         colors = ['b','g']
-        title = 'Comparing Best Worst Distance'
+        
         visualize.plotGroupBar(out_file,dict_vals,xtick_labels,legend_vals,colors, xlabel=xlabel,ylabel=ylabel,title=title,width=0.5,ylim=None,loc=None)
         print out_file
 
     visualize.writeHTMLForFolder(out_dir)
 
+
+def graph_l1_supervise_W_experiment():
+    # print 'hey girl'
+    # raw_input()
+
+    model_name = 'graph_multi_video_with_L1_supervise_W'
+    branch_to_test = 2
+    multibranch = 2
+    loss_weights = [1,1,1]
+
+    # model_name = 'wsddn_graph_multi_video_det'
+    # multibranch = 1
+    # branch_to_test = -1
+    # loss_weights = [1,1]
+
+    lr = [0.001,0.001, 0.001,0.001,0.001]
+    
+    
+    
+    attention = True
+
+    k_vec = None
+
+    gt_vec = False
+    just_primary = False
+
+    seed = 999
+    torch.backends.cudnn.deterministic = True
+    random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
+    
+    
+    
+    epoch_stuff = [100,100]
+    model_file = None
+    # '../experiments/graph_multi_video_with_L1_supervise_W/graph_multi_video_with_L1_supervise_W_aft_nonlin_HT_L2_non_lin_HT_aft_nonlin_feat_HT_L2_sparsify_0.5_graph_size_2_sigmoid_True_in_out_feat_2048_2048_graph_sum_True_deno_8_n_classes_20_in_out_2048_512_feat_dim_2048_1024_method_cos_ucf/all_classes_False_just_primary_False_limit_None_cw_True_MultiCrossEntropyMultiBranchWithL1_200_step_200_0.1_0.001_0.001_0.001_0.001_0.001_lw_1.00_1.00_1.00__noZeroSelf/model_199.pt'
+
+    dataset = 'ucf'
+    limit  = None
+    save_after = 50
+    
+    test_mode = True
+    
+    # test_method = 'wtalc'
+    # test_method = 'wtalc'
+    # test_post_pend = '_'+test_method+'_tp_fp_conf'
+
+    test_method = 'best_worst_dot'
+    test_post_pend = '_'+test_method
+    # test_method = 'original'
+    # test_post_pend = '_'+test_method+'_dotted'
+
+    model_nums = None
+    retrain = False
+    viz_mode = False
+    viz_sim = False
+
+    # post_pend = '_noBiasLastLayer'
+    
+    network_params = {}
+    network_params['in_out_feat'] = [2048,2048]
+    network_params['aft_nonlin_feat'] = 'HT_L2'
+    network_params['deno'] = 8
+    network_params['in_out'] = [2048,512]
+    network_params['feat_dim'] = [2048,1024]
+    network_params['graph_size'] = 2
+    network_params['method'] = 'cos'
+    network_params['sparsify'] = 0.5
+    network_params['graph_sum'] = attention
+    network_params['non_lin'] = 'HT'
+    network_params['aft_nonlin']='HT_L2'
+    network_params['sigmoid'] = False
+    post_pend = '_noZeroSelf'
+    first_thresh=0.
+    class_weights = True
+    test_after = 10
+    all_classes = False
+    
+    second_thresh = 0.5
+    det_class = -1
+    train_simple_mill_all_classes (model_name = model_name,
+                        lr = lr,
+                        dataset = dataset,
+                        network_params = network_params,
+                        limit = limit, 
+                        epoch_stuff= epoch_stuff,
+                        batch_size = 32,
+                        batch_size_val = 32,
+                        save_after = save_after,
+                        test_mode = test_mode,
+                        class_weights = class_weights,
+                        test_after = test_after,
+                        all_classes = all_classes,
+                        just_primary = just_primary,
+                        model_nums = model_nums,
+                        retrain = retrain,
+                        viz_mode = viz_mode,
+                        second_thresh = second_thresh,
+                        first_thresh = first_thresh,
+                        det_class = det_class,
+                        post_pend = post_pend,
+                        viz_sim = viz_sim,
+                        gt_vec = gt_vec,
+                        loss_weights = loss_weights,
+                        multibranch = multibranch,
+                        branch_to_test = branch_to_test,
+                        k_vec = k_vec,
+                        attention = attention,
+                        test_pair = False,
+                        test_post_pend = test_post_pend,
+                        test_method = test_method,
+                        model_file = model_file)
+
+def graph_l1_supervise_W_graph_direct_experiment():
+    # print 'hey girl'
+    # raw_input()
+    model_name = 'graph_multi_video_with_L1_supervise_W_graph_direct'
+    
+    lr = [0.001,0.001, 0.001,0.001]
+    multibranch = 2
+    loss_weights = [1,1,1]
+    
+    branch_to_test = 1
+    attention = True
+
+    k_vec = None
+
+    gt_vec = False
+    just_primary = False
+
+    seed = 999
+    torch.backends.cudnn.deterministic = True
+    random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
+    
+    
+    
+    epoch_stuff = [100,100]
+    dataset = 'ucf'
+    limit  = None
+    save_after = 50
+    
+    test_mode = False
+    
+    # test_method = 'wtalc'
+    # test_method = 'wtalc'
+    # test_post_pend = '_'+test_method+'_tp_fp_conf'
+
+    # test_method = 'best_worst_dot'
+    # test_post_pend = '_'+test_method
+    test_method = 'original'
+    test_post_pend = '_'+test_method+'_graph_branch'
+
+    model_nums = None
+    retrain = False
+    viz_mode = False
+    viz_sim = False
+
+    # post_pend = '_noBiasLastLayer'
+    
+    network_params = {}
+    network_params['in_out_feat'] = [2048,2048]
+    network_params['aft_nonlin_feat'] = 'HT_L2'
+    network_params['deno'] = 8
+    network_params['in_out'] = [2048,20]
+    network_params['feat_dim'] = [2048,1024]
+    network_params['graph_size'] = 2
+    network_params['method'] = 'cos'
+    network_params['sparsify'] = 0.5
+    network_params['graph_sum'] = attention
+    network_params['non_lin'] = 'HT'
+    network_params['aft_nonlin']=None
+    network_params['sigmoid'] = False
+    post_pend = '_noZeroSelf'
+    first_thresh=0.
+    class_weights = True
+    test_after = 10
+    all_classes = False
+    
+    second_thresh = 0.5
+    det_class = -1
+    train_simple_mill_all_classes (model_name = model_name,
+                        lr = lr,
+                        dataset = dataset,
+                        network_params = network_params,
+                        limit = limit, 
+                        epoch_stuff= epoch_stuff,
+                        batch_size = 32,
+                        batch_size_val = 32,
+                        save_after = save_after,
+                        test_mode = test_mode,
+                        class_weights = class_weights,
+                        test_after = test_after,
+                        all_classes = all_classes,
+                        just_primary = just_primary,
+                        model_nums = model_nums,
+                        retrain = retrain,
+                        viz_mode = viz_mode,
+                        second_thresh = second_thresh,
+                        first_thresh = first_thresh,
+                        det_class = det_class,
+                        post_pend = post_pend,
+                        viz_sim = viz_sim,
+                        gt_vec = gt_vec,
+                        loss_weights = loss_weights,
+                        multibranch = multibranch,
+                        branch_to_test = branch_to_test,
+                        k_vec = k_vec,
+                        attention = attention,
+                        test_pair = False,
+                        test_post_pend = test_post_pend,
+                        test_method = test_method)
+
+
 def main():
     
-
-    # comparing_best_worst()
+    # graph_l1_supervise_W_graph_direct_experiment()
+    # graph_l1_supervise_W_experiment()
+    comparing_best_worst()
+    # return
 
     # numpy.histogram(a, bins=10, range=None, normed=None, weights=None, density=None)
 
@@ -1755,7 +1983,7 @@ def main():
     # graph_l1_experiment()
 
     # simple_just_mill_flexible()
-    wsddn_simply_experiments()
+    # wsddn_simply_experiments()
     # scripts_comparative()
     # separate_supervision_experiment()
     # super_simple_experiment()
