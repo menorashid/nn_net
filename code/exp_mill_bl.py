@@ -1474,7 +1474,7 @@ def simple_just_mill_flexible():
 def graph_l1_experiment():
     # print 'hey girl'
     # raw_input()
-    model_name = 'graph_multi_video_with_L1'
+    model_name = 'graph_multi_video_with_L1_more_lin'
     
     lr = [0.001,0.001, 0.001]
     multibranch = 1
@@ -1499,10 +1499,10 @@ def graph_l1_experiment():
     
     epoch_stuff = [100,100]
     dataset = 'ucf'
-    limit  = None
-    save_after = 50
+    limit  = 500
+    save_after = 10
     
-    test_mode = False
+    test_mode = True
     
     # test_method = 'wtalc'
     # test_method = 'wtalc'
@@ -1522,8 +1522,12 @@ def graph_l1_experiment():
     
     network_params = {}
     network_params['deno'] = 8
-    network_params['in_out'] = [2048,512]
+    # network_params['in_out'] = [2048,512]
+    # network_params['feat_dim'] = [2048,1024]
+
+    network_params['in_out'] = [2048,512,512]
     network_params['feat_dim'] = [2048,1024]
+
     network_params['graph_size'] = 2
     network_params['method'] = 'cos'
     network_params['sparsify'] = 0.5
@@ -1743,7 +1747,7 @@ def graph_l1_supervise_W_experiment():
     # raw_input()
 
     model_name = 'graph_multi_video_with_L1_supervise_W'
-    branch_to_test = 2
+    branch_to_test = 1
     multibranch = 2
     loss_weights = [1,1,1]
 
@@ -1786,10 +1790,10 @@ def graph_l1_supervise_W_experiment():
     # test_method = 'wtalc'
     # test_post_pend = '_'+test_method+'_tp_fp_conf'
 
-    test_method = 'best_worst_dot'
-    test_post_pend = '_'+test_method
-    # test_method = 'original'
-    # test_post_pend = '_'+test_method+'_dotted'
+    # test_method = 'best_worst_dot'
+    # test_post_pend = '_'+test_method
+    test_method = 'original'
+    test_post_pend = '_'+test_method+'_graph_branch_no_softmax'
 
     model_nums = None
     retrain = False
@@ -1957,9 +1961,10 @@ def graph_l1_supervise_W_graph_direct_experiment():
 
 def main():
     
+    graph_l1_experiment()
     # graph_l1_supervise_W_graph_direct_experiment()
     # graph_l1_supervise_W_experiment()
-    comparing_best_worst()
+    # comparing_best_worst()
     # return
 
     # numpy.histogram(a, bins=10, range=None, normed=None, weights=None, density=None)
