@@ -11,6 +11,7 @@ import multiprocessing
 import subprocess
 import scipy.io
 import random
+from globals import class_names
 
 dir_meta = '../data/ucf101'
 dir_meta_features = '../data/i3d_features'
@@ -780,10 +781,121 @@ def save_test_pair_file():
     util.writeFile(out_file, test_new_data)
 
 
+def write_cooc_train_test_files(num_neighbors = 100):
+    dir_train_test = '../data/ucf101/train_test_files'
+    in_files = ['train.txt','test.txt']
+    out_post = '_cooc_'+str(num_neighbors).replace('/','_')
+    cooc_dir = '../data/ucf101/i3d_dists_just_train/arr_coocs_'+str(num_neighbors)
+
+    for in_file in in_files:
+        just_name = in_file[:in_file.rindex('.')]
+        out_file = os.path.join(dir_train_test, just_name+out_post+'.txt')
+        in_file = os.path.join(dir_train_test, in_file)
+        # print in_file, out_file
+        lines = util.readLinesFromFile(in_file)
+        new_lines = []
+        for line_curr in lines:
+            line_split = line_curr.split(' ')
+            just_vid_name = os.path.split(line_split[0])[1]
+            just_vid_name = just_vid_name[:just_vid_name.rindex('.')]
+            cooc_file = os.path.join(cooc_dir, just_vid_name+'.npy')
+            assert os.path.exists(cooc_file)
+            line_new = [line_split[0],cooc_file]+line_split[1:]
+            line_new = ' '.join(line_new)
+            new_lines.append(line_new)
+            # print line_new
+            # raw_input()
+        print out_file, len(new_lines), new_lines[0]
+        raw_input()
+        util.writeFile(out_file, new_lines)
+        
+
+def write_cooc_per_class_train_test_files():
+    dir_train_test = '../data/ucf101/train_test_files'
+    in_files = ['train.txt','test.txt']
+    out_post = '_cooc_per_class'
+    cooc_dir = '../data/ucf101/i3d_dists_just_train/arr_coocs_per_class'
+
+    for in_file in in_files:
+        just_name = in_file[:in_file.rindex('.')]
+        out_file = os.path.join(dir_train_test, just_name+out_post+'.txt')
+        in_file = os.path.join(dir_train_test, in_file)
+        # print in_file, out_file
+        lines = util.readLinesFromFile(in_file)
+        new_lines = []
+        for line_curr in lines:
+            line_split = line_curr.split(' ')
+            just_vid_name = os.path.split(line_split[0])[1]
+            just_vid_name = just_vid_name[:just_vid_name.rindex('.')]
+            line_new = [line_split[0]]
+            # ,cooc_file]+line_split[1:]
+            for class_name in class_names:
+                cooc_file = os.path.join(cooc_dir,class_name, just_vid_name+'.npz')
+                assert os.path.exists(cooc_file)
+                line_new.append(cooc_file)
+
+            line_new +=line_split[1:]
+            
+            line_new = ' '.join(line_new)
+            new_lines.append(line_new)
+            # print line_new
+            # raw_input()
+        print out_file, len(new_lines), new_lines[0]
+        raw_input()
+        util.writeFile(out_file, new_lines)
+        
+
+def merge_coocs_per_class():
+    dir_train_test = '../data/ucf101/train_test_files'
+    in_files = ['train_cooc_per_class.txt','test_cooc_per_class.txt']
+    cooc_dir = '../data/ucf101/i3d_dists_just_train/arr_coocs_per_class'
+    out_dir = os.path.join(cooc_dir,'merged')
+    util.mkdir(out_dir)
+
+    for in_file in in_files:
+        file_curr = os.path.join(dir_train_test,in_file)
+        lines = util.readLinesFromFile(file_curr)
+        for line in lines:
+            line_split = line.split(' ')
+            vid_name = os.path.split(line_split[0])[1]
+            vid_name = vid_name[:vid_name.rindex('.')]
+            out_file = os.path.join(out_dir,vid_name+'.npy')
+            if os.path.exists(out_file):
+                continue
+            print vid_name
+            assert len(line_split)==41
+            npz_files = line_split[1:21]
+            npzs = [np.load(npz_file_curr)['arr_0'][np.newaxis,:,:] for npz_file_curr in npz_files]
+            npzs = np.concatenate(npzs, axis = 0)
+            # print npzs.shape
+
+            
+            # print out_file
+            # raw_input()
+            # np.savez_compressed(out_file, npzs)
+            np.save(out_file, npzs)
+        #     break
+        # break
+
+
 
 def main():
+    # file_npz = '../data/ucf101/i3d_dists_just_train/arr_coocs_per_class/merged/video_validation_0000051.npz'
+    # file_npy = file_npz.replace('.npz','.npy')
+    # import time
+    # t = time.time()
+    # arr = np.load(file_npz)['arr_0']
+    # print time.time()-t
 
-    save_test_pair_file()
+    # t = time.time()
+    # arr = np.load(file_npy)
+    # print time.time()-t
+
+    # merge_coocs_per_class()
+    write_cooc_train_test_files(num_neighbors = 'per_class/merged')
+    # write_cooc_per_class_train_test_files()
+
+    # save_test_pair_file()
 
     # just_primary = True
     # write_train_test_files_all(False, just_primary = just_primary)

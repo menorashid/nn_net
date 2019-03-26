@@ -4,11 +4,14 @@ import numpy as np
 # from torchvision import transforms
 from helpers import util, visualize
 import torch.nn as nn
+from wtalc_criterions import MyLoss_triple,MyLoss_triple_old
 
 class MultiCrossEntropy(nn.Module):
     def __init__(self,class_weights=None, loss_weights = None, num_branches = None):
         super(MultiCrossEntropy, self).__init__()
         self.LogSoftmax = nn.LogSoftmax(dim = 1)
+        # print self.class_weights
+        # raw_input()
         if class_weights is None:
             self.class_weights = None
         else: 
@@ -144,7 +147,15 @@ class MultiCrossEntropyMultiBranch(nn.Module):
         super(MultiCrossEntropyMultiBranch, self).__init__()
         self.LogSoftmax = nn.LogSoftmax(dim = 1)
         self.num_branches = num_branches
+        
+        print class_weights
 
+        if class_weights is not None and len(class_weights)==100:
+            class_weights = class_weights*5
+            print 'scaling class_weights'
+            # class_weights = None
+        print class_weights        
+        # raw_input()
         if class_weights is None:
             self.class_weights = None
         else: 
@@ -155,8 +166,12 @@ class MultiCrossEntropyMultiBranch(nn.Module):
         else:
             self.loss_weights = loss_weights
 
-    def forward(self, gt, preds):
-        loss_all = 0
+    def forward(self, gt, preds, collate = True):
+        if collate:
+            loss_all = 0
+        else:
+            loss_all = []
+
         assert len(preds) == self.num_branches
         for idx_pred, pred in enumerate(preds):
             pred = self.LogSoftmax(pred)
@@ -169,44 +184,196 @@ class MultiCrossEntropyMultiBranch(nn.Module):
 
             loss = torch.sum(loss, dim = 1)
             loss = torch.mean(loss)
-            loss_all += loss*self.loss_weights[idx_pred]
+            if collate:
+                loss_all += loss*self.loss_weights[idx_pred]
+            else:
+                # print 'loss',loss
+                loss_all.append(loss)
+
         return loss_all
 
 class MultiCrossEntropyMultiBranchWithL1(MultiCrossEntropyMultiBranch):
-    def __init__(self,class_weights=None, loss_weights = None, num_branches = 2, att_weight = 0.5):
+    def __init__(self,class_weights=None, loss_weights = None, num_branches = 2, att_weight = 0.5, num_similar = 0):
         num_branches = max(num_branches,1)
-        super(MultiCrossEntropyMultiBranchWithL1, self).__init__(class_weights=class_weights, loss_weights = loss_weights[:-1], num_branches = num_branches)
         self.att_weight = loss_weights[-1]
+
+        super(MultiCrossEntropyMultiBranchWithL1, self).__init__(class_weights=class_weights, loss_weights = loss_weights[:-1], num_branches = num_branches)
+        # self.loss_weights_all = loss_weights
         
-    def forward(self, gt, preds, att):
+    def forward(self, gt, preds, att, collate = True):
         if self.num_branches ==1:
             preds = [preds]
 
-        loss_regular = super(MultiCrossEntropyMultiBranchWithL1,self).forward(gt, preds)
+        loss_regular = super(MultiCrossEntropyMultiBranchWithL1,self).forward(gt, preds, collate = collate)
         # print 'min_val',torch.min(torch.abs(att))
         
 
         l1 = torch.mean(torch.abs(att))
-        # print 'l1',l1,'loss_regular',loss_regular
-        l1 = self.att_weight*l1
-        # print 'l1',l1,'loss_regular',loss_regular
-        loss_all = l1+loss_regular
-        # raw_input()
-        # loss_all = 0
-        # assert len(preds) == self.num_branches
-        # for idx_pred, pred in enumerate(preds):
-        #     pred = self.LogSoftmax(pred)
-        #     # print pred.size()
-        #     if self.class_weights is not None:
-        #         assert self.class_weights.size(1)==pred.size(1)
-        #         loss = self.class_weights*-1*gt*pred
-        #     else:
-        #         loss = -1*gt* pred
+        # print l1
+        # print 'att',att
+        # print 'l1',l1
+        if collate:
+            l1 = self.att_weight*l1
+            loss_all = l1+loss_regular
+        else:
+            loss_regular.append(l1)
+            loss_all = loss_regular
 
-        #     loss = torch.sum(loss, dim = 1)
-        #     loss = torch.mean(loss)
-        #     loss_all += loss*self.loss_weights[idx_pred]
         return loss_all
+
+class MultiCrossEntropyMultiBranchWithL1_CASL(MultiCrossEntropyMultiBranchWithL1):
+    def __init__(self,class_weights=None, loss_weights = None, num_branches = 2, att_weight = 0.5, num_similar = 0):
+        # self.att_weight =None
+        
+        super(MultiCrossEntropyMultiBranchWithL1_CASL,self).__init__(class_weights=class_weights, loss_weights = loss_weights[:-1], num_branches = num_branches)
+        # print 'att_super',super(MultiCrossEntropyMultiBranchWithL1_CASL,self).att_weight
+        self.num_similar = num_similar
+        self.casl_weight = loss_weights[-1]
+        self.loss_weights_all = loss_weights
+        self.loss_strs = ['CrossEnt'+str(idx) for idx in range(len(self.loss_weights_all)-2)]+['L1','CASL']
+
+        
+    def forward(self, gt, preds, att, out, collate = True):
+        graph_sum = att[0]
+        feature = att[1]
+        input_sizes = att[2]
+        # print graph_sum
+        # print input_sizes
+
+        # for att_curr in att[1:]:
+            # print len(att_curr), att_curr.size()
+        # print len(att_curr), att_curr[1].size()
+        # raw_input()
+
+        loss_everything_else = super(MultiCrossEntropyMultiBranchWithL1_CASL,self).forward(gt, preds, graph_sum, collate = collate)
+
+        if self.num_branches>1:
+            # print len(out)
+            # print len(out[0])
+            # .size()
+            out = out[0]
+            # raw_input()
+
+        casl_loss = MyLoss_triple(feature, out, input_sizes, gt, type_loss = 'casl', debug = False, num_similar = self.num_similar)
+        # print 'casl_loss',casl_loss
+        
+        if collate:
+            loss = loss_everything_else + self.casl_weight*casl_loss    
+        else:
+            loss_everything_else.append(casl_loss)
+            loss = 0
+            for idx_loss, loss_curr in enumerate(loss_everything_else):
+                # print 'here',idx_loss, self.loss_weights_all[idx_loss],loss_curr
+                # print loss_curr, self.loss_weights_all[idx_loss]*loss_curr
+                loss += self.loss_weights_all[idx_loss]*loss_curr
+            loss = [loss,loss_everything_else]
+        # print loss_everything_else
+        return loss
+
+
+class MultiCrossEntropyMultiBranchFakeL1_CASL(MultiCrossEntropyMultiBranch):
+    def __init__(self,class_weights=None, loss_weights = None, num_branches = 2, att_weight = 0.5, num_similar = 0):
+        # self.att_weight =None
+        num_branches = max(num_branches,1)
+        
+        super(MultiCrossEntropyMultiBranchFakeL1_CASL,self).__init__(class_weights=class_weights, loss_weights = loss_weights[:-1], num_branches = num_branches)
+        # print 'att_super',super(MultiCrossEntropyMultiBranchWithL1_CASL,self).att_weight
+        self.num_similar = num_similar
+        self.casl_weight = loss_weights[-1]
+        self.loss_weights_all = loss_weights
+        self.loss_strs = ['CrossEnt'+str(idx) for idx in range(len(self.loss_weights_all)-2)]+['CASL']
+
+        
+    def forward(self, gt, preds, att, out, collate = True):
+        # graph_sum = att[0]
+        if self.num_branches ==1:
+            preds = [preds]
+
+        feature = att[1]
+        input_sizes = att[2]
+        loss_everything_else = super(MultiCrossEntropyMultiBranchFakeL1_CASL,self).forward(gt, preds, collate = collate)
+
+        
+        casl_loss = MyLoss_triple(feature, out, input_sizes, gt, type_loss = 'casl', debug = False, num_similar = self.num_similar)
+        
+        if collate:
+            loss = loss_everything_else + self.casl_weight*casl_loss    
+        else:
+            loss_everything_else.append(casl_loss)
+            loss = 0
+            for idx_loss, loss_curr in enumerate(loss_everything_else):
+                loss += self.loss_weights_all[idx_loss]*loss_curr
+            loss = [loss,loss_everything_else]
+
+        return loss
+
+
+
+class MultiCrossEntropyMultiBranchWithL1_CASL_pushH(MultiCrossEntropyMultiBranchWithL1):
+    def __init__(self,class_weights=None, loss_weights = None, num_branches = 2, att_weight = 0.5):
+        # self.att_weight =None
+        
+        super(MultiCrossEntropyMultiBranchWithL1_CASL_pushH,self).__init__(class_weights=class_weights, loss_weights = loss_weights[:-1], num_branches = num_branches)
+        # print 'att_super',super(MultiCrossEntropyMultiBranchWithL1_CASL_pushH,self).att_weight
+        
+        self.casl_weight = loss_weights[-1]
+        self.loss_weights_all = loss_weights
+        self.loss_strs = ['CrossEnt'+str(idx) for idx in range(len(self.loss_weights_all)-2)]+['L1','PushH']
+
+        
+    def forward(self, gt, preds, att, out, collate = True):
+        graph_sum = att[0]
+        feature = att[1]
+        input_sizes = att[2]
+        loss_everything_else = super(MultiCrossEntropyMultiBranchWithL1_CASL_pushH,self).forward(gt, preds, graph_sum, collate = collate)
+
+        
+        casl_loss = MyLoss_triple(feature, out, input_sizes, gt, type_loss = 'pushH', debug = False)
+        
+        if collate:
+            loss = loss_everything_else + self.casl_weight*casl_loss    
+        else:
+            loss_everything_else.append(casl_loss)
+            loss = 0
+            for idx_loss, loss_curr in enumerate(loss_everything_else):
+                loss += self.loss_weights_all[idx_loss]*loss_curr
+            loss = [loss,loss_everything_else]
+
+        return loss
+
+
+class MultiCrossEntropyMultiBranchWithL1_CASL_pushDiff(MultiCrossEntropyMultiBranchWithL1):
+    def __init__(self,class_weights=None, loss_weights = None, num_branches = 2, att_weight = 0.5):
+        # self.att_weight =None
+        
+        super(MultiCrossEntropyMultiBranchWithL1_CASL_pushDiff,self).__init__(class_weights=class_weights, loss_weights = loss_weights[:-1], num_branches = num_branches)
+        # print 'att_super',super(MultiCrossEntropyMultiBranchWithL1_CASL_pushDiff,self).att_weight
+        
+        self.casl_weight = loss_weights[-1]
+        self.loss_weights_all = loss_weights
+        self.loss_strs = ['CrossEnt'+str(idx) for idx in range(len(self.loss_weights_all)-2)]+['L1','PushH']
+
+        
+    def forward(self, gt, preds, att, out, collate = True):
+        graph_sum = att[0]
+        feature = att[1]
+        input_sizes = att[2]
+        loss_everything_else = super(MultiCrossEntropyMultiBranchWithL1_CASL_pushDiff,self).forward(gt, preds, graph_sum, collate = collate)
+
+        
+        casl_loss = MyLoss_triple_old(feature, out, input_sizes, gt, type_loss = 'pushDiff', debug = False)
+        
+        if collate:
+            loss = loss_everything_else + self.casl_weight*casl_loss    
+        else:
+            loss_everything_else.append(casl_loss)
+            loss = 0
+            for idx_loss, loss_curr in enumerate(loss_everything_else):
+                loss += self.loss_weights_all[idx_loss]*loss_curr
+            loss = [loss,loss_everything_else]
+
+        return loss
+
 
 class MCE_CenterLoss_Combo(nn.Module):
     def __init__(self, n_classes, feat_dim, bg, lambda_param, alpha_param, class_weights = None):

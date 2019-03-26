@@ -66,7 +66,9 @@ class Graph_Multi_Video(nn.Module):
         last_graph = []
         last_graph.append(nn.Dropout(0.5))
         last_graph.append(nn.Linear(in_out[-1],n_classes, bias = True))
-        
+        if sigmoid:
+            last_graph.append(nn.Sigmoid())
+
         self.last_graph = nn.Sequential(*last_graph)
         
     def forward(self, input, epoch_num = None, ret_bg =False, branch_to_test = -1):
@@ -111,6 +113,7 @@ class Graph_Multi_Video(nn.Module):
         for input in input_chunks:
             input_sizes = [input_curr.size(0) for input_curr in input]
             input = torch.cat(input,0)
+            # print input.size()
 
             if is_cuda:
                 input = input.cuda()
@@ -153,6 +156,8 @@ class Graph_Multi_Video(nn.Module):
 
                 end = start+input_sizes[idx_sample]
                 x_curr = out_col[start:end,:]
+
+                # THIS LINE IS DIFFERENT BETWEEN RETF AND RETW
                 out_graph_curr = out_graph[start:end,:]
 
                 x_all.append(x_curr)
@@ -172,7 +177,7 @@ class Graph_Multi_Video(nn.Module):
         # x_all = torch.cat(x_all,dim=0)
         # out_graph_all = torch.cat(out_graph_all, dim = 0)
         # print x_all.size(), out_graph_all.size()
-
+        # print graph_sums
         if hasattr(self,'feat_ret') and self.feat_ret:
             pmf_all = [pmf_all, [torch.cat(graph_sums,dim = 0),out_graph_all,input_sizes_all]]
         elif self.graph_sum:

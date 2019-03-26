@@ -85,10 +85,10 @@ def write_train_test_files():
 	new_data_path = '../data/untf/npy'
 	
 
-	# old_data_path = '../data/i3d_features/Thumos14-I3D-JOINTFeatures_val'
-	# train_file = os.path.join(data_dir, 'train.txt')
-	old_data_path = '../data/i3d_features/Thumos14-I3D-JOINTFeatures_test'
-	train_file = os.path.join(data_dir, 'test.txt')
+	old_data_path = '../data/i3d_features/Thumos14-I3D-JOINTFeatures_val'
+	train_file = os.path.join(data_dir, 'train.txt')
+	# old_data_path = '../data/i3d_features/Thumos14-I3D-JOINTFeatures_test'
+	# train_file = os.path.join(data_dir, 'test.txt')
 
 	replace_str = [old_data_path, new_data_path]
 
@@ -118,8 +118,8 @@ def write_train_test_files():
 	
 
 def main():
-	save_npy()
-	# write_train_test_files()
+	# save_npy()
+	write_train_test_files()
 	
 
 

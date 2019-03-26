@@ -283,7 +283,8 @@ def plotSimple(xAndYs,out_file=None,title='',xlabel='',ylabel='',legend_entries=
 
     if xticks is not None:
         ax = plt.gca()
-        ax.set_xticks(xticks)
+        ax.set_xticks(xticks[0])
+        ax.set_xticklabels(xticks[1],rotation=0)
 
     if ylim is not None:
         plt.ylim([ylim[0],ylim[1]]);
@@ -304,6 +305,41 @@ def writeHTMLForFolder(path_to_im,ext='jpg',height=300,width=300):
     out_file_html=os.path.join(path_to_im,path_to_im[path_to_im.rindex('/')+1:]+'.html');
     writeHTML(out_file_html,im_paths,captions,height=height,width=width);
 
+
+def plotBars(out_file,x_vals,widths,y_val,color,xlabel='',ylabel='',title='',xlim = None, ylim = None):
+    plt.figure();
+    # plt.grid(1);
+    plt.title(title);
+    plt.xlabel(xlabel);
+    plt.ylabel(ylabel);
+    
+    plt.gca().bar(x_vals,y_val,widths,color=color,align = 'edge')
+
+    if ylim is not None:
+        plt.ylim(ylim )
+
+    if xlim is not None:
+        plt.xlim(xlim )
+    
+    plt.savefig(out_file,bbox_inches='tight');
+    plt.close(); 
+    # plt.bar([p + width*pos_idx for p in pos],dict_vals[legend_val],width,color=colors[pos_idx],label=legend_val)
+    # dict_vals,xtick_labels,legend_vals,colors,xlabel='',ylabel='',title='',width=0.25,ylim=None,loc=None):
+
+def plotBarsSubplot(out_file,x_vals_all,widths_all,y_vals,colors,xlabel='',ylabel='',title='',xlim = None):
+    # Two subplots, the axes array is 1-d
+    f, ax_arr = plt.subplots(len(x_vals_all), sharex=True)
+    for idx_ax_curr,ax_curr in enumerate(ax_arr):
+        ax_curr.bar(x_vals_all[idx_ax_curr],y_vals[idx_ax_curr],widths_all[idx_ax_curr],color=colors[idx_ax_curr],align = 'edge')     
+
+    if xlim is not None:
+        plt.xlim(xlim )   
+    plt.savefig(out_file,bbox_inches='tight');
+    plt.close(); 
+
+        # axarr[0].plot(x, y)
+        # axarr[0].set_title('Sharing X axis')
+        # axarr[1].scatter(x, y)
 
 def plotGroupBar(out_file,dict_vals,xtick_labels,legend_vals,colors,xlabel='',ylabel='',title='',width=0.25,ylim=None,loc=None):
     # print 'loc',loc

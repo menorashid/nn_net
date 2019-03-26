@@ -22,7 +22,8 @@ def train_model_new(out_dir_train,
                 epoch_start = 0,
                 network_params = None,
                 weight_decay = 0, 
-                multibranch = 1):
+                multibranch = 1,
+                plot_losses = False):
 
     util.mkdir(out_dir_train)
     log_file = os.path.join(out_dir_train,'log.txt')
@@ -35,11 +36,17 @@ def train_model_new(out_dir_train,
     plot_arr = [[],[]]
     plot_val_arr =  [[],[]]
     plot_val_acc_arr = [[],[]]
-    plot_det_arr = [([],[]),([],[]),([],[]),([],[]),([],[])]
+    
     plot_strs_posts = ['Loss']
     plot_acc_file = os.path.join(out_dir_train,'val_accu.jpg')
     plot_det_file = os.path.join(out_dir_train,'val_det.jpg')
-    lengend_strs_detection = ['0.5','0.4','0.3','0.2','0.1']
+
+
+    # plot_det_arr = [([],[]),([],[]),([],[]),([],[]),([],[])]
+    # lengend_strs_detection = ['0.1','0.2','0.3','0.4','0.5']
+
+    plot_det_arr = [([],[]),([],[]),([],[])]
+    lengend_strs_detection = ['0.5','0.7','0.9']
 
     network = models.get(model_name,network_params)
 
@@ -78,6 +85,15 @@ def train_model_new(out_dir_train,
     # torch.save(model,out_file)    
     # return
     criterion_str = criterion.__class__.__name__.lower()
+    if plot_losses:
+        plot_loss_arr = [([],[]) for lw in criterion.loss_weights_all]
+        lengend_strs_loss = [loss_str for loss_str in criterion.loss_strs]
+
+        # plot_det_arr = [([],[]),([],[]),([],[]),([],[]),([],[])]
+        # plot_strs_posts = ['Train Loss']
+        plot_losses_file = os.path.join(out_dir_train,'loss_all.jpg')
+    
+
 
     optimizer = torch.optim.Adam(network.get_lr_list(lr),weight_decay=weight_decay)
 
@@ -95,11 +111,17 @@ def train_model_new(out_dir_train,
     for num_epoch in range(epoch_start,num_epochs):
 
         plot_arr_epoch = []
+        if plot_losses:
+            plot_losses_inner_epoch = [[] for i in range(len(plot_loss_arr))]
+
+        # t = time.time()
         for num_iter_train,batch in enumerate(train_dataloader):
+            # print 'getting batch',time.time()-t
 
             samples = batch['features']
             labels = batch['label'].cuda()
 
+            # t = time.time()
             if 'centerloss' in model_name:
                 preds,extra = model.forward(samples, labels)
                 labels = [labels]+extra
@@ -148,12 +170,35 @@ def train_model_new(out_dir_train,
                 else:
                     preds = torch.cat(preds,0)        
 
-            if 'l1' in criterion_str:
+            # print 'forwarding',time.time()-t
+            
+            # t = time.time()
+
+            if 'casl' in criterion_str:
+                loss = criterion(labels, preds,att, out, collate = not plot_losses)
+                # print loss
+                # raw_input()
+            elif 'l1' in criterion_str:
                 loss = criterion(labels, preds,att)
             else:
                 loss = criterion(labels, preds)
-            loss_iter = loss.data[0]
+            
+            # print 'getting loss',time.time()-t
+            # t = time.time()
 
+            # print loss
+            if type(loss) == list:
+
+                [loss, loss_broken_down] = loss
+                if plot_losses:
+                    for idx_loss_curr, loss_curr in enumerate(loss_broken_down):
+                        # print loss_curr.data[0]
+                        loss_curr = loss_curr.data[0] if type(loss_curr)!=float else loss_curr
+                        plot_losses_inner_epoch[idx_loss_curr].append(loss_curr)
+                    # print loss_broken_down,plot_losses_inner_epoch
+
+
+            loss_iter = loss.data[0]
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -172,9 +217,19 @@ def train_model_new(out_dir_train,
             str_display = 'lr: %.6f, iter: %d, loss: %.4f' %(optimizer.param_groups[-1]['lr'],num_iter,loss_iter)
             log_arr.append(str_display)
             print str_display
+            
+            # print 'everything_else',time.time() - t
+            # t = time.time()
+
+
 
         plot_arr[0].append(num_epoch)
         plot_arr[1].append(np.mean(plot_arr_epoch))
+        if plot_losses:
+            for idx_tuple_curr, tuple_curr in enumerate(plot_loss_arr):
+                tuple_curr[0].append(num_epoch)
+                tuple_curr[1].append(np.mean(plot_losses_inner_epoch[idx_tuple_curr]))
+
 
         if num_epoch % plot_after== 0 and num_iter>0:
             
@@ -195,7 +250,9 @@ def train_model_new(out_dir_train,
                 # print lengend_strs
                 visualize.plotSimple(plot_vals,out_file = plot_file,title = 'Loss',xlabel = 'Iteration',ylabel = 'Loss',legend_entries=lengend_strs)
 
-                visualize.plotSimple(plot_det_arr,out_file = plot_det_file,title = 'Detection',xlabel = 'Iteration',ylabel = 'Accuracy',legend_entries=lengend_strs_detection)
+                # visualize.plotSimple(plot_det_arr,out_file = plot_det_file,title = 'Detection',xlabel = 'Iteration',ylabel = 'Accuracy',legend_entries=lengend_strs_detection)
+                if plot_losses:                
+                    visualize.plotSimple(plot_loss_arr,out_file = plot_losses_file,title = 'Losses',xlabel = 'Iteration',ylabel = 'Loss',legend_entries=lengend_strs_loss)
 
                 visualize.plotSimple([(plot_val_acc_arr[0],plot_val_acc_arr[1])],out_file = plot_acc_file,title = 'Loss',xlabel = 'Iteration',ylabel = 'Accuracy',legend_entries=['Val'])
                 
@@ -204,18 +261,19 @@ def train_model_new(out_dir_train,
         if (num_epoch+1) % test_after == 0 or num_epoch==0:
             model.eval()
             accuracy, loss_iter = test_model_core(model, test_dataloader, criterion, log_arr, multibranch  = multibranch)
-            aps = test_model_overlap(model, test_dataloader, criterion, log_arr,
-                first_thresh = test_args['first_thresh'] ,
-                second_thresh = test_args['second_thresh'] ,
-                bin_trim = test_args['trim_preds'] ,
-                multibranch = test_args['multibranch'],
-                branch_to_test = test_args['branch_to_test'],
-                save_outfs = test_args['save_outfs'],
-                dataset = test_args['dataset'],
-                test_method = test_args['test_method'])
-            aps_rel = aps[-1,:]
-            [plot_det_arr_curr[0].append(num_epoch) for plot_det_arr_curr in plot_det_arr]
-            [plot_det_arr[idx_ap][1].append(ap) for idx_ap,ap in enumerate(aps_rel)]
+            # aps = test_model_overlap(model, test_dataloader, criterion, log_arr,
+            #     first_thresh = test_args['first_thresh'] ,
+            #     second_thresh = test_args['second_thresh'] ,
+            #     bin_trim = test_args['trim_preds'] ,
+            #     multibranch = test_args['multibranch'],
+            #     branch_to_test = test_args['branch_to_test'],
+            #     save_outfs = test_args['save_outfs'],
+            #     dataset = test_args['dataset'],
+            #     test_method = test_args['test_method'])
+            # aps_rel = aps[-1,:]
+            # [plot_det_arr_curr[0].append(num_epoch) for plot_det_arr_curr in plot_det_arr]
+            # [plot_det_arr[idx_ap][1].append(ap) for idx_ap,ap in enumerate(aps_rel)]
+            
             # print plot_det_arr
 
             # print aps.shape
@@ -245,7 +303,9 @@ def train_model_new(out_dir_train,
 
         elif dec_after is not None and dec_after[0]!='exp':
             exp_lr_scheduler.step()
-    
+        
+
+
     out_file = os.path.join(out_dir_train,'model_'+str(num_epoch)+'.pt')
     print 'saving',out_file
     torch.save(model,out_file)
@@ -265,7 +325,9 @@ def train_model_new(out_dir_train,
         # print lengend_strs
         visualize.plotSimple(plot_vals,out_file = plot_file,title = 'Loss',xlabel = 'Iteration',ylabel = 'Loss',legend_entries=lengend_strs)
 
-        visualize.plotSimple(plot_det_arr,out_file = plot_det_file,title = 'Detection',xlabel = 'Iteration',ylabel = 'Accuracy',legend_entries=lengend_strs_detection)
+        # visualize.plotSimple(plot_det_arr,out_file = plot_det_file,title = 'Detection',xlabel = 'Iteration',ylabel = 'Accuracy',legend_entries=lengend_strs_detection)
+        if plot_losses:                
+            visualize.plotSimple(plot_loss_arr,out_file = plot_losses_file,title = 'Losses',xlabel = 'Iteration',ylabel = 'Loss',legend_entries=lengend_strs_loss)
 
 
         visualize.plotSimple([(plot_val_acc_arr[0],plot_val_acc_arr[1])],out_file = plot_acc_file,title = 'Loss',xlabel = 'Iteration',ylabel = 'Accuracy',legend_entries=['Val'])

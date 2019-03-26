@@ -252,7 +252,9 @@ def print_overlap(aps,class_names,overlap_thresh_all, log_arr):
 
 def test_overlap(det_vid_names_all, det_conf_all, det_time_intervals_all, second_thresh, train=False, log_arr = [], dataset = 'ucf'):
     
-    if dataset =='ucf':
+    print dataset
+
+    if dataset =='ucf' or dataset.startswith('ucf_cooc'):
         # class_names = ['BaseballPitch', 'BasketballDunk', 'Billiards', 'CleanAndJerk', 'CliffDiving', 'CricketBowling', 'CricketShot', 'Diving', 'FrisbeeCatch', 'GolfSwing', 'HammerThrow', 'HighJump', 'JavelinThrow', 'LongJump', 'PoleVault', 'Shotput', 'SoccerPenalty', 'TennisSwing', 'ThrowDiscus', 'VolleyballSpiking']
         # class_names.sort()
         class_names = globals.class_names_ucf
@@ -263,8 +265,10 @@ def test_overlap(det_vid_names_all, det_conf_all, det_time_intervals_all, second
     elif dataset =='activitynet':
         class_names = globals.class_names_activitynet
         gt_vid_names, gt_class_names, gt_time_intervals = load_activitynet_gt(train)
-        overlap_thresh_all = np.array([0.5,0.75,0.95])
+        overlap_thresh_all = np.array([0.5,0.7,0.9])
+        # overlap_thresh_all = np.arange(0.1,0.6,0.1)
         aps = np.zeros((len(class_names)+1,overlap_thresh_all.size))
+
     elif dataset=='ucf_untf':
         class_names = globals.class_names_ucf
         gt_vid_names, gt_class_names, gt_time_intervals = load_ucf_gt(train)
@@ -272,7 +276,7 @@ def test_overlap(det_vid_names_all, det_conf_all, det_time_intervals_all, second
         overlap_thresh_all = np.arange(0.1,0.6,0.1)
         fps_stuff = 10./30.
     else:
-        Exception('Problem. '+dataset+' not valid')
+        raise ValueError('Problem. '+dataset+' not valid')
 
 
     
@@ -474,8 +478,18 @@ def viz_overlap(out_dir_meta, det_vid_names, det_conf_all, det_time_intervals_al
 def viz_overlap_multi(out_dir_meta, det_conf_all_dict, out_shapes, fps_stuff, title= None):
     # print 'HELLO'
     # fps_stuff = 1./10.
-    class_names = ['BaseballPitch', 'BasketballDunk', 'Billiards', 'CleanAndJerk', 'CliffDiving', 'CricketBowling', 'CricketShot', 'Diving', 'FrisbeeCatch', 'GolfSwing', 'HammerThrow', 'HighJump', 'JavelinThrow', 'LongJump', 'PoleVault', 'Shotput', 'SoccerPenalty', 'TennisSwing', 'ThrowDiscus', 'VolleyballSpiking']
-    class_names.sort()
+    activitynet = False
+    if activitynet:
+        class_names = globals.class_names_activitynet
+        gt_vid_names_all, gt_class_names, gt_time_intervals_all = load_activitynet_gt(False)
+
+    # print len(gt_vid_names_all), type(gt_vid_names_all), gt_vid_names_all[0]
+    # print len(gt_class_names), type(gt_class_names), gt_class_names[0]
+    # print len(gt_time_intervals), type(gt_time_intervals), gt_time_intervals[0]
+    # raw_input()
+    else:
+        class_names = ['BaseballPitch', 'BasketballDunk', 'Billiards', 'CleanAndJerk', 'CliffDiving', 'CricketBowling', 'CricketShot', 'Diving', 'FrisbeeCatch', 'GolfSwing', 'HammerThrow', 'HighJump', 'JavelinThrow', 'LongJump', 'PoleVault', 'Shotput', 'SoccerPenalty', 'TennisSwing', 'ThrowDiscus', 'VolleyballSpiking']
+        class_names.sort()
 
     aps = np.zeros((len(class_names)+1,5))
     overlap_thresh_all = np.arange(0.1,0.6,0.1)
@@ -486,25 +500,29 @@ def viz_overlap_multi(out_dir_meta, det_conf_all_dict, out_shapes, fps_stuff, ti
         out_dir = os.path.join(out_dir_meta,class_name)
         util.mkdir(out_dir)
 
-        mat_file = os.path.join('../TH14evalkit','mat_files', class_name+'_test.mat')
+        if not activitynet:
+            mat_file = os.path.join('../TH14evalkit','mat_files', class_name+'_test.mat')
 
-        loaded = scipy.io.loadmat(mat_file)
-        
-        gt_vid_names_all = loaded['gtvideonames'][0]
-        gt_class_names = loaded['gt_events_class'][0]
+            loaded = scipy.io.loadmat(mat_file)
+            
+            gt_vid_names_all = loaded['gtvideonames'][0]
+            gt_class_names = loaded['gt_events_class'][0]
 
-        gt_time_intervals = loaded['gt_time_intervals'][0]
-        
-        arr_meta = [gt_vid_names_all, gt_class_names]
-        arr_out = []
-        for arr_curr in arr_meta:
-            arr_curr = [str(a[0]) for a in arr_curr]
-            arr_out.append(arr_curr)
+            gt_time_intervals = loaded['gt_time_intervals'][0]
+            
+            arr_meta = [gt_vid_names_all, gt_class_names]
+            arr_out = []
+            for arr_curr in arr_meta:
+                arr_curr = [str(a[0]) for a in arr_curr]
+                arr_out.append(arr_curr)
 
-        [gt_vid_names_all, gt_class_names] = arr_out
-        gt_time_intervals_all = np.array([a[0] for a in gt_time_intervals])
+            [gt_vid_names_all, gt_class_names] = arr_out
+            gt_time_intervals_all = np.array([a[0] for a in gt_time_intervals])
+
 
         gt_vid_names = list( np.unique(np.array(gt_vid_names_all)[np.array(gt_class_names)==class_name]))
+        # print 'gt_vid_names',np.array(gt_vid_names_all)[0],np.array(gt_class_names)[0]
+        # raw_input()
         # det_vid_names = np.array(det_vid_names)
         # print len(det_vid_names)
         # print np.unique(det_vid_names).shape
@@ -543,6 +561,7 @@ def viz_overlap_multi(out_dir_meta, det_conf_all_dict, out_shapes, fps_stuff, ti
             legend_entries = []
 
             max_det_conf = None
+            # print det_conf_all_dict
             for k in det_conf_all_dict.keys():
                 
 
@@ -551,12 +570,14 @@ def viz_overlap_multi(out_dir_meta, det_conf_all_dict, out_shapes, fps_stuff, ti
 
                 bin_keep = det_vid_names == gt_vid_name
                 
+                # print det_vid_names[0], gt_vid_names, np.sum(bin_keep)
+
                 bin_keep = np.logical_and(bin_keep, det_events_class_all==idx_class_name)
                 if np.sum(bin_keep)==0:
                     # print 'Continuing'
                     continue
 
-
+                # print 'not Continuing'
                 # det_conf_curr = det_conf_all_dict[k][0]
                 det_time_intervals_merged = det_time_intervals_all[bin_keep,:]
                 det_conf_curr = det_conf_curr[bin_keep]
@@ -589,9 +610,21 @@ def viz_overlap_multi(out_dir_meta, det_conf_all_dict, out_shapes, fps_stuff, ti
             if title is None:
                 title = 'det conf over time'
             # print plot_arr
+            out_file_first = out_file_curr[:out_file_curr.rindex('.')]
+            # plot_arr_for_save = {}
+            for idx_arr in range(len(plot_arr)):
+                # plot_arr_for_save[legend_entries[idx_arr]]=np.array(list(plot_arr[idx_arr]))
+                arr_curr = np.array(list(plot_arr[idx_arr])) 
+                np.save(out_file_first+'_'+legend_entries[idx_arr]+'.npy',arr_curr)
+
+
+                # print legend_entries[idx_arr],plot_arr_for_save[legend_entries[idx_arr]].shape
+
+
 
             
-            visualize.plotSimple(plot_arr,out_file = out_file_curr,title = title,xlabel = 'Time',ylabel = 'Detection Confidence',legend_entries=legend_entries)
+            visualize.plotSimple(plot_arr,out_file = out_file_curr,title = title,xlabel = 'Time',ylabel = 'Detection Confidence'
+            ,legend_entries=legend_entries)
             
         
         visualize.writeHTMLForFolder(out_dir)

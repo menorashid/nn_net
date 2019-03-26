@@ -256,12 +256,11 @@ def save_sort_idx_just_train_opv():
     train_file = os.path.join(dir_train_test_files,'train.txt')
     test_file = os.path.join(dir_train_test_files,'test.txt')
     
-    lines = util.readLinesFromFile(train_file)
-    # +util.readLinesFromFile(test_file)
-    # lines = lines[:5]
+    train_lines = util.readLinesFromFile(train_file)
+    lines = train_lines+util.readLinesFromFile(test_file)
+    num_train = len(train_lines)
     num_files = len(lines)
-    print len(lines)
-    print lines[0]
+    print 'num_files, num_train',num_files, num_train
 
     out_dir = '../scratch/i3d_dists_just_train'
     out_dir_in = '../scratch/i3d_dists'
@@ -270,21 +269,27 @@ def save_sort_idx_just_train_opv():
     npy_files = [line_curr.split(' ')[0] for line_curr in lines]
     
     vid_lens = np.load(os.path.join(out_dir_in,'vid_lens.npy'))
-    vid_lens = vid_lens[:len(lines)]
+    # vid_lens = vid_lens[:len(lines)]
     
+    # total_len = np.sum(vid_lens)
     total_len = np.sum(vid_lens)
-
+    total_len_train = np.sum(vid_lens[:num_train])
+    vid_idx_arr_file = os.path.join(out_dir, 'vid_idx_arr.npy')
+    vid_idx_arr = np.load(vid_idx_arr_file)
+    print vid_idx_arr.shape
+    
     arr_dots = []
-    for first_vid_idx in range(num_files-1):
+    for first_vid_idx in range(num_train):
+        print first_vid_idx
         file_curr = os.path.join(out_dir_in,str(first_vid_idx)+'.npy')
         arr_curr = np.load(file_curr)
-        e_curr = np.sum(vid_lens[:first_vid_idx+1])
-        arr_curr = arr_curr[:,:(total_len - e_curr)]
+        # print arr_curr.shape
+        # raw_input()
+        # e_curr = np.sum(vid_lens[:first_vid_idx+1])
+        # arr_curr = arr_curr[:,:(total_len - e_curr)]
         arr_dots.append(arr_curr)
     
 
-    vid_idx_arr_file = os.path.join(out_dir, 'vid_idx_arr.npy')
-    vid_idx_arr = np.load(vid_idx_arr_file)
     
 
     args =[]
@@ -292,15 +297,15 @@ def save_sort_idx_just_train_opv():
         out_file_curr = os.path.join(out_dir,str(idx_vid_len)+'_sort_idx_opv.npz')
         if os.path.exists(out_file_curr):
             continue
-        arg = (arr_dots, vid_idx_arr, idx_vid_len, vid_lens, out_file_curr)
+        arg = (arr_dots, vid_idx_arr, idx_vid_len, vid_lens, out_file_curr,num_train)
 
         args.append(arg)
     print len(args)
     
     for arg in args:
         save_sort_idx_opv_mp(arg)
-        print 'done'
-    #     break
+        # print 'done'
+        # break
 
     # pool = multiprocessing.Pool()
     # pool.map(save_sort_idx_opv_mp, args)
@@ -308,13 +313,14 @@ def save_sort_idx_just_train_opv():
     # pool.join()
 
 
-def save_sort_idx_opv_mp((arr_dots, vid_idx_arr, idx_vid_len,vid_lens,out_file_curr)):
+def save_sort_idx_opv_mp((arr_dots, vid_idx_arr, idx_vid_len,vid_lens,out_file_curr, num_train)):
     print idx_vid_len
     vid_idx_opv = np.unique(vid_idx_arr)
-
-    # for idx_vid_len in range(len(vid_lens)):
-    new_dot = integrate_dots(arr_dots, idx_vid_len, vid_lens)
-    
+    # print vid_idx_opv
+    # return
+    new_dot = integrate_dots(arr_dots, idx_vid_len, vid_lens, num_train)
+    # print new_dot.shape
+    # raw_input()
     max_vals_all = []
     max_idx_all = []
 
@@ -323,48 +329,52 @@ def save_sort_idx_opv_mp((arr_dots, vid_idx_arr, idx_vid_len,vid_lens,out_file_c
 
         rel_dots = new_dot[:, vid_idx_arr==vid_idx_curr]
         max_idx = np.argmax(rel_dots,axis = 1)[:,np.newaxis]
-        # print 'max_idx.shape',max_idx.shape
-        
         max_idx_all.append(max_idx.flatten())
-
 
         max_vals = np.take_along_axis(rel_dots, max_idx, axis = 1)
 
-         # rel_dots[:,max_idx]
         max_idx_new_dot = rel_vid_idx[max_idx]
-        # print 'max_vals.shape',max_vals.shape
         max_vals_all.append(max_vals.flatten())
-        # vid_idx_opv.append(vid_idx_curr)
-
+        
     max_vals_all = np.array(max_vals_all).T
     max_idx_all = np.array(max_idx_all).T
     sort_idx = np.argsort(max_vals_all,axis = 1)[:,::-1]
 
-    # out_file_curr = os.path.join(out_dir,str(idx_vid_len)+'_sort_idx_opv.npz')
     np.savez_compressed(out_file_curr,sort_idx = sort_idx, max_vals_all = max_vals_all, max_idx_all = max_idx_all)
 
 
-def integrate_dots(arr_dots, idx_vid_len, vid_lens):
+def integrate_dots(arr_dots, idx_vid_len, vid_lens, num_train):
     # for idx_vid_len in range(len(vid_lens)):
     total_len = np.sum(vid_lens)
-    print 'idx_vid_len',idx_vid_len
+    total_len_train = np.sum(vid_lens[:num_train])
+    # print 'idx_vid_len',idx_vid_len
     start_idx = np.sum(vid_lens[:idx_vid_len])
     end_idx = np.sum(vid_lens[:idx_vid_len+1])
     # vid_idx_arr[start_idx:end_idx]=idx_vid_len
     
-    new_dot = np.ones((vid_lens[idx_vid_len],total_len))*-1
+    new_dot = np.ones((vid_lens[idx_vid_len],total_len_train))*-1
     
-    if idx_vid_len<(len(vid_lens)-1):
-        new_dot[:,end_idx:] = arr_dots[idx_vid_len]
+    print idx_vid_len
 
-    for prev in range(idx_vid_len):
-        print prev,
+    if idx_vid_len<(num_train-1):
+        # new_dot[:,end_idx:] = arr_dots[idx_vid_len]
+
+        # print 'loading self'
+        arr_curr = arr_dots[idx_vid_len]
+        arr_curr = arr_curr[:,:(total_len_train - end_idx)]
+        new_dot[:,end_idx:] = arr_curr
+        # arr_dots[idx_vid_len]
+
+    for prev in range(min(num_train,idx_vid_len)):
+        
+        assert prev<num_train
         # print 'vid_lens[:idx_vid_len+1]',vid_lens[:idx_vid_len+1]
         start_idx_prev = np.sum(vid_lens[:prev])
         end_idx_prev = np.sum(vid_lens[:prev+1])
         start_ac = start_idx - end_idx_prev
         end_ac = end_idx - end_idx_prev
 
+        print prev,
         prev_select = arr_dots[prev][:,start_ac:end_ac].T
         new_dot[:,start_idx_prev:end_idx_prev] = prev_select
 
@@ -470,30 +480,24 @@ def get_cooc_per_vid(n = 10, just_train = False, one_per_vid = False):
         
         vid_name = os.path.split(npy_files[idx_vid_len])[1]
         out_file = os.path.join(out_dir_coocs, vid_name.replace('.npy','.npz'))
-        # if post_load.endswith('.npz'):
 
         sort_idx_file = os.path.join(out_dir,str(idx_vid_len)+post_load)
-            # '_sort_idx.npy')
+
         if os.path.exists(out_file):
             continue
+
         arg_curr = (sort_idx_file, out_file, n, vid_idx_arr, idx_vid_len)
         args.append(arg_curr)
 
     print len(args)
-    # raw_input()
-    # for arg in args:
-    #     print arg
-    #     func_curr(arg)
-    #     print 'done'
-        # raw_input()
-    
+   
     if len(args)>0:
         pool = multiprocessing.Pool()
         pool.map(func_curr, args)
         pool.close()
         pool.join()
 
-def visualize_cooc_hists(n = 10, just_train = False, one_per_vid = False):
+def visualize_cooc_hists(n = 10, just_train = False, one_per_vid = 'reg'):
 
     dir_train_test_files = '../data/ucf101/train_test_files'
     dir_gt_vecs = '../data/ucf101/gt_vecs/just_primary_corrected'
@@ -501,21 +505,27 @@ def visualize_cooc_hists(n = 10, just_train = False, one_per_vid = False):
     test_file = os.path.join(dir_train_test_files,'test.txt')
     if just_train:
         out_dir = '../scratch/i3d_dists_just_train'
-        lines = util.readLinesFromFile(train_file)+util.readLinesFromFile(test_file)
+        lines = util.readLinesFromFile(train_file)
+        # +util.readLinesFromFile(test_file)
     else:
         out_dir = '../scratch/i3d_dists'
         lines = util.readLinesFromFile(train_file)+util.readLinesFromFile(test_file)
 
     # out_dir = '../scratch/i3d_dists'
-    if one_per_vid:
+    if one_per_vid =='opv':
         out_dir_pre = 'arr_coocs_opv_'
+    elif one_per_vid == 'opvpc':
+        out_dir_pre = 'arr_coocs_per_class/'
     else:
         out_dir_pre = 'arr_coocs_'
 
 
-    # n = 10
+    # # n = 10
     out_dir_coocs = os.path.join(out_dir,out_dir_pre+str(n))
     out_dir_hists = os.path.join(out_dir,out_dir_pre+str(n)+'_viz')
+
+    # out_dir_coocs = os.path.join(out_dir,'arr_coocs_per_class',n)
+    # out_dir_hists = os.path.join(out_dir,'arr_coocs_per_class',n+'_viz')
     util.mkdir(out_dir_hists)
     out_dir_cooc_viz = os.path.join(out_dir_hists, 'mat')
     out_dir_bg = os.path.join(out_dir_hists,'bg')
@@ -565,23 +575,23 @@ def visualize_cooc_hists(n = 10, just_train = False, one_per_vid = False):
         all_vals = [val.flatten() for val in [fg_all,fg_fg,bg_all,bg_bg,fg_bg]]
         all_vals_all.append(all_vals)
 
-        for idx_out_file, out_dir_curr in enumerate(out_dirs_all):
-            out_file_curr = os.path.join(out_dir_curr, just_vid_name+'.jpg')
-            if os.path.exists(out_file_curr):
-                continue
+        # for idx_out_file, out_dir_curr in enumerate(out_dirs_all):
+        #     out_file_curr = os.path.join(out_dir_curr, just_vid_name+'.jpg')
+        #     if os.path.exists(out_file_curr):
+        #         continue
             
-            title = title_pres[idx_out_file]+just_vid_name
-            plot_idx_curr = plot_idx_all[idx_out_file]
+        #     title = title_pres[idx_out_file]+just_vid_name
+        #     plot_idx_curr = plot_idx_all[idx_out_file]
             
-            if plot_idx_curr is None:
-                visualize.saveMatAsImage(arr_cooc, out_file_curr, title = title)
-            else:
-                vals_curr = [all_vals[idx_curr] for idx_curr in plot_idx_curr]
-                legend_entries_curr = [legend_entries[idx_curr] for idx_curr in plot_idx_curr]
-                bins_all = [num_bins for idx_curr in plot_idx_curr]
+        #     if plot_idx_curr is None:
+        #         visualize.saveMatAsImage(arr_cooc, out_file_curr, title = title)
+        #     else:
+        #         vals_curr = [all_vals[idx_curr] for idx_curr in plot_idx_curr]
+        #         legend_entries_curr = [legend_entries[idx_curr] for idx_curr in plot_idx_curr]
+        #         bins_all = [num_bins for idx_curr in plot_idx_curr]
 
-                visualize.plotMultiHist(out_file_curr ,vals = vals_curr, num_bins = bins_all, legend_entries = legend_entries_curr, title = title, xlabel = xlabel, ylabel = ylabel, xticks = xtick_labels, density = True, align = 'mid')
-            print out_file_curr
+        #         visualize.plotMultiHist(out_file_curr ,vals = vals_curr, num_bins = bins_all, legend_entries = legend_entries_curr, title = title, xlabel = xlabel, ylabel = ylabel, xticks = xtick_labels, density = True, align = 'mid')
+        #     print out_file_curr
 
     print len(class_id)
     for class_idx, class_id_curr in enumerate(class_id.T):
@@ -614,6 +624,8 @@ def visualize_cooc_hists(n = 10, just_train = False, one_per_vid = False):
 
                 visualize.plotMultiHist(out_file_curr ,vals = vals_curr, num_bins = bins_all, legend_entries = legend_entries_curr, title = title, xlabel = xlabel, ylabel = ylabel, xticks = xtick_labels, density = True, align = 'mid')
             print out_file_curr
+            if idx_out_file == (len(out_dirs_all)-1):
+                visualize.writeHTMLForFolder(out_dir_curr)
 
      
 
@@ -994,7 +1006,174 @@ def create_comparative_html_fast():
             visualize.writeHTMLForDifferentFolders(out_file_html,folders,n_strs,img_names,rel_path_replace=dir_server,height=330,width=400) 
 
 
+def cooc_sanity_check():
+    dir_cooc_meta = '../scratch/i3d_dists_just_train'
+    num_neighbors = 100
+    dir_cooc = os.path.join(dir_cooc_meta,'arr_coocs_'+str(num_neighbors))
+    all_files = glob.glob(os.path.join(dir_cooc, 'video_*.npz'))
+    print len(all_files)
+
+    dir_i3d_feat = '../data/i3d_features'
+    dir_i3d_feat_val = os.path.join(dir_i3d_feat, 'Thumos14-I3D-JOINTFeatures_val')
+    dir_i3d_feat_test = os.path.join(dir_i3d_feat, 'Thumos14-I3D-JOINTFeatures_test')
+
+    for idx_file_curr, file_curr in enumerate(all_files):
+        print file_curr
+        just_name = os.path.split(file_curr)[1]
+        just_name = just_name[:just_name.rindex('.')]
+        cooc = np.load(file_curr)['arr_0']
+        
+        if 'validation' in os.path.split(file_curr)[1]:
+            feat_file = os.path.join(dir_i3d_feat_val, just_name+'.npy')
+        else:
+            feat_file = os.path.join(dir_i3d_feat_test, just_name+'.npy')
+
+        features = np.load(feat_file)
+
+        assert cooc.shape[0]==features.shape[0]
+
+
+
+def get_cooc_per_class_per_vid_mp((idx_vid, class_bin, sort_idx_file, out_file_info,num_train)):
+
+    (out_dir_meta,out_file) = out_file_info
+    print idx_vid
+    # print class_bin.shape
+    # print class_bin[idx_vid]
+
+    sort_idx = np.load(sort_idx_file)
+    if sort_idx_file.endswith('.npz'):
+        sort_idx =  sort_idx['sort_idx']
+
+    sort_idx_idx = os.path.split(sort_idx_file)[1]
+    sort_idx_idx = int(sort_idx_idx.split('_')[0])
+    assert sort_idx_idx==idx_vid
+
+
+    for class_id_curr in range(class_bin.shape[1]):
+
+        class_str = class_names[class_id_curr]
+        out_dir_curr = os.path.join(out_dir_meta,class_str)
+        util.mkdir(out_dir_curr)
+        out_file_mat = os.path.join(out_dir_curr, out_file)
+        
+        if os.path.exists(out_file_mat):
+            continue
+
+        idx_rel = np.where(class_bin[:num_train,class_id_curr])[0]
+        
+
+        num_neighbors = len(idx_rel)
+
+        if idx_vid<num_train and class_bin[idx_vid,class_id_curr]:
+            assert np.isin(idx_vid,idx_rel)
+            assert not np.isin(idx_vid, sort_idx[:,:num_neighbors])
+            num_neighbors = num_neighbors-1
+        else:
+            assert not np.isin(idx_vid,idx_rel)
+            assert not np.isin(idx_vid, sort_idx[:,:num_neighbors])
+
+     
+        top_neighbors = sort_idx[:,:num_neighbors]
+        cooc_curr = np.zeros((sort_idx.shape[0], sort_idx.shape[0]))
+        bin_rel_top = np.isin(top_neighbors, idx_rel)
+
+        for row_idx in range(cooc_curr.shape[0]):
+
+            cooc_curr[row_idx,row_idx] = 1.
+            row_top = top_neighbors[row_idx,bin_rel_top[row_idx]]
+            
+            if not np.any(bin_rel_top[row_idx]):
+                # print 'no rel row!',bin_rel_top[row_idx],top_neighbors[row_idx]
+                continue
+
+            for col_idx in range(row_idx+1, cooc_curr.shape[1]):
+                if not np.any(bin_rel_top[col_idx]):
+                    # print 'no rel col!',bin_rel_top[col_idx],top_neighbors[col_idx]
+                    continue
+
+                # print ' top_neighbors[row_idx]', top_neighbors[row_idx]
+                # print ' top_neighbors[col_idx]', top_neighbors[col_idx]
+
+                col_top = top_neighbors[col_idx,bin_rel_top[col_idx]]
+
+                common_top = np.intersect1d( row_top,col_top )
+
+                cooc_val = common_top.size/float(num_neighbors)
+
+                cooc_curr[row_idx, col_idx] = cooc_val
+                cooc_curr[col_idx, row_idx] = cooc_val
+
+        # out_file_im = '../scratch/'+'_'.join([str(val) for val in ['check',idx_vid,class_id_curr,'.jpg']])
+        # visualize.saveMatAsImage(cooc_curr,out_file_im)
+        # raw_input()
+
+        np.savez_compressed(out_file_mat, cooc_curr)
+
+def get_cooc_per_class_per_vid():
+    dir_train_test_files = '../data/ucf101/train_test_files'
+    dir_gt_vecs = '../data/ucf101/gt_vecs/just_primary_corrected'
+    train_file = os.path.join(dir_train_test_files,'train.txt')
+    test_file = os.path.join(dir_train_test_files,'test.txt')
+    
+    out_dir = '../scratch/i3d_dists_just_train'
+    lines_train = util.readLinesFromFile(train_file)
+    num_train = len(lines_train)
+    lines = lines_train+util.readLinesFromFile(test_file)
+
+    out_dir_cooc = '../scratch/i3d_dists_just_train/arr_coocs_per_class'
+
+    vid_idx_arr_file = os.path.join(out_dir, 'vid_idx_arr.npy')
+    vid_idx_arr = np.load(vid_idx_arr_file)
+    
+    vid_idx_arr = np.unique(vid_idx_arr)
+    post_load = '_sort_idx_opv.npz'
+    
+    class_bin = [[int(val) for val in line_curr.split(' ')[1:]] for line_curr in lines]
+    class_bin = np.array(class_bin)
+    vid_names = [os.path.split(line_curr.split(' ')[0])[1] for line_curr in lines]
+    print len(vid_names)
+    print class_bin.shape
+
+    num_files = len(vid_names)
+
+    args = []
+
+    for idx_vid_len in range(num_files):
+        
+        vid_name = vid_names[idx_vid_len]
+        sort_idx_file = os.path.join(out_dir,str(idx_vid_len)+post_load)
+        vid_name = vid_name[:vid_name.rindex('.')]
+        out_file_info= (out_dir_cooc, vid_name+'.npz')
+        # if idx_vid_len<num_train:
+        #     is_train = True
+        # else:
+        #     is_train = False
+        arg_curr = (idx_vid_len, class_bin, sort_idx_file, out_file_info, num_train)
+        args.append(arg_curr)
+
+    # for arg in args:
+    #     get_cooc_per_class_per_vid_mp(arg)
+
+    print len(args)
+    pool = multiprocessing.Pool()
+    pool.map(get_cooc_per_class_per_vid_mp, args)
+    pool.close()
+    pool.join()
+
+
 def main():
+    for class_name_curr in class_names[1:]:
+        visualize_cooc_hists(n = class_name_curr, just_train = True, one_per_vid = 'opvpc')
+    # visualize_cooc_hists(just_train = True)
+    # visualize.writeHTMLForFolder('../scratch')
+
+    # save_sort_idx_just_train_opv()
+    # get_cooc_per_class_per_vid()
+
+    # return
+    # print 'heelo'
+    # raw_input()
     # save_sort_idx_just_train()
     # return
     # save_sort_idx_just_train_opv()
@@ -1003,25 +1182,20 @@ def main():
 
     # just_train = True
 
-         
-
-
-
     # nn_net/scratch/i3d_dists_just_train_htmls/fg/BaseballPitch.html
-
-    # 
 
     # save_hists_per_class(just_train = True)
     # get_coocs_per_class(just_train = True)
     # compress_files()
-    one_per_vid = False
-    just_train = True
-    for n in [10,25,50]:
-        get_cooc_per_vid(n = n, just_train = just_train, one_per_vid = one_per_vid)
-        visualize_cooc_hists(n = n, just_train = just_train, one_per_vid = one_per_vid)
+
+    # one_per_vid = False
+    # just_train = True
+    # for n in [10,25,50]:
+    #     get_cooc_per_vid(n = n, just_train = just_train, one_per_vid = one_per_vid)
+    #     visualize_cooc_hists(n = n, just_train = just_train, one_per_vid = one_per_vid)
 
 
-        visualize.writeHTMLForFolder('../scratch/i3d_dists_just_train/arr_coocs_'+str(n)+'_viz/fg_nall')
+    #     visualize.writeHTMLForFolder('../scratch/i3d_dists_just_train/arr_coocs_'+str(n)+'_viz/fg_nall')
 
     # save_sort_idx_just_train()
     # make_cooc_html(just_train = True)

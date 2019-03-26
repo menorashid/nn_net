@@ -54,19 +54,33 @@ class Graph_Multi_Video(nn.Module):
         
         self.bn =None
         # nn.BatchNorm1d(2048, affine = False)
-        self.linear_layer = nn.Linear(feat_dim[0], feat_dim[1], bias = True)
+        self.linear_layer = []
+        self.linear_layer.append(nn.Linear(feat_dim[0], feat_dim[1], bias = True))
+        
+        if non_lin is not None:
+            if non_lin.lower()=='ht':
+                self.linear_layer.append(nn.Hardtanh())
+            elif non_lin.lower()=='rl':
+                self.linear_layer.append(nn.ReLU())
+            else:
+                error_message = str('non_lin %s not recognized', non_lin)
+                raise ValueError(error_message)
 
+
+        self.linear_layer = nn.Sequential(*self.linear_layer)    
         # self.graph_layer = nn.ModuleList()
         
         # self.last_graph = nn.ModuleList()
         
         
-        self.graph_layer = Graph_Layer_Wrapper(in_out[0],n_out = in_out[1], non_lin = non_lin, method = method, aft_nonlin = aft_nonlin)
+        self.graph_layer = Graph_Layer_Wrapper(in_out[0],n_out = in_out[1], non_lin = None, method = method, aft_nonlin = aft_nonlin)
         
         last_graph = []
         last_graph.append(nn.Dropout(0.5))
         last_graph.append(nn.Linear(in_out[-1],n_classes, bias = True))
-        
+        if sigmoid:
+            last_graph.append(nn.Sigmoid())
+
         self.last_graph = nn.Sequential(*last_graph)
         
     def forward(self, input, epoch_num = None, ret_bg =False, branch_to_test = -1):
@@ -111,6 +125,7 @@ class Graph_Multi_Video(nn.Module):
         for input in input_chunks:
             input_sizes = [input_curr.size(0) for input_curr in input]
             input = torch.cat(input,0)
+            # print input.size()
 
             if is_cuda:
                 input = input.cuda()
@@ -153,7 +168,9 @@ class Graph_Multi_Video(nn.Module):
 
                 end = start+input_sizes[idx_sample]
                 x_curr = out_col[start:end,:]
-                out_graph_curr = out_graph[start:end,:]
+
+                # THIS LINE IS DIFFERENT BETWEEN RETF AND NO RETF
+                out_graph_curr = feature_out[start:end,:]
 
                 x_all.append(x_curr)
                 out_graph_all.append(out_graph_curr)
@@ -172,7 +189,7 @@ class Graph_Multi_Video(nn.Module):
         # x_all = torch.cat(x_all,dim=0)
         # out_graph_all = torch.cat(out_graph_all, dim = 0)
         # print x_all.size(), out_graph_all.size()
-
+        # print graph_sums
         if hasattr(self,'feat_ret') and self.feat_ret:
             pmf_all = [pmf_all, [torch.cat(graph_sums,dim = 0),out_graph_all,input_sizes_all]]
         elif self.graph_sum:

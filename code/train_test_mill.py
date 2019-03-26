@@ -121,10 +121,14 @@ def test_model_core(model, test_dataloader, criterion, log_arr, multibranch = 1)
             else:
                 preds_mini = torch.cat(preds_mini,0)
         
-        if 'l1' in criterion_str:
+        if 'casl' in criterion_str:
+            loss = criterion(labels, preds_mini, att, out)
+        elif 'l1' in criterion_str:
             loss = criterion(labels, preds_mini, att)
         else:
             loss = criterion(labels, preds_mini)
+        
+
         labels_all.append(labels.data.cpu().numpy())
         loss_iter = loss.data[0]
         loss_iter_total+=loss_iter    
@@ -291,8 +295,11 @@ def visualize_dets(model, test_dataloader, dir_viz, first_thresh , second_thresh
                 out = out[:,np.where(bin_trim)[0]]
                 pmf = pmf[np.where(bin_trim)[0]]
 
-            # out = torch.nn.functional.softmax(out,dim = 1)
-            # print 'not smaxing'
+            if branch_to_test==-1:
+                out = torch.nn.functional.softmax(out,dim = 1)
+                print 'smaxing'
+            else:
+                print 'not smaxing'
 
             start_seq = np.array(range(0,out.shape[0]))*fps_stuff
             end_seq = np.array(range(1,out.shape[0]+1))*fps_stuff
@@ -304,7 +311,16 @@ def visualize_dets(model, test_dataloader, dir_viz, first_thresh , second_thresh
             # print det_class
             # raw_input()
             if det_class==-1:
-                class_idx = np.where(labels[idx_sample].numpy())[0][0]
+                class_idx = np.where(labels[idx_sample].numpy())[0]
+                # [0][0]
+                if len(class_idx)>2:
+                    print class_idx
+                    class_idx = class_idx[2]
+                else:
+                    class_idx = class_idx[0]
+                # else:
+                #     continue
+
                 class_idx_gt = class_idx
             elif det_class ==-2:
                 bg = bg.data.cpu().numpy()
@@ -389,7 +405,7 @@ def visualize_dets(model, test_dataloader, dir_viz, first_thresh , second_thresh
     # raw_input()
     plot_dict = {}
     plot_dict['Det'] = [det_conf_all,det_time_intervals_all, det_events_class_all, np.array(det_vid_names)]
-    # plot_dict['Merged'] = [det_conf_merged_all,det_time_intervals_merged_all,det_events_class_merged, det_vid_names_merged]
+    plot_dict['Merged'] = [det_conf_merged_all,det_time_intervals_merged_all,det_events_class_merged, det_vid_names_merged]
 
     # et.viz_overlap(dir_viz, det_vid_names, det_conf_all, det_time_intervals_all, det_events_class_all,out_shapes)
     et.viz_overlap_multi(dir_viz,  plot_dict, out_shapes, fps_stuff)
@@ -397,7 +413,7 @@ def visualize_dets(model, test_dataloader, dir_viz, first_thresh , second_thresh
     # np.savez('../scratch/debug_det_graph.npz', det_vid_names = det_vid_names, det_conf = det_conf, det_time_intervals = det_time_intervals, det_events_class = det_events_class)
 
 
-def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh , second_thresh , bin_trim = None , multibranch =1, branch_to_test = -1,dataset = 'ucf', save_outfs = None, test_method = 'original', fps_stuff = 16./25.):
+def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh , second_thresh , bin_trim = None , multibranch =1, branch_to_test = -1,dataset = 'ucf', save_outfs = None, test_method = 'original', fps_stuff = 16./25., matlab_arr = None, soft_out = True):
 
     # model, 
     # print 'test_dataloader ',test_dataloader 
@@ -433,7 +449,8 @@ def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh ,
 
     model.eval()
     limit_bef =  test_dataloader.dataset.feature_limit
-    test_dataloader.dataset.feature_limit = None
+    test_dataloader.dataset.select_front = True
+    # test_dataloader.dataset.feature_limit = None
 
     is_cuda = next(model.parameters()).is_cuda
     if not is_cuda:
@@ -474,14 +491,19 @@ def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh ,
                 if multibranch>1:
                     if 'perfectg' in model_name or 'cooc' in model_name:
                         out, pmf = model.forward([sample.cuda(),batch['gt_vec'][idx_sample].cuda()], branch_to_test = branch_to_test)
+                    elif 'cog' in model_name:
+                        out, pmf = model.forward(sample, branch_to_test = branch_to_test)
                     else:
                         out, pmf = model.forward(sample.cuda(), branch_to_test = branch_to_test)
                     
                 else:
                     if 'perfectg' in model_name or 'cooc' in model_name:
                         out,pmf = model.forward([sample.cuda(),batch['gt_vec'][idx_sample].cuda()])
-                    else:    
-                        out, pmf = model.forward(sample.cuda())
+                    else:  
+                        # if type(sample)==type([]):
+                        out, pmf = model.forward(sample)
+                        # else:  
+                        #     out, pmf = model.forward(sample.cuda())
                         # print pmf
                         # print model
                         if save_outfs:
@@ -511,9 +533,9 @@ def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh ,
             # print det_vid_names_ac[idx_test]
             # print out.size()
             # raw_input()
-            
-            if second_thresh>=0 and branch_to_test!=-2 and branch_to_test!=-4 and branch_to_test!=-5:
-                # print 'smaxing'
+
+            if second_thresh>=0 and soft_out and branch_to_test!=-2 and branch_to_test!=-4 and branch_to_test!=-5:
+                print 'smaxing'
                 out_temp = out.data.cpu().numpy()
                 idx_interesting = np.where(np.sum(out_temp,axis = 1)==0)[0]
                 # print idx_interesting
@@ -641,16 +663,32 @@ def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh ,
         det_conf = np.concatenate(det_conf_all,axis =0)
         det_time_intervals = np.concatenate(det_time_intervals_all,axis = 0)
         det_events_class = np.array(det_events_class)
-        # class_keep = np.argmax(det_conf , axis = 1)
+        # print globs.class_names
 
-        # np.savez('../scratch/debug_det_graph.npz', det_vid_names = det_vid_names, det_conf = det_conf, det_time_intervals = det_time_intervals, det_events_class = det_events_class)
-        # raw_input()
+        # class_idx = [7,9,12,21,22,23,24,26,31,33,36,40,45,51,68,79,85,92,93,97]
+        # if matlab_arr is not None:
+        #     for idx_det in range(len(det_vid_names)):
+        #         vid_curr = det_vid_names[idx_det]
+        #         start_time = det_time_intervals[idx_det,0]
+        #         end_time = det_time_intervals[idx_det,1]
+        #         conf = det_conf[idx_det]
+        #         class_curr = det_events_class[idx_det]
+        #         class_idx_curr = class_idx[class_curr]
+        #         str_curr = []
+        #         str_curr.append(vid_curr+'.mpeg')
+        #         str_curr.append('%.2f'%start_time)
+        #         str_curr.append('%.2f'%end_time)
+        #         str_curr.append('%d'%class_idx_curr)
+        #         str_curr.append('%.10f'%conf)
+        #         str_curr = ' '.join(str_curr)
+        #         matlab_arr.append(str_curr)
+
 
         aps = et.test_overlap(det_vid_names, det_conf, det_time_intervals,det_events_class,log_arr = log_arr, dataset = dataset)
     
     model.train()
     
-    test_dataloader.dataset.feature_limit = limit_bef
+    # test_dataloader.dataset.feature_limit = limit_bef
     
     return aps
 
@@ -851,8 +889,10 @@ def test_model(out_dir_train,
         append_name = ''    
 
     log_file = os.path.join(out_dir_results,'log'+append_name+'.txt')
+    matlab_file = os.path.join(out_dir_results,'dets_for_matlab'+append_name+'.txt')
     out_file = os.path.join(out_dir_results,'aps'+append_name+'.npy')
     log_arr=[]
+    matlab_arr = []
 
     model = torch.load(model_file)
     # print model
@@ -890,21 +930,26 @@ def test_model(out_dir_train,
         bin_trim = None
     
     if visualize:
-        dir_viz = os.path.join(out_dir_results, '_'.join([str(val) for val in ['viz',det_class, first_thresh, second_thresh]]))
+        dir_viz = os.path.join(out_dir_results, '_'.join([str(val) for val in ['viz',det_class, first_thresh, second_thresh, branch_to_test]]))
         util.mkdir(dir_viz)
         if multibranch>1:
             branch_to_test_pass = branch_to_test
+        elif branch_to_test<0:
+            branch_to_test_pass = branch_to_test
         else:
             branch_to_test_pass = -1
+        # print branch_to_test_pass
+        # raw_input()
         visualize_dets(model, test_dataloader,  dir_viz,first_thresh = first_thresh, second_thresh = second_thresh,bin_trim = bin_trim,det_class = det_class, branch_to_test = branch_to_test_pass, criterion_str = criterion_str,dataset = dataset)
     elif test_pair:
         aps = test_model_overlap_pairs(model, test_dataloader, criterion, log_arr ,first_thresh = first_thresh, second_thresh = second_thresh, bin_trim = bin_trim, multibranch = multibranch, branch_to_test = branch_to_test,dataset = dataset, save_outfs = save_outfs)
         np.save(out_file, aps)
         util.writeFile(log_file, log_arr)
     else:
-        aps = test_model_overlap(model, test_dataloader, criterion, log_arr ,first_thresh = first_thresh, second_thresh = second_thresh, bin_trim = bin_trim, multibranch = multibranch, branch_to_test = branch_to_test,dataset = dataset, save_outfs = save_outfs, test_method = test_method)
+        aps = test_model_overlap(model, test_dataloader, criterion, log_arr ,first_thresh = first_thresh, second_thresh = second_thresh, bin_trim = bin_trim, multibranch = multibranch, branch_to_test = branch_to_test,dataset = dataset, save_outfs = save_outfs, test_method = test_method, matlab_arr = matlab_arr)
         np.save(out_file, aps)
         util.writeFile(log_file, log_arr)
+        util.writeFile(matlab_file, matlab_arr)
 
 
 def visualize_sim_mat(out_dir_train,

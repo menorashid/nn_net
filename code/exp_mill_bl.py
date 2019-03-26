@@ -10,7 +10,7 @@ import numpy as np
 import torch
 from globals import * 
 
-def get_data(dataset, limit, all_classes, just_primary, gt_vec, k_vec, test_pair = False):
+def get_data(dataset, limit, all_classes, just_primary, gt_vec, k_vec, test_pair = False, num_similar = 0):
 
     if dataset =='ucf':
         dir_files = '../data/ucf101/train_test_files'
@@ -59,8 +59,17 @@ def get_data(dataset, limit, all_classes, just_primary, gt_vec, k_vec, test_pair
             test_data = UCF_dataset_gt_vec(test_file, None)
         else:
             # all_classes
-            train_data = UCF_dataset(train_file, limit)
-            test_train_data = UCF_dataset(test_train_file, limit)
+            # train_data = UCF_dataset(train_file, limit)
+            # test_train_data = UCF_dataset(test_train_file, limit)
+
+            if num_similar>0:
+                train_data = UCF_dataset_withNumSimilar(train_file, limit, num_similar = num_similar)
+                # test_train_data =  UCF_dataset_withNumSimilar(test_train_file, limit, num_similar = num_similar)
+            else:
+                train_data = UCF_dataset(train_file, limit)
+                # test_train_data = UCF_dataset(test_train_file, limit)
+
+            test_train_data =  UCF_dataset(test_train_file, limit)
             test_data = UCF_dataset(test_file, None)
     elif dataset =='activitynet':
         dir_files = '../data/activitynet/train_test_files'
@@ -77,9 +86,15 @@ def get_data(dataset, limit, all_classes, just_primary, gt_vec, k_vec, test_pair
         files = [file_curr+pp for file_curr,pp in zip(files,post_pends)]
         
         train_file, test_train_file, test_file = files
-        train_data = UCF_dataset(train_file, limit)
-        test_train_data = UCF_dataset(test_train_file, limit)
-        test_data = UCF_dataset(test_file, None)
+        if num_similar>0:
+            train_data = UCF_dataset_withNumSimilar(train_file, limit, num_similar = num_similar)
+            # test_train_data =  UCF_dataset_withNumSimilar(test_train_file, limit, num_similar = num_similar)
+        else:
+            train_data = UCF_dataset(train_file, limit)
+            # test_train_data = UCF_dataset(test_train_file, limit)
+        test_train_data =  UCF_dataset(test_train_file, limit)
+        test_data =  UCF_dataset(test_file, None)
+        
     elif dataset =='ucf_untf':
         dir_files = '../data/ucf101/train_test_files'
         n_classes = 20
@@ -99,15 +114,60 @@ def get_data(dataset, limit, all_classes, just_primary, gt_vec, k_vec, test_pair
         train_data = UCF_dataset(train_file, limit)
         test_train_data = UCF_dataset(test_train_file, limit)
         test_data = UCF_dataset(test_file, None)
-    print train_file, test_file
+    elif dataset == 'ucf_cooc_per_class':
+        cooc_str = '_cooc_per_class'
+        dir_files = '../data/ucf101/train_test_files'
+        n_classes = 20
+        trim_preds = None
+        post_pends = ['','','']
+        train_file = os.path.join(dir_files, 'train'+cooc_str)
+        test_train_file = os.path.join(dir_files, 'test'+cooc_str)
+        test_file = os.path.join(dir_files, 'test'+cooc_str)
+        
+        files = [train_file, test_train_file, test_file]
+        post_pends = [pp+'.txt' for pp in post_pends]
+        files = [file_curr+pp for file_curr,pp in zip(files,post_pends)]
+        
+        train_file, test_train_file, test_file = files
+        train_data = UCF_dataset_cooc_per_class_graph(train_file, limit)
+        test_train_data = UCF_dataset_cooc_per_class_graph(test_train_file, limit)
+        test_data = UCF_dataset_cooc_per_class_graph(test_file, None)
+
+    elif dataset.startswith('ucf_cooc'):
+        cooc_number = '_'.join(dataset.split('_')[2:])
+        cooc_str = '_cooc_'+cooc_number
+        dir_files = '../data/ucf101/train_test_files'
+        n_classes = 20
+        trim_preds = None
+        post_pends = ['','','']
+        train_file = os.path.join(dir_files, 'train'+cooc_str)
+        test_train_file = os.path.join(dir_files, 'test'+cooc_str)
+        test_file = os.path.join(dir_files, 'test'+cooc_str)
+        
+        files = [train_file, test_train_file, test_file]
+
+        
+        post_pends = [pp+'.txt' for pp in post_pends]
+        files = [file_curr+pp for file_curr,pp in zip(files,post_pends)]
+        
+        train_file, test_train_file, test_file = files
+        train_data = UCF_dataset_cooc_graph(train_file, limit)
+        test_train_data = UCF_dataset_cooc_graph(test_train_file, limit)
+        test_data = UCF_dataset_cooc_graph(test_file, None)
+
+    print train_file, test_train_file, test_file
+    print os.path.exists(train_file), os.path.exists(test_train_file), os.path.exists(test_file)
     # raw_input()
     return train_data, test_train_data, test_data, n_classes, trim_preds
 
-def get_criterion(criterion_str,attention,class_weights_val,  loss_weights, multibranch):
+def get_criterion(criterion_str,attention,class_weights_val,  loss_weights, multibranch, num_similar = 0):
 
     args = {'class_weights' : class_weights_val, 
             'loss_weights' : loss_weights, 
             'num_branches' : multibranch} 
+
+    if num_similar>0:
+        args['num_similar'] = num_similar
 
     if criterion_str is None:
         if attention:
@@ -174,7 +234,9 @@ def train_simple_mill_all_classes(model_name,
                                     save_outfs = False,
                                     test_pair = False, 
                                     criterion_str= None, 
-                                    test_method = 'original'):
+                                    test_method = 'original',
+                                    plot_losses = False,
+                                    num_similar = 0):
 
     num_epochs = epoch_stuff[1]
 
@@ -188,7 +250,7 @@ def train_simple_mill_all_classes(model_name,
 
     lr = lr
 
-    train_data, test_train_data, test_data, n_classes, trim_preds = get_data(dataset, limit, all_classes, just_primary, gt_vec, k_vec, test_pair = test_pair)
+    train_data, test_train_data, test_data, n_classes, trim_preds = get_data(dataset, limit, all_classes, just_primary, gt_vec, k_vec, test_pair = test_pair, num_similar = num_similar)
     
     network_params['n_classes']=n_classes
 
@@ -205,7 +267,7 @@ def train_simple_mill_all_classes(model_name,
         class_weights_val = None
 
     
-    criterion, criterion_str = get_criterion(criterion_str,attention,class_weights_val,  loss_weights, multibranch)
+    criterion, criterion_str = get_criterion(criterion_str,attention,class_weights_val,  loss_weights, multibranch, num_similar = num_similar)
     
     init = False
     
@@ -279,7 +341,8 @@ def train_simple_mill_all_classes(model_name,
                 model_file = model_file,
                 epoch_start = epoch_start,
                 network_params = network_params, 
-                multibranch = multibranch)
+                multibranch = multibranch,
+                plot_losses = plot_losses)
     
 
     if not test_mode:
@@ -1471,16 +1534,25 @@ def simple_just_mill_flexible():
                                     loss_weights = loss_weights,
                                     test_method = test_method)
 
-def graph_l1_experiment():
-    # print 'hey girl'
+def graph_l1_experiment_untf():
+    print 'hey girl'
     # raw_input()
-    model_name = 'graph_multi_video_with_L1_more_lin'
-    
+    model_name = 'graph_multi_video_with_L1_retF'
+    criterion_str = 'MultiCrossEntropyMultiBranchWithL1_CASL'
+    loss_weights = [1,1,1]
+    plot_losses = True
+
+    # model_name = 'graph_multi_video_with_L1'
+    # criterion_str = 'MultiCrossEntropyMultiBranchWithL1'
+    # loss_weights = [1,1]
+    # plot_losses = False
+
     lr = [0.001,0.001, 0.001]
     multibranch = 1
-    loss_weights = [1,1]
+    # loss_weights = [1,1]
     
     branch_to_test = -2
+    print 'branch_to_test',branch_to_test
     attention = True
 
     k_vec = None
@@ -1498,11 +1570,11 @@ def graph_l1_experiment():
     
     
     epoch_stuff = [100,100]
-    dataset = 'ucf'
-    limit  = 500
-    save_after = 10
+    dataset = 'ucf_untf'
+    limit  = 750
+    save_after = 50
     
-    test_mode = True
+    test_mode = False
     
     # test_method = 'wtalc'
     # test_method = 'wtalc'
@@ -1522,21 +1594,19 @@ def graph_l1_experiment():
     
     network_params = {}
     network_params['deno'] = 8
-    # network_params['in_out'] = [2048,512]
-    # network_params['feat_dim'] = [2048,1024]
-
-    network_params['in_out'] = [2048,512,512]
+    network_params['in_out'] = [2048,1024]
     network_params['feat_dim'] = [2048,1024]
-
+    network_params['feat_ret']=True
+ 
     network_params['graph_size'] = 2
     network_params['method'] = 'cos'
     network_params['sparsify'] = 0.5
     network_params['graph_sum'] = attention
-    network_params['non_lin'] = 'HT'
-    network_params['aft_nonlin']='HT_L2'
+    network_params['non_lin'] = None
+    network_params['aft_nonlin']='RL_L2'
     network_params['sigmoid'] = False
-    post_pend = '_noZeroSelf'
-    first_thresh=0.
+    post_pend = '_difflossweights'
+    first_thresh=0
     class_weights = True
     test_after = 10
     all_classes = False
@@ -1573,7 +1643,136 @@ def graph_l1_experiment():
                         attention = attention,
                         test_pair = False,
                         test_post_pend = test_post_pend,
-                        test_method = test_method)
+                        test_method = test_method,
+                        criterion_str = criterion_str,
+                        plot_losses = plot_losses)
+
+def graph_l1_experiment():
+    print 'hey girl'
+    # raw_input()
+    model_name = 'graph_multi_video_with_L1_retF'
+    criterion_str = 'MultiCrossEntropyMultiBranchWithL1_CASL'
+    loss_weights = [1.,0.,0.3]
+    plot_losses = True
+
+    # model_name = 'graph_multi_video_with_L1'
+    # criterion_str = 'MultiCrossEntropyMultiBranchWithL1'
+    # loss_weights = [1.,0.]
+    # plot_losses = False
+
+    # model_name = 'graph_multi_video_with_L1'
+    # criterion_str = 'MultiCrossEntropyMultiBranchFakeL1_CASL'
+    # loss_weights = [1.,0.5]
+    # plot_losses = True
+
+    lr = [0.001,0.001, 0.001]
+    multibranch = 1
+    # loss_weights = [1,1]
+    
+    branch_to_test = -2
+    print 'branch_to_test',branch_to_test
+    attention = True
+
+    k_vec = None
+
+    gt_vec = False
+    just_primary = False
+
+    seed = 999
+    torch.backends.cudnn.deterministic = True
+    random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
+    
+    
+    
+    epoch_stuff = [250,250]
+    dataset = 'ucf'
+    num_similar = 0
+    batch_size = 32
+    # -2*num_similar
+    batch_size_val = 32
+    # 32
+    limit  = None
+    save_after = 50
+    
+    test_mode = False
+    
+    # test_method = 'wtalc'
+    # test_method = 'wtalc'
+    # test_post_pend = '_'+test_method+'_tp_fp_conf'
+
+    # test_method = 'best_worst_dot'
+    # test_post_pend = '_'+test_method
+    test_method = 'original'
+    test_post_pend = '_'+test_method+'_class'
+
+    model_nums = None
+    retrain = False
+    viz_mode = False
+    viz_sim = False
+
+    # post_pend = '_noBiasLastLayer'
+    
+    network_params = {}
+
+    network_params['deno'] = 8
+    network_params['in_out'] = [2048,1024]
+    network_params['feat_dim'] = [2048,1024]
+    network_params['feat_ret']=True
+ 
+    network_params['graph_size'] = 2
+    network_params['method'] = 'cos'
+    network_params['sparsify'] = 0.5
+    network_params['graph_sum'] = attention
+    network_params['non_lin'] = None
+    network_params['aft_nonlin']='RL_L2'
+    network_params['sigmoid'] = False
+    post_pend = '_numSim_'+str(num_similar)+'_rest_'+str(batch_size)+'_test'
+    # post_pend = '_htbefwithcasl'
+    first_thresh=0.
+    class_weights = True
+    test_after = 10
+    all_classes = False
+    
+    second_thresh = 0.5
+    det_class = -1
+    train_simple_mill_all_classes (model_name = model_name,
+                        lr = lr,
+                        dataset = dataset,
+                        network_params = network_params,
+                        limit = limit, 
+                        epoch_stuff= epoch_stuff,
+                        batch_size = batch_size,
+                        batch_size_val = batch_size_val,
+                        save_after = save_after,
+                        test_mode = test_mode,
+                        class_weights = class_weights,
+                        test_after = test_after,
+                        all_classes = all_classes,
+                        just_primary = just_primary,
+                        model_nums = model_nums,
+                        retrain = retrain,
+                        viz_mode = viz_mode,
+                        second_thresh = second_thresh,
+                        first_thresh = first_thresh,
+                        det_class = det_class,
+                        post_pend = post_pend,
+                        viz_sim = viz_sim,
+                        gt_vec = gt_vec,
+                        loss_weights = loss_weights,
+                        multibranch = multibranch,
+                        branch_to_test = branch_to_test,
+                        k_vec = k_vec,
+                        attention = attention,
+                        test_pair = False,
+                        test_post_pend = test_post_pend,
+                        test_method = test_method,
+                        criterion_str = criterion_str,
+                        plot_losses = plot_losses,
+                        num_similar = num_similar)
+
 
 def graph_wsddn_experiment():
     model_name = 'graph_multi_video_wsddn'
@@ -1959,9 +2158,908 @@ def graph_l1_supervise_W_graph_direct_experiment():
                         test_method = test_method)
 
 
-def main():
+
+def graph_cooc_experiment():
+    # print 'hey girl'
+    # raw_input()
+    model_name = 'graph_multi_video_cog'
+    criterion_str = 'MultiCrossEntropyMultiBranchFakeL1_CASL'
+    # criterion_str = 'MultiCrossEntropyMultiBranch'
+    # loss_weights = [1]
+    # plot_losses = False
+
+    # model_name = 'graph_multi_video_with_L1'
+    # criterion_str = 'MultiCrossEntropyMultiBranchWithL1'
+    loss_weights = [1,0.5]
+    plot_losses = True
+
+    lr = [0.001,0.001]
+    multibranch = 1
+    # loss_weights = [1,1]
     
-    graph_l1_experiment()
+    branch_to_test = -2
+    print 'branch_to_test',branch_to_test
+    attention = False
+
+    k_vec = None
+
+    gt_vec = False
+    just_primary = False
+
+    seed = 999
+    torch.backends.cudnn.deterministic = True
+    random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
+    
+    
+    
+    epoch_stuff = [100,200]
+    dataset = 'ucf_cooc_25'
+    limit  = None
+    save_after = 50
+    
+    test_mode = False
+    
+    # test_method = 'wtalc'
+    # test_method = 'wtalc'
+    # test_post_pend = '_'+test_method+'_tp_fp_conf'
+
+    # test_method = 'best_worst_dot'
+    # test_post_pend = '_'+test_method
+    test_method = 'original'
+    test_post_pend = '_'+test_method+'_class'
+
+    model_nums = None
+    retrain = False
+    viz_mode = False
+    viz_sim = False
+
+    # post_pend = '_noBiasLastLayer'
+    
+    network_params = {}
+    network_params['deno'] = 8
+    network_params['in_out'] = [2048,1024]
+    network_params['feat_ret']=True
+ 
+    # network_params['graph_size'] = 2
+    # network_params['method'] = 'cos'
+    network_params['sparsify'] = 'mid'
+    # network_params['graph_sum'] = attention
+    # network_params['non_lin'] = 'HT'
+    network_params['aft_nonlin']='RL_L2'
+    # network_params['sigmoid'] = False
+    post_pend = '_regulardivsumrow'
+    first_thresh=0.
+    class_weights = True
+    test_after = 10
+    all_classes = False
+    
+    second_thresh = 0.5
+    det_class = -1
+    train_simple_mill_all_classes (model_name = model_name,
+                        lr = lr,
+                        dataset = dataset,
+                        network_params = network_params,
+                        limit = limit, 
+                        epoch_stuff= epoch_stuff,
+                        batch_size = 32,
+                        batch_size_val = 32,
+                        save_after = save_after,
+                        test_mode = test_mode,
+                        class_weights = class_weights,
+                        test_after = test_after,
+                        all_classes = all_classes,
+                        just_primary = just_primary,
+                        model_nums = model_nums,
+                        retrain = retrain,
+                        viz_mode = viz_mode,
+                        second_thresh = second_thresh,
+                        first_thresh = first_thresh,
+                        det_class = det_class,
+                        post_pend = post_pend,
+                        viz_sim = viz_sim,
+                        gt_vec = gt_vec,
+                        loss_weights = loss_weights,
+                        multibranch = multibranch,
+                        branch_to_test = branch_to_test,
+                        k_vec = k_vec,
+                        attention = attention,
+                        test_pair = False,
+                        test_post_pend = test_post_pend,
+                        test_method = test_method,
+                        criterion_str = criterion_str,
+                        plot_losses = plot_losses)
+
+
+def wtalc_us_experiment():
+    print 'hey girl'
+    # raw_input()
+    model_name = 'wtalc_multi_video_with_L1'
+    criterion_str = 'MultiCrossEntropyMultiBranchFakeL1_CASL'
+    loss_weights = [1,0.5]
+    plot_losses = True
+
+    lr = [0.001,0.001]
+    multibranch = 1
+    
+    branch_to_test = -2
+    print 'branch_to_test',branch_to_test
+
+    attention = False
+    k_vec = None
+    gt_vec = False
+    just_primary = False
+
+    seed = 999
+    torch.backends.cudnn.deterministic = True
+    random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
+    
+    
+    
+    epoch_stuff = [250,250]
+    dataset = 'ucf'
+    limit  = None
+    save_after = 50
+    
+    test_mode = True
+    
+    test_method = 'original'
+    test_post_pend = '_'+test_method+'_class'
+
+    model_nums = [249]
+    retrain = False
+    viz_mode = True
+    viz_sim = False
+
+    
+    network_params = {}
+    network_params['deno'] = 8
+    network_params['in_out'] = [2048,2048]
+    network_params['feat_ret']=True
+ 
+    network_params['aft_nonlin']='RL_L2'
+    post_pend = '_caslexp'
+    first_thresh=0.
+    class_weights = True
+    test_after = 10
+    all_classes = False
+    
+    second_thresh = 0.5
+    det_class = -1
+    train_simple_mill_all_classes (model_name = model_name,
+                        lr = lr,
+                        dataset = dataset,
+                        network_params = network_params,
+                        limit = limit, 
+                        epoch_stuff= epoch_stuff,
+                        batch_size = 32,
+                        batch_size_val = 32,
+                        save_after = save_after,
+                        test_mode = test_mode,
+                        class_weights = class_weights,
+                        test_after = test_after,
+                        all_classes = all_classes,
+                        just_primary = just_primary,
+                        model_nums = model_nums,
+                        retrain = retrain,
+                        viz_mode = viz_mode,
+                        second_thresh = second_thresh,
+                        first_thresh = first_thresh,
+                        det_class = det_class,
+                        post_pend = post_pend,
+                        viz_sim = viz_sim,
+                        gt_vec = gt_vec,
+                        loss_weights = loss_weights,
+                        multibranch = multibranch,
+                        branch_to_test = branch_to_test,
+                        k_vec = k_vec,
+                        attention = attention,
+                        test_pair = False,
+                        test_post_pend = test_post_pend,
+                        test_method = test_method,
+                        criterion_str = criterion_str,
+                        plot_losses = plot_losses)
+
+
+def graph_sim_and_cooc_experiment():
+    print 'hey girl'
+    # raw_input()
+    model_name = 'graph_multi_video_L1_retF_cog'
+    criterion_str = 'MultiCrossEntropyMultiBranchWithL1_CASL'
+    loss_weights = [1,1.,0.5]
+    plot_losses = True
+
+    # model_name = 'graph_multi_video_with_L1'
+    # criterion_str = 'MultiCrossEntropyMultiBranchWithL1'
+    # loss_weights = [1,1]
+    # plot_losses = False
+
+    lr = [0.001,0.001, 0.001,0.001,0.001]
+    multibranch = 1
+    # loss_weights = [1,1]
+    
+    branch_to_test = -2
+    print 'branch_to_test',branch_to_test
+    attention = True
+
+    k_vec = None
+
+    gt_vec = False
+    just_primary = False
+
+    seed = 999
+    torch.backends.cudnn.deterministic = True
+    random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
+    
+    
+    
+    epoch_stuff = [100,100]
+    dataset = 'ucf_cooc_25'
+    limit  = None
+    save_after = 50
+    
+    test_mode = False
+    
+    # test_method = 'wtalc'
+    # test_method = 'wtalc'
+    # test_post_pend = '_'+test_method+'_tp_fp_conf'
+
+    # test_method = 'best_worst_dot'
+    # test_post_pend = '_'+test_method
+    test_method = 'original'
+    test_post_pend = '_'+test_method+'_class'
+
+    model_nums = None
+    retrain = False
+    viz_mode = False
+    viz_sim = False
+
+    # post_pend = '_noBiasLastLayer'
+    
+    network_params = {}
+    network_params['deno'] = 8
+    network_params['in_out'] = [2048,1024]
+    network_params['feat_dim'] = [2048,1024]
+    network_params['feat_ret']=True
+    network_params['graph_size'] = 2
+    network_params['method'] = 'cos'
+    network_params['sparsify'] = [0.5,'mid']
+    network_params['graph_sum'] = attention
+    network_params['non_lin'] = None
+    network_params['aft_nonlin']='RL_L2'
+    network_params['sigmoid'] = False
+    network_params['smax'] = False
+    post_pend = '_nosmaxcombonosig'
+    first_thresh=0
+    class_weights = True
+    test_after = 10
+    all_classes = False
+    
+    second_thresh = 0.5
+    det_class = -1
+    train_simple_mill_all_classes (model_name = model_name,
+                        lr = lr,
+                        dataset = dataset,
+                        network_params = network_params,
+                        limit = limit, 
+                        epoch_stuff= epoch_stuff,
+                        batch_size = 32,
+                        batch_size_val = 32,
+                        save_after = save_after,
+                        test_mode = test_mode,
+                        class_weights = class_weights,
+                        test_after = test_after,
+                        all_classes = all_classes,
+                        just_primary = just_primary,
+                        model_nums = model_nums,
+                        retrain = retrain,
+                        viz_mode = viz_mode,
+                        second_thresh = second_thresh,
+                        first_thresh = first_thresh,
+                        det_class = det_class,
+                        post_pend = post_pend,
+                        viz_sim = viz_sim,
+                        gt_vec = gt_vec,
+                        loss_weights = loss_weights,
+                        multibranch = multibranch,
+                        branch_to_test = branch_to_test,
+                        k_vec = k_vec,
+                        attention = attention,
+                        test_pair = False,
+                        test_post_pend = test_post_pend,
+                        test_method = test_method,
+                        criterion_str = criterion_str,
+                        plot_losses = plot_losses)
+
+
+def graph_sim_and_cooc_per_class_merged_experiment():
+    print 'hey girl'
+    # raw_input()
+    # model_name = 'graph_multi_video_L1_retF_cog_pcmfc_branched'
+    # loss_weights = [1.,1.,1.,1.,0.5]
+    # multibranch = 3
+    model_name = 'graph_multi_video_L1_retF_cog_pcmfc'
+    loss_weights = [1.,1.,0.5]
+    multibranch = 1
+    criterion_str = 'MultiCrossEntropyMultiBranchWithL1_CASL'
+    plot_losses = True
+
+    # model_name = 'graph_multi_video_with_L1'
+    # criterion_str = 'MultiCrossEntropyMultiBranchWithL1'
+    # loss_weights = [1,1]
+    # plot_losses = False
+
+    lr = [0.001,0.001, 0.001,0.001,0.001]
+    
+    # loss_weights = [1,1]
+    
+    branch_to_test = -2
+    print 'branch_to_test',branch_to_test
+    attention = True
+
+    k_vec = None
+
+    gt_vec = False
+    just_primary = False
+
+    seed = 999
+    torch.backends.cudnn.deterministic = True
+    random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
+    
+    
+    
+    epoch_stuff = [200,200]
+    dataset = 'ucf_cooc_per_class_merged'
+    limit  = None
+    save_after = 50
+    
+    test_mode = True
+    
+    # test_method = 'wtalc'
+    # test_method = 'wtalc'
+    # test_post_pend = '_'+test_method+'_tp_fp_conf'
+
+    # test_method = 'best_worst_dot'
+    # test_post_pend = '_'+test_method
+    test_method = 'original'
+    test_post_pend = '_'+test_method+'_class'
+
+    model_nums = None
+    retrain = False
+    viz_mode = False
+    viz_sim = False
+
+    # post_pend = '_noBiasLastLayer'
+    
+    network_params = {}
+    network_params['deno'] = 8
+    network_params['in_out'] = [2048,1024]
+    network_params['in_out_gco'] = [2048,64]
+    network_params['feat_dim'] = [2048,1024]
+    network_params['feat_ret']=True
+    network_params['graph_size'] = 2
+    network_params['method'] = 'cos'
+    network_params['sparsify'] = [0.5,'mid']
+    network_params['graph_sum'] = attention
+    # network_params['non_lin'] = None
+    network_params['aft_nonlin']='RL_L2'
+    # network_params['sigmoid'] = True
+    network_params['smax'] = 'add'
+    post_pend = '_add'
+    first_thresh=0
+    class_weights = True
+    test_after = 10
+    all_classes = False
+    
+    second_thresh = 0.5
+    det_class = -1
+    train_simple_mill_all_classes (model_name = model_name,
+                        lr = lr,
+                        dataset = dataset,
+                        network_params = network_params,
+                        limit = limit, 
+                        epoch_stuff= epoch_stuff,
+                        batch_size = 32,
+                        batch_size_val = 32,
+                        save_after = save_after,
+                        test_mode = test_mode,
+                        class_weights = class_weights,
+                        test_after = test_after,
+                        all_classes = all_classes,
+                        just_primary = just_primary,
+                        model_nums = model_nums,
+                        retrain = retrain,
+                        viz_mode = viz_mode,
+                        second_thresh = second_thresh,
+                        first_thresh = first_thresh,
+                        det_class = det_class,
+                        post_pend = post_pend,
+                        viz_sim = viz_sim,
+                        gt_vec = gt_vec,
+                        loss_weights = loss_weights,
+                        multibranch = multibranch,
+                        branch_to_test = branch_to_test,
+                        k_vec = k_vec,
+                        attention = attention,
+                        test_pair = False,
+                        test_post_pend = test_post_pend,
+                        test_method = test_method,
+                        criterion_str = criterion_str,
+                        plot_losses = plot_losses)
+
+def graph_cooc_per_class_experiment():
+    # print 'hey girl'
+    # raw_input()
+    model_name = 'graph_multi_video_cog_per_class_merged_fc'
+    # criterion_str = 'MultiCrossEntropyMultiBranch'
+    # loss_weights = [1]
+    # plot_losses = False
+
+    # model_name = 'graph_multi_video_with_L1'
+    # criterion_str = 'MultiCrossEntropyMultiBranchWithL1'
+    # loss_weights = [1,1]
+    # plot_losses = False
+
+    lr = [0.001,0.001]
+    multibranch = 1
+    # loss_weights = [1,1]
+    
+    branch_to_test = -2
+    print 'branch_to_test',branch_to_test
+    attention = False
+
+    k_vec = None
+
+    gt_vec = False
+    just_primary = False
+
+    seed = 999
+    torch.backends.cudnn.deterministic = True
+    random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
+    
+    
+    
+    epoch_stuff = [100,100]
+    dataset = 'ucf_cooc_per_class_merged'
+    limit  = None
+    save_after = 50
+    
+    test_mode = False
+    
+    # test_method = 'wtalc'
+    # test_method = 'wtalc'
+    # test_post_pend = '_'+test_method+'_tp_fp_conf'
+
+    # test_method = 'best_worst_dot'
+    # test_post_pend = '_'+test_method
+    test_method = 'original'
+    test_post_pend = '_'+test_method+'_class'
+
+    model_nums = None
+    retrain = False
+    viz_mode = False
+    viz_sim = False
+
+    # post_pend = '_noBiasLastLayer'
+    
+    network_params = {}
+    network_params['deno'] = 8
+    network_params['in_out'] = [2048,64]
+    network_params['sparsify'] = 'mid'
+    network_params['aft_nonlin']='RL_L2'
+    post_pend = '_testing'
+    first_thresh=0.
+    class_weights = True
+    test_after = 10
+    all_classes = False
+    
+    second_thresh = 0.5
+    det_class = -1
+    train_simple_mill_all_classes (model_name = model_name,
+                        lr = lr,
+                        dataset = dataset,
+                        network_params = network_params,
+                        limit = limit, 
+                        epoch_stuff= epoch_stuff,
+                        batch_size = 32,
+                        batch_size_val = 32,
+                        save_after = save_after,
+                        test_mode = test_mode,
+                        class_weights = class_weights,
+                        test_after = test_after,
+                        all_classes = all_classes,
+                        just_primary = just_primary,
+                        model_nums = model_nums,
+                        retrain = retrain,
+                        viz_mode = viz_mode,
+                        second_thresh = second_thresh,
+                        first_thresh = first_thresh,
+                        det_class = det_class,
+                        post_pend = post_pend,
+                        viz_sim = viz_sim,
+                        gt_vec = gt_vec,
+                        # loss_weights = loss_weights,
+                        multibranch = multibranch,
+                        branch_to_test = branch_to_test,
+                        k_vec = k_vec,
+                        attention = attention,
+                        test_pair = False,
+                        test_post_pend = test_post_pend,
+                        test_method = test_method)
+    # ,
+    #                     criterion_str = criterion_str,
+    #                     plot_losses = plot_losses)
+
+
+
+def graph_l1_experiment_best_yet():
+    print 'hey girl'
+    # raw_input()
+    model_name = 'graph_multi_video_with_L1_retF'
+    criterion_str = 'MultiCrossEntropyMultiBranchWithL1_CASL'
+    loss_weights = [1,1,0.5]
+    plot_losses = True
+
+    # model_name = 'graph_multi_video_with_L1'
+    # criterion_str = 'MultiCrossEntropyMultiBranchWithL1'
+    # loss_weights = [1,1]
+    # plot_losses = False
+
+    lr = [0.001,0.001, 0.001]
+    multibranch = 1
+    # loss_weights = [1,1]
+    
+    branch_to_test = -2
+    print 'branch_to_test',branch_to_test
+    attention = True
+
+    k_vec = None
+
+    gt_vec = False
+    just_primary = False
+
+    seed = 999
+    torch.backends.cudnn.deterministic = True
+    random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
+    
+    
+    
+    epoch_stuff = [250,500]
+    dataset = 'ucf'
+    limit  = None
+    save_after = 50
+    
+    test_mode = True
+    
+    # test_method = 'wtalc'
+    # test_method = 'wtalc'
+    # test_post_pend = '_'+test_method+'_tp_fp_conf'
+
+    # test_method = 'best_worst_dot'
+    # test_post_pend = '_'+test_method
+    test_method = 'original'
+    test_post_pend = '_'+test_method+'_class'
+
+    model_nums = [249]
+    retrain = False
+    viz_mode = True
+    viz_sim = False
+
+    # post_pend = '_noBiasLastLayer'
+    
+    network_params = {}
+    network_params['deno'] = 8
+    network_params['in_out'] = [2048,1024]
+    network_params['feat_dim'] = [2048,1024]
+    network_params['feat_ret']=True
+ 
+    network_params['graph_size'] = 2
+    network_params['method'] = 'cos'
+    network_params['sparsify'] = 0.5
+    network_params['graph_sum'] = attention
+    network_params['non_lin'] = None
+    network_params['aft_nonlin']='RL_L2'
+    network_params['sigmoid'] = False
+    post_pend = '_noLimit'
+    first_thresh=0
+    class_weights = True
+    test_after = 10
+    all_classes = False
+    
+    second_thresh = 0.5
+    det_class = -1
+    train_simple_mill_all_classes (model_name = model_name,
+                        lr = lr,
+                        dataset = dataset,
+                        network_params = network_params,
+                        limit = limit, 
+                        epoch_stuff= epoch_stuff,
+                        batch_size = 32,
+                        batch_size_val = 32,
+                        save_after = save_after,
+                        test_mode = test_mode,
+                        class_weights = class_weights,
+                        test_after = test_after,
+                        all_classes = all_classes,
+                        just_primary = just_primary,
+                        model_nums = model_nums,
+                        retrain = retrain,
+                        viz_mode = viz_mode,
+                        second_thresh = second_thresh,
+                        first_thresh = first_thresh,
+                        det_class = det_class,
+                        post_pend = post_pend,
+                        viz_sim = viz_sim,
+                        gt_vec = gt_vec,
+                        loss_weights = loss_weights,
+                        multibranch = multibranch,
+                        branch_to_test = branch_to_test,
+                        k_vec = k_vec,
+                        attention = attention,
+                        test_pair = False,
+                        test_post_pend = test_post_pend,
+                        test_method = test_method,
+                        criterion_str = criterion_str,
+                        plot_losses = plot_losses)
+
+
+
+
+def graph_ablation_study():
+    print 'hey girl'
+    # raw_input()
+    model_name = 'graph_multi_video_with_L1_retF'
+    criterion_str = 'MultiCrossEntropyMultiBranchWithL1_CASL'
+    loss_weights = [1.,0.,0.5]
+    plot_losses = True
+
+    # model_name = 'graph_multi_video_with_L1'
+    # criterion_str = 'MultiCrossEntropyMultiBranchWithL1'
+    # loss_weights = [1.,0.]
+    # plot_losses = False
+
+    lr = [0.001,0.001, 0.001]
+    multibranch = 1
+    # loss_weights = [1,1]
+    
+    branch_to_test = -2
+    print 'branch_to_test',branch_to_test
+    attention = True
+
+    k_vec = None
+
+    gt_vec = False
+    just_primary = False
+
+    seed = 999
+    torch.backends.cudnn.deterministic = True
+    random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
+    
+    
+    
+    epoch_stuff = [250,250]
+    dataset = 'ucf'
+    num_similar = 0
+    batch_size = 32
+    batch_size_val = 32
+    limit  = None
+    save_after = 50
+    
+    test_mode = False
+    test_method = 'original'
+    test_post_pend = '_'+test_method+'_class'
+
+    model_nums = None
+    retrain = False
+    viz_mode = False
+    viz_sim = False
+
+    # post_pend = '_noBiasLastLayer'
+    
+    network_params = {}
+
+    network_params['deno'] = 8
+    network_params['in_out'] = [2048,1024]
+    network_params['feat_dim'] = [2048,1024]
+    network_params['feat_ret']=True
+ 
+    network_params['graph_size'] = 2
+    network_params['method'] = 'cos'
+    network_params['sparsify'] = 0.5
+    network_params['graph_sum'] = attention
+    network_params['non_lin'] = None
+    network_params['aft_nonlin']='RL_L2'
+    network_params['sigmoid'] = False
+    post_pend = '_ablation'
+    first_thresh=0.
+    class_weights = True
+    test_after = 10
+    all_classes = False
+    
+    second_thresh = 0.5
+    det_class = -1
+    train_simple_mill_all_classes (model_name = model_name,
+                        lr = lr,
+                        dataset = dataset,
+                        network_params = network_params,
+                        limit = limit, 
+                        epoch_stuff= epoch_stuff,
+                        batch_size = batch_size,
+                        batch_size_val = batch_size_val,
+                        save_after = save_after,
+                        test_mode = test_mode,
+                        class_weights = class_weights,
+                        test_after = test_after,
+                        all_classes = all_classes,
+                        just_primary = just_primary,
+                        model_nums = model_nums,
+                        retrain = retrain,
+                        viz_mode = viz_mode,
+                        second_thresh = second_thresh,
+                        first_thresh = first_thresh,
+                        det_class = det_class,
+                        post_pend = post_pend,
+                        viz_sim = viz_sim,
+                        gt_vec = gt_vec,
+                        loss_weights = loss_weights,
+                        multibranch = multibranch,
+                        branch_to_test = branch_to_test,
+                        k_vec = k_vec,
+                        attention = attention,
+                        test_pair = False,
+                        test_post_pend = test_post_pend,
+                        test_method = test_method,
+                        criterion_str = criterion_str,
+                        plot_losses = plot_losses,
+                        num_similar = num_similar)
+
+
+def graph_size_study():
+    print 'hey girl'
+    # raw_input()
+    model_name = 'graph_multi_video_with_L1_retF'
+    criterion_str = 'MultiCrossEntropyMultiBranchWithL1_CASL'
+    loss_weights = [1.,1.,0.5]
+    plot_losses = True
+
+    # model_name = 'graph_multi_video_with_L1'
+    # criterion_str = 'MultiCrossEntropyMultiBranchWithL1'
+    # loss_weights = [1.,0.]
+    # plot_losses = False
+
+    lr = [0.001,0.001, 0.001]
+    multibranch = 1
+    # loss_weights = [1,1]
+    
+    branch_to_test = -2
+    print 'branch_to_test',branch_to_test
+    attention = True
+
+    k_vec = None
+
+    gt_vec = False
+    just_primary = False
+
+    seed = 999
+    torch.backends.cudnn.deterministic = True
+    random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
+    
+    
+    
+    epoch_stuff = [250,250]
+    dataset = 'ucf'
+    num_similar = 0
+    batch_size = 32
+    batch_size_val = 32
+    limit  = 750
+    save_after = 50
+    
+    test_mode = False
+    test_method = 'original'
+    test_post_pend = '_'+test_method+'_class'
+
+    model_nums = None
+    retrain = False
+    viz_mode = False
+    viz_sim = False
+
+    # post_pend = '_noBiasLastLayer'
+    
+    network_params = {}
+
+    network_params['deno'] = 8
+    network_params['in_out'] = [2048,1024]
+    network_params['feat_dim'] = [2048,1024]
+    network_params['feat_ret']=True
+ 
+    network_params['graph_size'] = 32
+    network_params['method'] = 'cos'
+    network_params['sparsify'] = 0.5
+    network_params['graph_sum'] = attention
+    network_params['non_lin'] = None
+    network_params['aft_nonlin']='RL_L2'
+    network_params['sigmoid'] = False
+    post_pend = '_multigraphexp'
+    first_thresh=0.
+    class_weights = True
+    test_after = 10
+    all_classes = False
+    
+    second_thresh = 0.5
+    det_class = -1
+    train_simple_mill_all_classes (model_name = model_name,
+                        lr = lr,
+                        dataset = dataset,
+                        network_params = network_params,
+                        limit = limit, 
+                        epoch_stuff= epoch_stuff,
+                        batch_size = batch_size,
+                        batch_size_val = batch_size_val,
+                        save_after = save_after,
+                        test_mode = test_mode,
+                        class_weights = class_weights,
+                        test_after = test_after,
+                        all_classes = all_classes,
+                        just_primary = just_primary,
+                        model_nums = model_nums,
+                        retrain = retrain,
+                        viz_mode = viz_mode,
+                        second_thresh = second_thresh,
+                        first_thresh = first_thresh,
+                        det_class = det_class,
+                        post_pend = post_pend,
+                        viz_sim = viz_sim,
+                        gt_vec = gt_vec,
+                        loss_weights = loss_weights,
+                        multibranch = multibranch,
+                        branch_to_test = branch_to_test,
+                        k_vec = k_vec,
+                        attention = attention,
+                        test_pair = False,
+                        test_post_pend = test_post_pend,
+                        test_method = test_method,
+                        criterion_str = criterion_str,
+                        plot_losses = plot_losses,
+                        num_similar = num_similar)
+
+
+
+def main():
+    graph_l1_experiment_best_yet()
+    # wtalc_us_experiment()
+    
+    # graph_size_study()
+    # graph_ablation_study()
+    # graph_sim_and_cooc_per_class_merged_experiment()
+    # graph_cooc_per_class_experiment()
+    # graph_sim_and_cooc_experiment()
+    
+    # graph_cooc_experiment()
+    # graph_l1_experiment()
+    
     # graph_l1_supervise_W_graph_direct_experiment()
     # graph_l1_supervise_W_experiment()
     # comparing_best_worst()

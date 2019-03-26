@@ -22,6 +22,109 @@ class Thresher(nn.Module):
         return G
 
 
+class Graph_Layer_Cooc(nn.Module):
+    def __init__(self,in_size, n_out = None):
+        super(Graph_Layer_Cooc, self).__init__()
+        
+        self.in_size = in_size
+        self.n_out = self.in_size if n_out is None else n_out
+        self.weight = nn.Parameter(torch.randn(in_size,self.n_out))
+        nn.init.kaiming_uniform_(self.weight, a=math.sqrt(5))
+
+        print self.weight.size()
+        
+        
+    def forward(self, x, sim_feat, to_keep = None, alpha = None, graph_sum = False, identity = False, method = None):
+
+        G = self.get_affinity(sim_feat, to_keep = to_keep, alpha = alpha, graph_sum = graph_sum, identity = identity, method = method)
+        temp = torch.mm(G,x)
+        
+        # sums = torch.sum(temp,dim = 1, keepdim = True)
+        # print temp.size(), sums.size()
+        # sums[sums==0]=1
+        # temp = temp/sums
+        # print temp.size(), sums.size()
+        # raw_input()
+
+        out = torch.mm(temp,self.weight)
+
+        return out
+
+    def get_affinity(self,G, to_keep = None, alpha = None, nosum = False,graph_sum = False, identity = False, method = None):
+        
+        
+        if to_keep is not None:
+            if type(to_keep) == type(()):
+                to_keep,input_sizes = to_keep
+                topk = []
+                indices = []
+                
+                for vid_idx in range(len(input_sizes)):
+                    end_idx = sum(input_sizes[:vid_idx+1])
+                    start_idx = sum(input_sizes[:vid_idx])
+                    size_vid = input_sizes[vid_idx]
+                    to_keep_curr = min(size_vid, to_keep)
+                    
+                    try:
+                        # if alpha is not None:
+                        #     _, indices_curr = torch.topk(torch.abs(alphamat[:,start_idx:end_idx]), to_keep_curr, dim = 1) 
+                        # else:
+                        _, indices_curr = torch.topk(torch.abs(G[:,start_idx:end_idx]), to_keep_curr, dim = 1) 
+                    except:
+                        print G.size()
+                        print input_sizes
+                        print start_idx, end_idx, size_vid, to_keep_curr, to_keep
+                        raw_input()
+
+                    indices_curr = indices_curr+start_idx   
+                    
+                    indices.append(indices_curr)
+                    
+                indices = torch.cat(indices,dim = 1)
+                topk = torch.gather(G, 1, indices)
+                
+
+                G = G*0
+                G = G.scatter(1, indices, topk)
+            elif type(to_keep)==float:
+                # print 'sparsifying!'
+                # print G[0]
+                if to_keep>0:
+                    G[torch.abs(G)<to_keep] = 0
+                else:
+                    G[G<to_keep] = 0
+            elif to_keep == 'mid':
+                #zero diagonal
+                eye_inv = (torch.eye(G.size(0)).cuda()+1) % 2
+                # get max
+                max_val = torch.max(G*eye_inv)
+                thresh = 0.5*max_val
+                # print max_val
+                # print thresh
+                # print torch.min(G[G>0])
+                # print 0.5*max_val
+                G[G<thresh] = 0
+                # print torch.min(G[G>0])
+                # raw_input()
+
+                
+
+                # print G[0]
+                # raw_input()
+
+        if not nosum:
+            # print 'div summing right now'
+            sums = torch.sum(G,dim = 1, keepdim = True)
+            sums[sums==0]=1
+            G = G/sums
+            # G = G/G.size(1)
+            # raw_input()
+
+        return G
+
+
+
+
 class Graph_Layer(nn.Module):
     def __init__(self,in_size, n_out = None, method = 'cos', k = None,
         affinity_dict = None):
@@ -59,11 +162,6 @@ class Graph_Layer(nn.Module):
         #     self.thresher.append(nn.Linear(1,1,bias = False))
         #     self.thresher.append(nn.ReLU())
         #     self.thresher = nn.Sequential(*self.thresher)
-
-
-
-
-
         
     def forward(self, x, sim_feat, to_keep = None, alpha = None, graph_sum = False, identity = False, method = None):
 
@@ -129,6 +227,11 @@ class Graph_Layer(nn.Module):
                 input = F.normalize(input)
             
             G = torch.mm(input,torch.t(input))
+            # print torch.min(input), torch.max(input), torch.min(G), torch.max(G)
+
+            # eye_inv_l1 = (torch.eye(G.size(0)).cuda()+1) % 2
+            # G = 
+
             gsum = torch.sum(torch.abs(G.clone()))/(G.size(0)*G.size(1))
             
 
@@ -219,6 +322,7 @@ class Graph_Layer(nn.Module):
                 # print torch.min(G),torch.max(G)
                 if to_keep>0:
                     G[torch.abs(G)<to_keep] = 0
+                    # G = torch.nn.functional.hardshrink(G.cpu(), lambd=0.5).cuda()
                 else:
                     G[G<to_keep] = 0
                 # print 'torch.min(G),torch.max(G)'
@@ -229,9 +333,11 @@ class Graph_Layer(nn.Module):
         
 
         if not nosum:
+            # print 'div summing right now'
             sums = torch.sum(G,dim = 1, keepdim = True)
             sums[sums==0]=1
             G = G/sums
+            # raw_input()
 
 
         
@@ -248,13 +354,16 @@ class Graph_Layer(nn.Module):
 
 class Graph_Layer_Wrapper(nn.Module):
     def __init__(self,in_size, n_out = None, non_lin = 'HT', method = 'cos', aft_nonlin = None,
-        affinity_dict = None):
+        affinity_dict = None, type_layer = 'regular'):
 
         super(Graph_Layer_Wrapper, self).__init__()
         
         n_out = in_size if n_out is None else n_out
 
-        self.graph_layer = Graph_Layer(in_size, n_out = n_out, method = method,affinity_dict = affinity_dict)
+        if type_layer=='regular':
+            self.graph_layer = Graph_Layer(in_size, n_out = n_out, method = method,affinity_dict = affinity_dict)
+        elif type_layer=='cooc':
+            self.graph_layer = Graph_Layer_Cooc(in_size, n_out = n_out)
 
         
 
