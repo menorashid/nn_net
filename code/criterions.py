@@ -221,6 +221,49 @@ class MultiCrossEntropyMultiBranchWithL1(MultiCrossEntropyMultiBranch):
 
         return loss_all
 
+class MultiCrossEntropyMultiBranchWithL1_withplot(MultiCrossEntropyMultiBranch):
+    def __init__(self,class_weights=None, loss_weights = None, num_branches = 2, att_weight = 0.5, num_similar = 0):
+        num_branches = max(num_branches,1)
+        self.att_weight = loss_weights[-1]
+        self.loss_weights_all = loss_weights
+        # print self.loss_weights_all
+        # raw_input()
+        super(MultiCrossEntropyMultiBranchWithL1_withplot, self).__init__(class_weights=class_weights, loss_weights = loss_weights[:-1], num_branches = num_branches)
+        
+        self.loss_strs = ['CrossEnt'+str(idx) for idx in range(len(self.loss_weights_all)-1)]+['L1']
+        # self.loss_weights_all = loss_weights
+        
+    def forward(self, gt, preds, att, collate = True):
+        if self.num_branches ==1:
+            preds = [preds]
+
+        loss_regular = super(MultiCrossEntropyMultiBranchWithL1_withplot,self).forward(gt, preds, collate = collate)
+        # print 'min_val',torch.min(torch.abs(att))
+        
+
+        l1 = torch.mean(torch.abs(att))
+
+        
+        # print l1
+        # print 'att',att
+        # print 'l1',l1
+        if collate:
+            l1 = self.att_weight*l1
+            loss_all = l1+loss_regular
+        else:
+            loss_regular.append( l1)
+            loss = 0
+            for idx_loss, loss_curr in enumerate(loss_regular):
+                # print 'here',idx_loss, self.loss_weights_all[idx_loss],loss_curr
+                # print loss_curr, self.loss_weights_all[idx_loss]*loss_curr
+                loss += self.loss_weights_all[idx_loss]*loss_curr
+            loss_all = [loss,loss_regular]
+            # print loss_all,loss_regular
+            # loss_all = loss_regular
+
+        return loss_all
+
+
 class MultiCrossEntropyMultiBranchWithL1_CASL(MultiCrossEntropyMultiBranchWithL1):
     def __init__(self,class_weights=None, loss_weights = None, num_branches = 2, att_weight = 0.5, num_similar = 0):
         # self.att_weight =None

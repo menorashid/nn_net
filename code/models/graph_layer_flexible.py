@@ -204,6 +204,9 @@ class Graph_Layer(nn.Module):
         if method is None:
             method = self.method
 
+        # print method
+        # raw_input()
+
         if identity:
             G = Variable(torch.eye(input.size(0)).cuda())
             gsum = torch.sum(G)
@@ -224,6 +227,7 @@ class Graph_Layer(nn.Module):
             G = torch.gather(G,1,index)
         else:
             if 'cos' in method:
+                # print 'normalizing'
                 input = F.normalize(input)
             
             G = torch.mm(input,torch.t(input))
@@ -281,7 +285,9 @@ class Graph_Layer(nn.Module):
             # print G[:2,:2]
 
             # raw_input()
-            
+        
+        # print to_keep
+        # raw_input()
         if to_keep is not None:
             if type(to_keep) == type(()):
                 to_keep,input_sizes = to_keep

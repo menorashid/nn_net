@@ -178,6 +178,8 @@ def train_model_new(out_dir_train,
                 loss = criterion(labels, preds,att, out, collate = not plot_losses)
                 # print loss
                 # raw_input()
+            elif 'l1' in criterion_str and 'withplot' in  criterion_str:
+                loss = criterion(labels, preds,att, collate = not plot_losses)
             elif 'l1' in criterion_str:
                 loss = criterion(labels, preds,att)
             else:

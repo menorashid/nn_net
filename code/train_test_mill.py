@@ -349,8 +349,8 @@ def visualize_dets(model, test_dataloader, dir_viz, first_thresh , second_thresh
                 #     continue
             
             det_conf = out[:,class_idx]
-            if second_thresh<0:
-                thresh = 0
+            if second_thresh<=0:
+                thresh = second_thresh
             else:
                 thresh = np.max(det_conf)-(np.max(det_conf)-np.min(det_conf))*second_thresh
             bin_second_thresh = det_conf>thresh
@@ -408,7 +408,7 @@ def visualize_dets(model, test_dataloader, dir_viz, first_thresh , second_thresh
     plot_dict['Merged'] = [det_conf_merged_all,det_time_intervals_merged_all,det_events_class_merged, det_vid_names_merged]
 
     # et.viz_overlap(dir_viz, det_vid_names, det_conf_all, det_time_intervals_all, det_events_class_all,out_shapes)
-    et.viz_overlap_multi(dir_viz,  plot_dict, out_shapes, fps_stuff)
+    et.viz_overlap_multi(dir_viz,  plot_dict, out_shapes, fps_stuff, dataset = dataset)
 
     # np.savez('../scratch/debug_det_graph.npz', det_vid_names = det_vid_names, det_conf = det_conf, det_time_intervals = det_time_intervals, det_events_class = det_events_class)
 
@@ -501,15 +501,27 @@ def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh ,
                         out,pmf = model.forward([sample.cuda(),batch['gt_vec'][idx_sample].cuda()])
                     else:  
                         # if type(sample)==type([]):
+                        if save_outfs:
+                            model.feat_ret = True
+
                         out, pmf = model.forward(sample)
                         # else:  
                         #     out, pmf = model.forward(sample.cuda())
                         # print pmf
                         # print model
                         if save_outfs:
-                            outf = model.out_f(sample.cuda()).data.cpu().numpy()
+                            outf = pmf[1][1]
+                            # .cpu().numpy()
+                            # print len(outf)
+                            # print outf[0].shape
+                            outf = outf[0].data.cpu().numpy()
+                            # raw_input()
+                            # .size()
+                            pmf = pmf[:2]
+                            # model.out_f(sample.cuda()).data.cpu().numpy()
                             vid_name = det_vid_names_ac[idx_test]
                             out_file_f = os.path.join(save_outfs,vid_name+'.npy')
+                            
                             np.save(out_file_f,outf)
                         # elif test_method=='best_worst_dot':
                         #     out_fs.append(model.out_f(sample.cuda()).data.cpu().numpy())
@@ -575,14 +587,17 @@ def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh ,
                     bin_not_keep = labels[idx_sample].data.cpu().numpy()==0
                 else:
                     bin_not_keep = pmf<first_thresh
+
+                # print bin_not_keep
+                # raw_input()
                 # print 'in overlap',det_vid_names_ac[idx_test]
                 for class_idx in range(pmf.size):
                     if bin_not_keep[class_idx]:
                         continue
 
                     det_conf = out[:,class_idx]
-                    if second_thresh<0:
-                        thresh = 0
+                    if second_thresh<=0:
+                        thresh = second_thresh
                     else:
                         thresh = np.max(det_conf)-(np.max(det_conf)-np.min(det_conf))*second_thresh
                     bin_second_thresh = det_conf>thresh
@@ -958,7 +973,7 @@ def visualize_sim_mat(out_dir_train,
                 batch_size_val = None,
                 gpu_id = 0,
                 num_workers = 0,
-                post_pend = '', first_thresh = 0, second_thresh = 0.5):
+                post_pend = '', first_thresh = 0, second_thresh = 0.5, dataset = 'ucf'):
     
     out_dir_results = os.path.join(out_dir_train,'results_model_'+str(model_num)+post_pend+'_'+str(first_thresh)+'_'+str(second_thresh))
     util.mkdir(out_dir_results)
@@ -985,10 +1000,10 @@ def visualize_sim_mat(out_dir_train,
     util.mkdir(dir_viz)
 
 
-    visualize_sim_mat_inner(model, test_dataloader,  dir_viz)
+    visualize_sim_mat_inner(model, test_dataloader,  dir_viz, dataset = dataset)
      
             
-def visualize_sim_mat_inner(model, test_dataloader, dir_viz):
+def visualize_sim_mat_inner(model, test_dataloader, dir_viz, dataset = 'ucf'):
 
     model.eval()
     model_name = model.__class__.__name__.lower()
@@ -1027,11 +1042,12 @@ def visualize_sim_mat_inner(model, test_dataloader, dir_viz):
                 sim_mat = model.get_similarity(sample.cuda())
             # print sim_mat.size()
             sim_mat = sim_mat.data.cpu().numpy()
-            dg.save_sim_viz(vid_name, out_shape_curr, sim_mat, class_idx, dir_viz)
+            dg.save_sim_viz(vid_name, out_shape_curr, sim_mat, class_idx, dir_viz, dataset = dataset)
 
             idx_test +=1
     
     dg.make_htmls(dir_viz)        
+
 
 def train_model(out_dir_train,
                 train_data,

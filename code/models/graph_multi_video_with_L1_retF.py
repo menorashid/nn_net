@@ -108,8 +108,8 @@ class Graph_Multi_Video(nn.Module):
                 graph_size = min(self.graph_size, len(input))
 
         # print 'graph_size', graph_size, self.training
-        
-        input_chunks = [input[i:i + graph_size] for i in xrange(0, len(input), graph_size)]
+        input_chunks = [[input[0]]]+[input[i:i + graph_size] for i in xrange(1, len(input), graph_size)]
+        # input_chunks = [input[i:i + graph_size] for i in xrange(0, len(input), graph_size)]
 
         is_cuda = next(self.parameters()).is_cuda
         # print 'Graph branch'
@@ -124,6 +124,7 @@ class Graph_Multi_Video(nn.Module):
         
         for input in input_chunks:
             input_sizes = [input_curr.size(0) for input_curr in input]
+            # print input_sizes
             input = torch.cat(input,0)
             # print input.size()
 
@@ -195,6 +196,7 @@ class Graph_Multi_Video(nn.Module):
         elif self.graph_sum:
             pmf_all = [pmf_all, torch.cat(graph_sums,dim = 0)]
 
+        # raw_input()
         if ret_bg:
             return x_all, pmf_all, None
         else:
@@ -210,21 +212,21 @@ class Graph_Multi_Video(nn.Module):
         pmf = torch.sum(pmf[:k,:], dim = 0)/k
         return pmf
 
-    def get_similarity(self,input,idx_graph_layer = 0,sparsify = False, nosum = False):
+    def get_similarity(self,input,idx_graph_layer = 0,sparsify = False, nosum = True):
 
         # if sparsify is None:
         #     sparsify = self.sparsify
 
         is_cuda = next(self.parameters()).is_cuda
 
-        input_sizes = [input_curr.size(0) for input_curr in input]
-        input = torch.cat(input,0)
+        # input_sizes = [input_curr.size(0) for input_curr in input]
+        # input = torch.cat(input,0)
 
 
         if is_cuda:
             input = input.cuda()
         
-        assert idx_graph_layer<len(self.graph_layers)
+        # assert idx_graph_layer<len(self.graph_layers)
         
         if hasattr(self, 'layer_bef') and self.layer_bef is not None:
             input = self.layer_bef(input)
@@ -232,11 +234,12 @@ class Graph_Multi_Video(nn.Module):
         feature_out = self.linear_layer(input)
         
         if sparsify:
-            to_keep = self.sparsify[idx_graph_layer]                
+            to_keep = self.sparsify
+            # [idx_graph_layer]                
         else:
             to_keep = None
 
-        sim_mat = self.graph_layers[idx_graph_layer].get_affinity(feature_out, to_keep = to_keep,nosum = nosum)
+        sim_mat = self.graph_layer.get_affinity(feature_out, to_keep = to_keep,nosum = nosum)
 
         return sim_mat
     

@@ -159,11 +159,13 @@ def make_vid_viz():
     #                 'video_test_0001038',
     #                 'video_test_0000698',
     #                 'video_test_0000844']
-    video_name_list = ['video_test_0000964',
-'video_test_0000601',
-'video_test_0001343',
-'video_test_0000273',
-'video_test_0001460']
+#     video_name_list = ['video_test_0000964',
+# 'video_test_0000601',
+# 'video_test_0001343',
+# 'video_test_0000273',
+# 'video_test_0001460']
+
+    video_name_list = ['video_test_0000006']
 
     # ['video_test_0000026',
     #                 'video_test_0000073']
@@ -176,7 +178,7 @@ def make_vid_viz():
     util.mkdir(out_dir_html)
     # /disk1/maheen-data/nn_net/data
 
-    dir_server = '/disk1'
+    dir_server = '/disk2'
     str_replace = ['..','/nn_net']
    
     for vid in video_name_list:

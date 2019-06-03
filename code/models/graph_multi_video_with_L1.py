@@ -66,7 +66,8 @@ class Graph_Multi_Video(nn.Module):
         last_graph = []
         last_graph.append(nn.Dropout(0.5))
         last_graph.append(nn.Linear(in_out[-1],n_classes, bias = True))
-        
+        if sigmoid:
+            last_graph.append(nn.Sigmoid())
         self.last_graph = nn.Sequential(*last_graph)
         
     def forward(self, input, epoch_num = None, ret_bg =False, branch_to_test = -1):
@@ -93,9 +94,12 @@ class Graph_Multi_Video(nn.Module):
             else:
                 graph_size = min(self.graph_size, len(input))
 
-        # print 'graph_size', graph_size, self.training
+        
         
         input_chunks = [input[i:i + graph_size] for i in xrange(0, len(input), graph_size)]
+
+        # print 'graph_size', graph_size, len(input), len(input_chunks)
+        # raw_input()
 
         is_cuda = next(self.parameters()).is_cuda
         # print 'Graph branch'
@@ -193,21 +197,21 @@ class Graph_Multi_Video(nn.Module):
         pmf = torch.sum(pmf[:k,:], dim = 0)/k
         return pmf
 
-    def get_similarity(self,input,idx_graph_layer = 0,sparsify = False, nosum = False):
+    def get_similarity(self,input,idx_graph_layer = 0,sparsify = False, nosum = True):
 
         # if sparsify is None:
         #     sparsify = self.sparsify
 
         is_cuda = next(self.parameters()).is_cuda
 
-        input_sizes = [input_curr.size(0) for input_curr in input]
-        input = torch.cat(input,0)
+        # input_sizes = [input_curr.size(0) for input_curr in input]
+        # input = torch.cat(input,0)
 
 
         if is_cuda:
             input = input.cuda()
         
-        assert idx_graph_layer<len(self.graph_layers)
+        # assert idx_graph_layer<len(self.graph_layers)
         
         if hasattr(self, 'layer_bef') and self.layer_bef is not None:
             input = self.layer_bef(input)
@@ -215,11 +219,11 @@ class Graph_Multi_Video(nn.Module):
         feature_out = self.linear_layer(input)
         
         if sparsify:
-            to_keep = self.sparsify[idx_graph_layer]                
+            to_keep = self.sparsify                
         else:
             to_keep = None
 
-        sim_mat = self.graph_layers[idx_graph_layer].get_affinity(feature_out, to_keep = to_keep,nosum = nosum)
+        sim_mat = self.graph_layer.get_affinity(feature_out, to_keep = to_keep,nosum = nosum)
 
         return sim_mat
     

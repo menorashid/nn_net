@@ -3,7 +3,7 @@ import numpy as np;
 matplotlib.use('Agg')
 # matplotlib.use('PS') 
 import matplotlib.pyplot as plt;
-# matplotlib.rcParams.update({'font.size': 22})
+matplotlib.rcParams.update({'font.size': 16})
 from matplotlib.backends.backend_pdf import PdfPages
 import os;
 from PIL import Image,ImageDraw,ImageFont;
@@ -135,7 +135,7 @@ def plotMultiHist(out_file, vals, num_bins, title='',xlabel='',ylabel='',legend_
         if len(xticks)>13:
             ax.set_xticklabels(xticks, fontsize = 'small')
         else:
-            ax.set_xticklabels(xticks,rotation=90)
+            ax.set_xticklabels(xticks,rotation=0)
         
 
     if ylim is not None:

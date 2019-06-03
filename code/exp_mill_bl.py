@@ -94,7 +94,29 @@ def get_data(dataset, limit, all_classes, just_primary, gt_vec, k_vec, test_pair
             # test_train_data = UCF_dataset(test_train_file, limit)
         test_train_data =  UCF_dataset(test_train_file, limit)
         test_data =  UCF_dataset(test_file, None)
+    elif dataset =='activitynet_select':
+        dir_files = '../data/activitynet/train_test_files'
+        n_classes = 65
+        trim_preds = None
+        post_pends = ['','','']
+        train_file = os.path.join(dir_files, 'train_select')
+        test_train_file = os.path.join(dir_files, 'val_select')
+        test_file = os.path.join(dir_files, 'val_select')
+            
+        files = [train_file, test_train_file, test_file]
+
+        post_pends = [pp+'.txt' for pp in post_pends]
+        files = [file_curr+pp for file_curr,pp in zip(files,post_pends)]
         
+        train_file, test_train_file, test_file = files
+        if num_similar>0:
+            train_data = UCF_dataset_withNumSimilar(train_file, limit, num_similar = num_similar)
+            # test_train_data =  UCF_dataset_withNumSimilar(test_train_file, limit, num_similar = num_similar)
+        else:
+            train_data = UCF_dataset(train_file, limit)
+            # test_train_data = UCF_dataset(test_train_file, limit)
+        test_train_data =  UCF_dataset(test_train_file, limit)
+        test_data =  UCF_dataset(test_file, None)  
     elif dataset =='ucf_untf':
         dir_files = '../data/ucf101/train_test_files'
         n_classes = 20
@@ -396,16 +418,17 @@ def train_simple_mill_all_classes(model_name,
                     multibranch = multibranch,
                     branch_to_test =branch_to_test,
                     dataset = dataset)
-            test_model(**test_params)
-            # test_params = dict(out_dir_train = out_dir_train,
-            #         model_num = model_num,
-            #         test_data = test_data,
-            #         batch_size_val = batch_size_val,
-            #         gpu_id = gpu_id,
-            #         num_workers = 0,
-            #         second_thresh = second_thresh,
-            #         first_thresh = first_thresh)
-            # visualize_sim_mat(**test_params)
+            # test_model(**test_params)
+            test_params = dict(out_dir_train = out_dir_train,
+                    model_num = model_num,
+                    test_data = test_data,
+                    batch_size_val = batch_size_val,
+                    gpu_id = gpu_id,
+                    num_workers = 0,
+                    second_thresh = second_thresh,
+                    first_thresh = first_thresh,
+                    dataset = dataset)
+            visualize_sim_mat(**test_params)
 
 
 
@@ -2825,15 +2848,15 @@ def graph_l1_experiment_best_yet():
 def graph_ablation_study():
     print 'hey girl'
     # raw_input()
-    model_name = 'graph_multi_video_with_L1_retF'
-    criterion_str = 'MultiCrossEntropyMultiBranchWithL1_CASL'
-    loss_weights = [1.,0.,0.5]
-    plot_losses = True
-
-    # model_name = 'graph_multi_video_with_L1'
-    # criterion_str = 'MultiCrossEntropyMultiBranchWithL1'
-    # loss_weights = [1.,0.]
-    # plot_losses = False
+    # model_name = 'graph_multi_video_with_L1_retF'
+    # criterion_str = 'MultiCrossEntropyMultiBranchWithL1_CASL'
+    # loss_weights = [1.,0.,0.5]
+    # plot_losses = True
+    save_outfs = False
+    model_name = 'graph_multi_video_with_L1'
+    criterion_str = 'MultiCrossEntropyMultiBranchWithL1'
+    loss_weights = [1.,1.]
+    plot_losses = False
 
     lr = [0.001,0.001, 0.001]
     multibranch = 1
@@ -2865,13 +2888,13 @@ def graph_ablation_study():
     limit  = None
     save_after = 50
     
-    test_mode = False
+    test_mode = True
     test_method = 'original'
     test_post_pend = '_'+test_method+'_class'
 
     model_nums = None
     retrain = False
-    viz_mode = False
+    viz_mode = True
     viz_sim = False
 
     # post_pend = '_noBiasLastLayer'
@@ -2881,7 +2904,7 @@ def graph_ablation_study():
     network_params['deno'] = 8
     network_params['in_out'] = [2048,1024]
     network_params['feat_dim'] = [2048,1024]
-    network_params['feat_ret']=True
+    # network_params['feat_ret']=True
  
     network_params['graph_size'] = 2
     network_params['method'] = 'cos'
@@ -2931,7 +2954,8 @@ def graph_ablation_study():
                         test_method = test_method,
                         criterion_str = criterion_str,
                         plot_losses = plot_losses,
-                        num_similar = num_similar)
+                        num_similar = num_similar,
+                        save_outfs = save_outfs)
 
 
 def graph_size_study():
