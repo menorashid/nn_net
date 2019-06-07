@@ -23,11 +23,11 @@ class MultiCrossEntropy(nn.Module):
         if self.class_weights is not None:
             assert self.class_weights.size(1)==pred.size(1)
             loss = self.class_weights*-1*gt*pred
+            loss = torch.sum(loss, dim = 1)
         else:
             loss = -1*gt* pred
-
-        loss = torch.sum(loss, dim = 1)
-        loss = torch.mean(loss)
+            loss = torch.sum(loss, dim = 1)
+            loss = torch.mean(loss)
         return loss
 
 class MultiCrossEntropy_noSoftmax(nn.Module):
@@ -179,11 +179,14 @@ class MultiCrossEntropyMultiBranch(nn.Module):
             if self.class_weights is not None:
                 assert self.class_weights.size(1)==pred.size(1)
                 loss = self.class_weights*-1*gt*pred
+                loss = torch.sum(loss)
+                # , dim = 1)
             else:
                 loss = -1*gt* pred
+                loss = torch.sum(loss, dim = 1)
+                loss = torch.mean(loss)
 
-            loss = torch.sum(loss, dim = 1)
-            loss = torch.mean(loss)
+
             if collate:
                 loss_all += loss*self.loss_weights[idx_pred]
             else:

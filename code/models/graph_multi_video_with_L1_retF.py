@@ -300,7 +300,9 @@ class Network:
 
         print 'network graph_size', graph_size
         self.model = Graph_Multi_Video(n_classes, deno, in_out,feat_dim, graph_size, method, sparsify, non_lin, aft_nonlin,sigmoid, layer_bef, graph_sum, background, just_graph, feat_ret)
+
         print self.model
+        # print 'done here'
         # time.sleep(4)
         # raw_input()
 

@@ -130,7 +130,7 @@ def test_model_core(model, test_dataloader, criterion, log_arr, multibranch = 1)
         
 
         labels_all.append(labels.data.cpu().numpy())
-        loss_iter = loss.data[0]
+        loss_iter = loss.item()
         loss_iter_total+=loss_iter    
         str_display = 'val iter: %d, val loss: %.4f' %(num_iter_test,loss_iter)
         log_arr.append(str_display)
@@ -141,7 +141,7 @@ def test_model_core(model, test_dataloader, criterion, log_arr, multibranch = 1)
     
     # if 'centerloss' not in criterion.__class__.__name__.lower():    
     #     loss = criterion(labels_all, preds)
-    #     loss_iter = loss.data[0]
+    #     loss_iter = loss.item()
 
     #     str_display = 'val total loss: %.4f' %(loss_iter)
     #     log_arr.append(str_display)
@@ -298,8 +298,8 @@ def visualize_dets(model, test_dataloader, dir_viz, first_thresh , second_thresh
             if branch_to_test==-1:
                 out = torch.nn.functional.softmax(out,dim = 1)
                 print 'smaxing'
-            else:
-                print 'not smaxing'
+            # else:
+            #     print 'not smaxing'
 
             start_seq = np.array(range(0,out.shape[0]))*fps_stuff
             end_seq = np.array(range(1,out.shape[0]+1))*fps_stuff
@@ -314,7 +314,7 @@ def visualize_dets(model, test_dataloader, dir_viz, first_thresh , second_thresh
                 class_idx = np.where(labels[idx_sample].numpy())[0]
                 # [0][0]
                 if len(class_idx)>2:
-                    print class_idx
+                    # print class_idx
                     class_idx = class_idx[2]
                 else:
                     class_idx = class_idx[0]
@@ -1196,7 +1196,7 @@ def train_model(out_dir_train,
                 loss = criterion(labels, preds,att)
             else:
                 loss = criterion(labels, preds)
-            loss_iter = loss.data[0]
+            loss_iter = loss.item()
 
             optimizer.zero_grad()
             loss.backward()

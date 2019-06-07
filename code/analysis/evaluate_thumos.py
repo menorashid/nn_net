@@ -205,7 +205,7 @@ def load_ucf_gt(train):
     gt_vid_names = loaded['gtvideonames'][0]
     gt_class_names = loaded['gt_events_class'][0]
     gt_time_intervals = loaded['gt_time_intervals'][0]
-    
+
     arr_meta = [gt_vid_names, gt_class_names]
 
     arr_out = []
@@ -217,7 +217,29 @@ def load_ucf_gt(train):
     gt_time_intervals = np.array([a[0] for a in gt_time_intervals])
     return gt_vid_names, gt_class_names, gt_time_intervals
 
+def load_multithumos_gt(train):
+    anno_dir = '../data/multithumos'
+    if train:
+        mat_file = os.path.join(anno_dir, 'train.npz')
+    else:
+        mat_file = os.path.join(anno_dir, 'test.npz')
 
+    loaded = np.load(mat_file)
+    
+    gt_vid_names = list(loaded['gt_vid_names'])
+    gt_class_names = list(loaded['gt_class_names'])
+    gt_time_intervals = loaded['gt_time_intervals']
+
+    arr_meta = [gt_vid_names, gt_class_names]
+
+    # # arr_out = []
+    # # for arr_curr in arr_meta:
+    # #     arr_curr = [str(a[0]) for a in arr_curr]
+    # #     arr_out.append(arr_curr)
+
+    # # [gt_vid_names, gt_class_names] = arr_out
+    # gt_time_intervals = np.array([a[0] for a in gt_time_intervals])
+    return gt_vid_names, gt_class_names, gt_time_intervals
 
 def print_overlap(aps,class_names,overlap_thresh_all, log_arr):
     
@@ -269,6 +291,15 @@ def test_overlap(det_vid_names_all, det_conf_all, det_time_intervals_all, second
         gt_vid_names, gt_class_names, gt_time_intervals = load_ucf_gt(train)
         aps = np.zeros((len(class_names)+1,5))
         overlap_thresh_all = np.arange(0.1,0.6,0.1)
+        fps_stuff = 16./25.
+    elif dataset =='multithumos':
+        # class_names = ['BaseballPitch', 'BasketballDunk', 'Billiards', 'CleanAndJerk', 'CliffDiving', 'CricketBowling', 'CricketShot', 'Diving', 'FrisbeeCatch', 'GolfSwing', 'HammerThrow', 'HighJump', 'JavelinThrow', 'LongJump', 'PoleVault', 'Shotput', 'SoccerPenalty', 'TennisSwing', 'ThrowDiscus', 'VolleyballSpiking']
+        # class_names.sort()
+        class_names = globals.class_names_multithumos
+        gt_vid_names, gt_class_names, gt_time_intervals = load_multithumos_gt(train)
+        
+        overlap_thresh_all = np.arange(0.1,0.2,0.1)
+        aps = np.zeros((len(class_names)+1,1))
         fps_stuff = 16./25.
     elif dataset =='activitynet':
         class_names = globals.class_names_activitynet
@@ -499,8 +530,12 @@ def viz_overlap_multi(out_dir_meta, det_conf_all_dict, out_shapes, fps_stuff, ti
     elif dataset =='activitynet_select':
         class_names = globals.class_names_activitynet_select
         gt_vid_names_all, gt_class_names, gt_time_intervals_all = load_activitynet_gt(False,True)
+    elif dataset=='multithumos':
+        class_names = globals.class_names_multithumos
+        gt_vid_names_all, gt_class_names, gt_time_intervals_all = load_multithumos_gt(False)
     else:
         class_names = ['BaseballPitch', 'BasketballDunk', 'Billiards', 'CleanAndJerk', 'CliffDiving', 'CricketBowling', 'CricketShot', 'Diving', 'FrisbeeCatch', 'GolfSwing', 'HammerThrow', 'HighJump', 'JavelinThrow', 'LongJump', 'PoleVault', 'Shotput', 'SoccerPenalty', 'TennisSwing', 'ThrowDiscus', 'VolleyballSpiking']
+        gt_vid_names_all, gt_class_names, gt_time_intervals_all = load_ucf_gt(False)
         class_names.sort()
 
     aps = np.zeros((len(class_names)+1,5))
@@ -512,24 +547,24 @@ def viz_overlap_multi(out_dir_meta, det_conf_all_dict, out_shapes, fps_stuff, ti
         out_dir = os.path.join(out_dir_meta,class_name)
         util.mkdir(out_dir)
 
-        if not dataset.startswith('activitynet'):
-            mat_file = os.path.join('../TH14evalkit','mat_files', class_name+'_test.mat')
+        # if not dataset.startswith('activitynet'):
+        #     mat_file = os.path.join('../TH14evalkit','mat_files', class_name+'_test.mat')
 
-            loaded = scipy.io.loadmat(mat_file)
+        #     loaded = scipy.io.loadmat(mat_file)
             
-            gt_vid_names_all = loaded['gtvideonames'][0]
-            gt_class_names = loaded['gt_events_class'][0]
+        #     gt_vid_names_all = loaded['gtvideonames'][0]
+        #     gt_class_names = loaded['gt_events_class'][0]
 
-            gt_time_intervals = loaded['gt_time_intervals'][0]
+        #     gt_time_intervals = loaded['gt_time_intervals'][0]
             
-            arr_meta = [gt_vid_names_all, gt_class_names]
-            arr_out = []
-            for arr_curr in arr_meta:
-                arr_curr = [str(a[0]) for a in arr_curr]
-                arr_out.append(arr_curr)
+        #     arr_meta = [gt_vid_names_all, gt_class_names]
+        #     arr_out = []
+        #     for arr_curr in arr_meta:
+        #         arr_curr = [str(a[0]) for a in arr_curr]
+        #         arr_out.append(arr_curr)
 
-            [gt_vid_names_all, gt_class_names] = arr_out
-            gt_time_intervals_all = np.array([a[0] for a in gt_time_intervals])
+        #     [gt_vid_names_all, gt_class_names] = arr_out
+        #     gt_time_intervals_all = np.array([a[0] for a in gt_time_intervals])
 
 
         gt_vid_names = list( np.unique(np.array(gt_vid_names_all)[np.array(gt_class_names)==class_name]))

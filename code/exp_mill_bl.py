@@ -177,6 +177,33 @@ def get_data(dataset, limit, all_classes, just_primary, gt_vec, k_vec, test_pair
         test_train_data = UCF_dataset_cooc_graph(test_train_file, limit)
         test_data = UCF_dataset_cooc_graph(test_file, None)
 
+    elif dataset == 'multithumos':
+        cooc_number = '_'.join(dataset.split('_')[2:])
+        cooc_str = '_cooc_'+cooc_number
+        dir_files = '../data/multithumos/train_test_files'
+        n_classes = 65
+        trim_preds = None
+        post_pends = ['','','']
+        train_file = os.path.join(dir_files, 'train')
+        test_train_file = os.path.join(dir_files, 'test')
+        test_file = os.path.join(dir_files, 'test')
+        
+        files = [train_file, test_train_file, test_file]
+
+        
+        post_pends = [pp+'.txt' for pp in post_pends]
+        files = [file_curr+pp for file_curr,pp in zip(files,post_pends)]
+        
+        train_file, test_train_file, test_file = files
+        # train_data = UCF_dataset(train_file, limit)
+        if num_similar>0:
+            train_data = UCF_dataset_withNumSimilar(train_file, limit, num_similar = num_similar)
+            # test_train_data =  UCF_dataset_withNumSimilar(test_train_file, limit, num_similar = num_similar)
+        else:
+            train_data = UCF_dataset(train_file, limit)
+        test_train_data = UCF_dataset(test_train_file, limit)
+        test_data = UCF_dataset(test_file, None)
+
     print train_file, test_train_file, test_file
     print os.path.exists(train_file), os.path.exists(test_train_file), os.path.exists(test_file)
     # raw_input()
@@ -258,7 +285,8 @@ def train_simple_mill_all_classes(model_name,
                                     criterion_str= None, 
                                     test_method = 'original',
                                     plot_losses = False,
-                                    num_similar = 0):
+                                    num_similar = 0,
+                                    det_test = False):
 
     num_epochs = epoch_stuff[1]
 
@@ -364,7 +392,8 @@ def train_simple_mill_all_classes(model_name,
                 epoch_start = epoch_start,
                 network_params = network_params, 
                 multibranch = multibranch,
-                plot_losses = plot_losses)
+                plot_losses = plot_losses,
+                det_test = det_test)
     
 
     if not test_mode:
@@ -400,7 +429,7 @@ def train_simple_mill_all_classes(model_name,
                 save_outfs = save_outfs,
                 test_pair = test_pair,
                 test_method = test_method)
-        test_model(**test_params)
+        # test_model(**test_params)
         if viz_mode:
             test_params = dict(out_dir_train = out_dir_train,
                     model_num = model_num,
@@ -418,7 +447,7 @@ def train_simple_mill_all_classes(model_name,
                     multibranch = multibranch,
                     branch_to_test =branch_to_test,
                     dataset = dataset)
-            # test_model(**test_params)
+            test_model(**test_params)
             test_params = dict(out_dir_train = out_dir_train,
                     model_num = model_num,
                     test_data = test_data,
@@ -428,7 +457,7 @@ def train_simple_mill_all_classes(model_name,
                     second_thresh = second_thresh,
                     first_thresh = first_thresh,
                     dataset = dataset)
-            visualize_sim_mat(**test_params)
+            # visualize_sim_mat(**test_params)
 
 
 

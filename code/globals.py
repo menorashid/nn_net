@@ -15,6 +15,9 @@ class_names_ucf.sort()
 
 class_names = class_names_ucf[:]
 
+class_names_multithumos = ['BaseballPitch', 'BasketballBlock', 'BasketballDribble', 'BasketballDunk', 'BasketballGuard', 'BasketballPass', 'BasketballShot', 'Billiards', 'BodyBend', 'BodyContract', 'BodyRoll', 'BodyTurn', 'ClapHands', 'CleanAndJerk', 'CliffDiving', 'CloseUpTalkToCamera', 'CricketBowling', 'CricketShot', 'DiscusRelease', 'DiscusWindUp', 'Diving', 'Drop', 'Fall', 'FistPump', 'FrisbeeCatch', 'GolfSwing', 'HammerThrow', 'HammerThrowRelease', 'HammerThrowSpin', 'HammerThrowWindUp', 'HighFive', 'HighJump', 'Hug', 'JavelinThrow', 'Jump', 'LongJump', 'NoHuman', 'OneHandedCatch', 'OneRaisedArmCelebrate', 'PatPerson', 'PickUp', 'PoleVault', 'PoleVaultPlantPole', 'Run', 'ShotPutBend', 'Shotput', 'Sit', 'SoccerPenalty', 'Squat', 'Stand', 'StandUp', 'TalkToCamera', 'TennisSwing', 'Throw', 'ThrowDiscus', 'TwoHandedCatch', 'TwoRaisedArmCelebrate', 'VolleyballBlock', 'VolleyballBump', 'VolleyballServe', 'VolleyballSet', 'VolleyballSpiking', 'Walk', 'WeightliftingClean', 'WeightliftingJerk']
+
+
 class_names_activitynet = ['Archery',
 'Ballet',
 'Bathing dog',
