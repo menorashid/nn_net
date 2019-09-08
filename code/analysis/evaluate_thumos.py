@@ -241,6 +241,21 @@ def load_multithumos_gt(train):
     # gt_time_intervals = np.array([a[0] for a in gt_time_intervals])
     return gt_vid_names, gt_class_names, gt_time_intervals
 
+def load_charades_gt(train):
+    anno_dir = '../data/charades'
+    if train:
+        mat_file = os.path.join(anno_dir, 'annos_train.npz')
+    else:
+        mat_file = os.path.join(anno_dir, 'annos_test.npz')
+
+    loaded = np.load(mat_file)
+    
+    gt_vid_names = list(loaded['gt_vid_names'])
+    gt_class_names = list(loaded['gt_class_names'])
+    gt_time_intervals = loaded['gt_time_intervals']
+
+    return gt_vid_names, gt_class_names, gt_time_intervals
+
 def print_overlap(aps,class_names,overlap_thresh_all, log_arr):
     
     # aps = np.array(aps)
@@ -293,14 +308,18 @@ def test_overlap(det_vid_names_all, det_conf_all, det_time_intervals_all, second
         overlap_thresh_all = np.arange(0.1,0.6,0.1)
         fps_stuff = 16./25.
     elif dataset =='multithumos':
-        # class_names = ['BaseballPitch', 'BasketballDunk', 'Billiards', 'CleanAndJerk', 'CliffDiving', 'CricketBowling', 'CricketShot', 'Diving', 'FrisbeeCatch', 'GolfSwing', 'HammerThrow', 'HighJump', 'JavelinThrow', 'LongJump', 'PoleVault', 'Shotput', 'SoccerPenalty', 'TennisSwing', 'ThrowDiscus', 'VolleyballSpiking']
-        # class_names.sort()
         class_names = globals.class_names_multithumos
         gt_vid_names, gt_class_names, gt_time_intervals = load_multithumos_gt(train)
         
         overlap_thresh_all = np.arange(0.1,0.2,0.1)
         aps = np.zeros((len(class_names)+1,1))
         fps_stuff = 16./25.
+    elif dataset.startswith('charades'):
+        class_names = globals.class_names_charades
+        gt_vid_names, gt_class_names, gt_time_intervals = load_charades_gt(train)
+        overlap_thresh_all = np.arange(0.1,0.2,0.1)
+        aps = np.zeros((len(class_names)+1,1))
+        fps_stuff = 1./6.
     elif dataset =='activitynet':
         class_names = globals.class_names_activitynet
         gt_vid_names, gt_class_names, gt_time_intervals = load_activitynet_gt(train)
@@ -572,7 +591,7 @@ def viz_overlap_multi(out_dir_meta, det_conf_all_dict, out_shapes, fps_stuff, ti
 
         for gt_vid_name in gt_vid_names:
 
-            gt_time_intervals = gt_time_intervals_all[np.array(gt_vid_names_all)==gt_vid_name]
+            gt_time_intervals = gt_time_intervals_all[np.logical_and(np.array(gt_vid_names_all)==gt_vid_name ,np.array(gt_class_names)==class_name)]
             if gt_vid_name not in list(out_shapes.keys()):
                 continue
 

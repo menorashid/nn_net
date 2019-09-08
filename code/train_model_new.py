@@ -124,11 +124,13 @@ def train_model_new(out_dir_train,
         # print 'starting'
         for num_iter_train,batch in enumerate(train_dataloader):
             # print 'getting batch',time.time()-t
+            # t = time.time()
+            # continue
 
             samples = batch['features']
             labels = batch['label'].cuda()
 
-            # t = time.time()
+            
             if 'centerloss' in model_name:
                 preds,extra = model.forward(samples, labels)
                 labels = [labels]+extra
@@ -142,8 +144,8 @@ def train_model_new(out_dir_train,
                 
                 for idx_sample, sample in enumerate(samples):
 
-                    if 'alt_train' in model_name and 'multi_video' in model_name:
-                        out,preds = model.forward(samples, epoch_num = num_epoch)
+                    if 'norm_game' in model_name and 'multi_video' in model_name:
+                        out,preds = model.forward(samples, epoch_num = num_epoch/float(num_epochs))
                         break
                     elif ('cooc' in model_name or 'perfectG' in model_name) and 'multi_video' in model_name:
                         out,preds = model.forward([samples,batch['gt_vec']])

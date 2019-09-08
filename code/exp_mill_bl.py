@@ -197,7 +197,33 @@ def get_data(dataset, limit, all_classes, just_primary, gt_vec, k_vec, test_pair
         train_file, test_train_file, test_file = files
         # train_data = UCF_dataset(train_file, limit)
         if num_similar>0:
-            train_data = UCF_dataset_withNumSimilar(train_file, limit, num_similar = num_similar)
+            train_data = UCF_dataset_withNumSimilar(train_file, limit, num_similar = num_similar, just_one = False)
+            # test_train_data =  UCF_dataset_withNumSimilar(test_train_file, limit, num_similar = num_similar)
+        else:
+            train_data = UCF_dataset(train_file, limit)
+        test_train_data = UCF_dataset(test_train_file, limit)
+        test_data = UCF_dataset(test_file, None)
+
+    elif dataset.startswith('charades'):
+        pre_pend = '_'.join(dataset.split('_')[1:])
+        dir_files = '../data/charades/train_test_files'
+        n_classes = 157
+        trim_preds = None
+        post_pends = ['_wmiss','_wmiss','_wmiss']
+        train_file = os.path.join(dir_files, pre_pend+'_train')
+        test_train_file = os.path.join(dir_files, pre_pend+'_test')
+        test_file = os.path.join(dir_files, pre_pend+'_test')
+        
+        files = [train_file, test_train_file, test_file]
+
+        
+        post_pends = [pp+'.txt' for pp in post_pends]
+        files = [file_curr+pp for file_curr,pp in zip(files,post_pends)]
+        
+        train_file, test_train_file, test_file = files
+        # train_data = UCF_dataset(train_file, limit)
+        if num_similar>0:
+            train_data = UCF_dataset_withNumSimilar(train_file, limit, num_similar = num_similar, just_one = False)
             # test_train_data =  UCF_dataset_withNumSimilar(test_train_file, limit, num_similar = num_similar)
         else:
             train_data = UCF_dataset(train_file, limit)
@@ -291,8 +317,13 @@ def train_simple_mill_all_classes(model_name,
     num_epochs = epoch_stuff[1]
 
     # test_mode = test_mode or viz_mode or viz_sim
+    if model_file is not None:
+        [model_file, epoch_start] = model_file
+    else:
+        epoch_start = 0
 
-    epoch_start = 0
+    # print model_file, epoch_start
+    # raw_input()
     if exp:
         dec_after = ['exp',0.96,epoch_stuff[0],1e-6]
     else:
@@ -311,7 +342,12 @@ def train_simple_mill_all_classes(model_name,
     print class_weights
     # raw_input()
 
-    if class_weights:
+    if class_weights :
+    # and 'BinaryCrossEntropy' in criterion_str:
+        # print 'bce class_weights'
+        # class_weights_val = util.get_class_weights_bce(util.readLinesFromFile(train_file),n_classes)
+    # elif class_weights:
+        print 'new class_weights'
         class_weights_val = util.get_class_weights_au(util.readLinesFromFile(train_file),n_classes)
     else:
         class_weights_val = None
@@ -320,7 +356,6 @@ def train_simple_mill_all_classes(model_name,
     criterion, criterion_str = get_criterion(criterion_str,attention,class_weights_val,  loss_weights, multibranch, num_similar = num_similar)
     
     init = False
-    
 
     
     out_dir_meta = os.path.join('../experiments',model_name)
@@ -409,6 +444,9 @@ def train_simple_mill_all_classes(model_name,
     for model_num in model_nums:
 
         print 'MODEL NUM',model_num
+        # if save_outfs:
+        #     save_outfs = os.path.join(out_dir_train, str(model_num)+'_out')
+        #     util.mkdir(save_outfs)
 
         test_params = dict(out_dir_train = out_dir_train,
                 model_num = model_num,
@@ -429,7 +467,7 @@ def train_simple_mill_all_classes(model_name,
                 save_outfs = save_outfs,
                 test_pair = test_pair,
                 test_method = test_method)
-        # test_model(**test_params)
+        test_model(**test_params)
         if viz_mode:
             test_params = dict(out_dir_train = out_dir_train,
                     model_num = model_num,
@@ -447,7 +485,7 @@ def train_simple_mill_all_classes(model_name,
                     multibranch = multibranch,
                     branch_to_test =branch_to_test,
                     dataset = dataset)
-            test_model(**test_params)
+            # test_model(**test_params)
             test_params = dict(out_dir_train = out_dir_train,
                     model_num = model_num,
                     test_data = test_data,
@@ -457,7 +495,8 @@ def train_simple_mill_all_classes(model_name,
                     second_thresh = second_thresh,
                     first_thresh = first_thresh,
                     dataset = dataset)
-            # visualize_sim_mat(**test_params)
+            print 'visualizing'
+            visualize_sim_mat(**test_params)
 
 
 

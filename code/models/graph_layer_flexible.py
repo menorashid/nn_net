@@ -135,9 +135,6 @@ class Graph_Layer(nn.Module):
         self.weight = nn.Parameter(torch.randn(in_size,self.n_out))
         nn.init.kaiming_uniform_(self.weight, a=math.sqrt(5))
 
-        # self.bias = nn.Parameter(torch.zeros(1,self.n_out))
-        # nn.init.kaiming_uniform_(self.weight, a=math.sqrt(5))
-
         print self.weight.size()
         self.method = method
         self.affinity_dict = affinity_dict
@@ -148,28 +145,10 @@ class Graph_Layer(nn.Module):
         
         if 'learn_thresh' in self.method:
             self.thresher = Thresher()
-            # []
-            # # torch.nn.Conv2d(in_channels, out_channels, kernel_size, stride=1
-            # conv = nn.Conv2d(1,1,1,stride = 1, bias = True)
-            # conv.weight.data.fill_(1)
-            # conv.bias.data.fill_(0)
-            # # nn.init.kaiming_uniform_(con.weight, a=math.sqrt(5))
-            # self.thresher.append(conv)
-            # self.thresher.append(nn.LeakyReLU())
-            # self.thresher = nn.Sequential(*self.thresher)
-        # elif 'learn_thresh' in self.method:
-        #     self.thresher = []
-        #     self.thresher.append(nn.Linear(1,1,bias = False))
-        #     self.thresher.append(nn.ReLU())
-        #     self.thresher = nn.Sequential(*self.thresher)
-        
-    def forward(self, x, sim_feat, to_keep = None, alpha = None, graph_sum = False, identity = False, method = None):
+            
+    def forward(self, x, sim_feat, to_keep = None, alpha = None, graph_sum = False, identity = False, method = None, nosum = False):
 
-        # if identity:
-        #     temp = x
-        #     if graph_sum= True:
-        # else:
-        G = self.get_affinity(sim_feat, to_keep = to_keep, alpha = alpha, graph_sum = graph_sum, identity = identity, method = method)
+        G = self.get_affinity(sim_feat, to_keep = to_keep, alpha = alpha, graph_sum = graph_sum, identity = identity, method = method, nosum = nosum)
         if graph_sum:
             [G, gsum] = G
         temp = torch.mm(G,x)
@@ -177,26 +156,9 @@ class Graph_Layer(nn.Module):
         out = torch.mm(temp,self.weight)
 
         if graph_sum:
-        # +self.bias
             return [out, gsum]
         else:
             return out
-
-
-    # def get_to_keep(self,input_sizes):
-        
-    #     k_all = [max(1,size_curr)//self.deno for idx_size_curr,size_curr in enumerate(input_sizes)]
-    #     k_all = int(np.mean(k_all))
-    #     # print k_all
-    #     # raw_input()
-    #     # k_all = []
-    #     # for idx_size_curr,size_curr in enumerate(input_sizes):
-    #     #     deno_curr = max(1,size_curr)//self.deno
-    #     #     k_all += [deno_curr]*size_curr 
-
-    #     return k_all
-    
-
 
     def get_affinity(self,input, to_keep = None, alpha = None, nosum = False,graph_sum = False, identity = False, method = None):
         
@@ -227,15 +189,10 @@ class Graph_Layer(nn.Module):
             G = torch.gather(G,1,index)
         else:
             if 'cos' in method:
-                # print 'normalizing'
                 input = F.normalize(input)
             
             G = torch.mm(input,torch.t(input))
-            # print torch.min(input), torch.max(input), torch.min(G), torch.max(G)
-
-            # eye_inv_l1 = (torch.eye(G.size(0)).cuda()+1) % 2
-            # G = 
-
+            
             gsum = torch.sum(torch.abs(G.clone()))/(G.size(0)*G.size(1))
             
 
@@ -259,35 +216,15 @@ class Graph_Layer(nn.Module):
                 G = G*eye_inv
             
 
-            # print torch.min(G), torch.max(G)
-
+            
 
 
 
         if alpha is not None:
             assert to_keep is None
-            # print G[:2,:2]
-            # print torch.min(alpha),torch.max(alpha)
             alpha = alpha.view(1,alpha.size(0))
-            # print alpha[0,:2]
             G = G*alpha
-            # diag_vals = torch.diagonal(G)
-
-            # print G[:2,:2]
-            # alpha1 = alpha.view(alpha.size(1),1)
-            # G = G*alpha1
             
-            # print G[:2,:2]
-            # eye_inv = (torch.eye(G.size(0)).cuda()+1) % 2
-            # G = G*eye_inv
-            # print G[:2,:2]
-            # G = G+torch.diag(diag_vals)
-            # print G[:2,:2]
-
-            # raw_input()
-        
-        # print to_keep
-        # raw_input()
         if to_keep is not None:
             if type(to_keep) == type(()):
                 to_keep,input_sizes = to_keep
@@ -301,9 +238,6 @@ class Graph_Layer(nn.Module):
                     to_keep_curr = min(size_vid, to_keep)
                     
                     try:
-                        # if alpha is not None:
-                        #     _, indices_curr = torch.topk(torch.abs(alphamat[:,start_idx:end_idx]), to_keep_curr, dim = 1) 
-                        # else:
                         _, indices_curr = torch.topk(torch.abs(G[:,start_idx:end_idx]), to_keep_curr, dim = 1) 
                     except:
                         print G.size()
@@ -322,35 +256,69 @@ class Graph_Layer(nn.Module):
                 G = G*0
                 G = G.scatter(1, indices, topk)
             elif type(to_keep)==float:
-                # print torch.sum(G==0)
-                # print to_keep
-                # print 'torch.min(G),torch.max(G)'
-                # print torch.min(G),torch.max(G)
                 if to_keep>0:
                     G[torch.abs(G)<to_keep] = 0
                     # G = torch.nn.functional.hardshrink(G.cpu(), lambd=0.5).cuda()
                 else:
                     G[G<to_keep] = 0
-                # print 'torch.min(G),torch.max(G)'
-                # print torch.min(G),torch.max(G)
-                # print torch.sum(G==0)
-                # raw_input()
+            elif type(to_keep)==str:
+                to_keep = to_keep.split('_')
+                to_keep = float(to_keep[1])
+                G_vals = torch.abs(G[torch.eye(G.size(0))==0])
+                min_val = torch.min(G_vals)
+                max_val = torch.max(G_vals)
+                thresh = min_val+ (max_val - min_val)*to_keep
+                # print 'thresh',thresh
+                G[torch.abs(G)<thresh] = 0
+                # eye_inv = (torch.eye(G.size(0)).cuda()+1) % 2
 
+                
         
+        # # print 'nosum',nosum
+        # if type(nosum)==float:
+        #     G_smax = torch.nn.functional.softmax(G, dim = 1)
+        #     sums = torch.sum(G,dim = 1, keepdim = True)
+        #     sums[sums==0]=1
+        #     G_rg = G/sums
+        #     # print nosum, (1-nosum)
 
+        #     G = G_rg*nosum + (1-nosum)*G_smax
+        # elif nosum==3:
+        #     # print nosum
+        #     G = torch.nn.functional.softmax(G, dim = 1)
+        #     G = torch.nn.functional.softmax(G, dim = 0)
+        # elif nosum==4:
+        #     # print nosum
+        #     sums = torch.sum(G,dim = 1, keepdim = True)
+        #     sums[sums==0]=1
+        #     G = G/sums
+        #     sums = torch.sum(G,dim = 0, keepdim = True)
+        #     sums[sums==0]=1
+        #     G = G/sums
+        # elif nosum==5:
+        #     # print nosum
+        #     sums = torch.sum(G,dim = 1, keepdim = True)
+        #     sums[sums==0]=1
+        #     G = G/sums
+        #     G = torch.nn.functional.softmax(G, dim = 0)
+            
+        # # if nosum==2:
+        # #     # sums = torch.sum(G,dim = 1, keepdim = True)
+        # #     G = torch.nn.functional.softmax(G, dim = 1)
+        # #     # G[sums==0]=1
+
+        # #     G_sum =torch.sum(G, dim = 1, keepdim = True) 
+        # el
         if not nosum:
-            # print 'div summing right now'
+            # print 'here'
             sums = torch.sum(G,dim = 1, keepdim = True)
             sums[sums==0]=1
             G = G/sums
-            # raw_input()
-
+            
 
         
 
 
-        # print torch.min(G), torch.max(G)    
-        # raw_input()
         if graph_sum:
             return [G, gsum]
         else:
@@ -408,14 +376,16 @@ class Graph_Layer_Wrapper(nn.Module):
             error_message = str('non_lin %s not recognized', non_lin)
             raise ValueError(error_message)
     
-    def forward(self, x, sim_feat, to_keep = None, alpha = None, graph_sum = False, identity = False, method= None):
+    def forward(self, x, sim_feat, to_keep = None, alpha = None, graph_sum = False, identity = False, method= None,nosum=False):
         if self.non_linearity is not None:
             sim_feat = self.non_linearity(sim_feat)
         # sim_feat = self.do(sim_feat)
-        out = self.graph_layer(x, sim_feat, to_keep = to_keep, alpha = alpha, graph_sum = graph_sum, identity = identity, method = method)
+        out = self.graph_layer(x, sim_feat, to_keep = to_keep, alpha = alpha, graph_sum = graph_sum, identity = identity, method = method,nosum=nosum)
         
         if hasattr(self,'aft') and self.aft is not None:
             if graph_sum:
+                # print self.aft
+                # print len(out),out[0].size(),out[1].size()
                 out[0] = self.aft(out[0])
             else:
                 out = self.aft(out)

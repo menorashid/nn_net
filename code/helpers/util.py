@@ -146,14 +146,56 @@ def get_class_weights_au(train_files, n_classes = None):
     for line_curr in train_files:
         arr.append([int(val) for val in line_curr.split(' ')[idx_start:]] )
     arr = np.array(arr)
+
+    arr[arr>0]=1
+    counts = np.sum(arr,0)
+
+    print counts
+    print np.sum(counts)/counts.size
+    # raw_input()
+    counts = counts/float(np.sum(counts))
+    counts = np.array([1./val  if val>0 else 0 for val in counts])
+    print counts
+    
+    counts = counts/float(np.sum(counts))  
+    
+    counts = counts*counts.size
+    print counts
+    raw_input()
+    return counts
+
+def get_class_weights_bce(train_files, n_classes = None):
+    
+    if n_classes is None:
+        idx_start = 1
+    else:
+        idx_start = -1*n_classes
+
+    arr = []
+    for line_curr in train_files:
+        arr.append([int(val) for val in line_curr.split(' ')[idx_start:]] )
+    arr = np.array(arr)
     
     arr[arr>0]=1
     counts = np.sum(arr,0)
-    counts = counts/float(np.sum(counts))
-    counts = np.array([1./val  if val>0 else 0 for val in counts])
-    counts = counts/float(np.sum(counts))  
+    arr = 1-arr
+    neg_counts = np.sum(arr,0)
+    print counts
+    print neg_counts
+
+    weight = float(np.sum(counts))/counts
+    # weight = neg_counts/counts
+    
+    print weight
+    constant = np.sum(counts)/(np.sum(counts)/float(counts.size))
+    
+    weight = weight/float(constant)
+    print weight
+    raw_input()
+    # counts = np.array([1./val  if val>0 else 0 for val in counts])
+    # counts = counts/float(np.sum(counts))  
         
-    return counts
+    return weight
 
 def softmax(x):
     """Compute softmax values for each sets of scores in x."""

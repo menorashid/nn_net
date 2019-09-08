@@ -223,16 +223,20 @@ def MyLoss_triple(x, element_logits, seq_len, labels, type_loss = 'original', de
     else:
         iterator = [(idx, idx+1) for idx in range(0,min(2*num_similar,batch_size),2)] 
 
-    # print (num_similar,iterator,batch_size)
+    print (num_similar,iterator,batch_size)
+    # debug = True
     # raw_input()
 
     for triple in iterator:
         total_pairs +=1
         triple = list(triple)
-
+        
+        print (labels[triple,:])
+        
         joint_label = torch.sum(labels[triple,:],dim = 0)
 
         if torch.max(joint_label)!=2:
+            # print ('first_continue')
             continue
 
         ssd = list(triple)
@@ -240,13 +244,16 @@ def MyLoss_triple(x, element_logits, seq_len, labels, type_loss = 'original', de
         
         # check same is same
         same_sum = torch.sum(labels[same_idx,:], dim = 0)
+        print (torch.max(same_sum),torch.sum(same_sum==1))
         if torch.max(same_sum)!=2 or torch.sum(same_sum==1)!=0:
+            # print ('second_continue')
             continue
 
         #check seq len is atleast 2
         if np.sum(seq_len[ssd]<2)>0:
             print ('third continue')
             continue
+
         # print (same_idx)
         labels_curr = [labels[idx,:] for idx in ssd]
         alpha = [element_logits[idx] for idx in ssd]
@@ -265,8 +272,96 @@ def MyLoss_triple(x, element_logits, seq_len, labels, type_loss = 'original', de
             sim_loss += single_casl_loss(alpha, labels_curr, x_curr, debug = debug)
     
 
+    # print (n_tmp
     sim_loss = sim_loss/max(n_tmp,1)
-    # print ('n_tmp',n_tmp, 'total_pairs', total_pairs)
+    print ('n_tmp',n_tmp, 'total_pairs', total_pairs)
+    raw_input()
+    return sim_loss
+
+
+def MyLoss_triple_noExclusive(x, element_logits, seq_len, labels, type_loss = 'original', debug = False, num_similar = 0):
+    ''' x is the torch tensor of feature from the last layer of model of dimension (n_similar, n_element, n_feature), 
+        element_logits should be torch tensor of dimension (n_similar, n_element, n_class) 
+        seq_len should be numpy array of dimension (B,)
+        labels should be a numpy array of dimension (B, n_class) of 1 or 0 '''
+
+    
+    batch_size = labels.size(0)
+    sim_loss = 0.
+    n_tmp = 0.
+    labels = labels.clone()
+    labels[labels>0]=1
+    total_pairs = 0
+    # print (labels.cpu().data)
+    # labels = torch.FloatTensor(labels)
+
+    if num_similar==0:
+        iterator = itertools.combinations(range(batch_size),2)
+    else:
+        iterator = [(idx, idx+1) for idx in range(0,min(2*num_similar,batch_size-1),2)] 
+
+    # print (num_similar,iterator,batch_size)
+    # debug = True
+    # raw_input()
+
+    for triple in iterator:
+        # if triple[1]>=batch_size:
+        #     continue
+
+        total_pairs +=1
+        triple = list(triple)
+        
+        # print (labels[triple,:])
+        
+        joint_label = torch.sum(labels[triple,:],dim = 0)
+        # print (torch.sum(joint_label==2))
+
+        if torch.max(joint_label)!=2:
+            # print ('first_continue')
+            continue
+
+        # if torch.sum(joint_label==2)>2:
+        #     # print ('second_continue')
+        #     continue
+
+        ssd = list(triple)
+        
+        #check seq len is atleast 2
+        if np.sum(seq_len[ssd]<2)>0:
+            print ('third continue')
+            continue
+
+        labels_curr = [labels[idx,:].clone() for idx in ssd]
+        # print (labels_curr)
+        # print (joint_label)
+        for label_curr in labels_curr:
+            label_curr[joint_label<2]=0
+            label_curr[joint_label>2]=1
+        # print (labels_curr)
+        # print ('...')
+        # print (labels[idx,:])
+        
+        # raw_input()
+
+        alpha = [element_logits[idx] for idx in ssd]
+        x_curr = [x[idx] for idx in ssd]
+        if debug:
+            for idx_x, x_pr in enumerate(x_curr):
+                print (x_pr.size())
+                print (alpha[idx_x].size())
+            raw_input()
+
+        n_tmp +=1
+
+        if type_loss =='pushH':
+            sim_loss += single_pushH_loss(alpha, labels_curr, x_curr, debug = debug)
+        elif type_loss =='casl':
+            sim_loss += single_casl_loss(alpha, labels_curr, x_curr, debug = debug)
+    
+
+    # print (n_tmp
+    sim_loss = sim_loss/max(n_tmp,1)
+    # print ('no exclusive n_tmp',n_tmp, 'total_pairs', total_pairs)
     # raw_input()
     return sim_loss
 

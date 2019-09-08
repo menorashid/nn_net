@@ -17,6 +17,7 @@ import sklearn.metrics
 import analysis.evaluate_thumos as et
 import debugging_graph as dg
 import wtalc
+from data_processors import preprocess_charades as pc
 
 class Exp_Lr_Scheduler:
     def __init__(self, optimizer,step_curr, init_lr, decay_rate, decay_steps, min_lr=1e-6):
@@ -412,7 +413,6 @@ def visualize_dets(model, test_dataloader, dir_viz, first_thresh , second_thresh
 
     # np.savez('../scratch/debug_det_graph.npz', det_vid_names = det_vid_names, det_conf = det_conf, det_time_intervals = det_time_intervals, det_events_class = det_events_class)
 
-
 def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh , second_thresh , bin_trim = None , multibranch =1, branch_to_test = -1,dataset = 'ucf', save_outfs = None, test_method = 'original', fps_stuff = 16./25., matlab_arr = None, soft_out = True):
 
     # model, 
@@ -501,14 +501,28 @@ def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh ,
                         out,pmf = model.forward([sample.cuda(),batch['gt_vec'][idx_sample].cuda()])
                     else:  
                         # if type(sample)==type([]):
-                        if save_outfs:
-                            model.feat_ret = True
+                        # if save_outfs:
+                        #     model.feat_ret = True
 
                         out, pmf = model.forward(sample)
+
+                        # print out.size(), sample.size(), save_outfs
+                        # raw_input()
+
                         # else:  
                         #     out, pmf = model.forward(sample.cuda())
                         # print pmf
                         # print model
+                        if save_outfs:
+                            outf = out.data.cpu().numpy()
+                            vid_name = det_vid_names_ac[idx_test]
+                            out_file_f = os.path.join(save_outfs,vid_name+'.npy')
+                            print idx_test, len(det_vid_names_ac), vid_name, outf.shape
+
+                            np.save(out_file_f,outf)
+                            idx_test+=1
+                            continue
+
                         if save_outfs:
                             outf = pmf[1][1]
                             # .cpu().numpy()
@@ -674,6 +688,9 @@ def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh ,
         print 'saved', out_file_feats
         raw_input()
     else:
+        if save_outfs:
+            pc.create_charades_det_file(save_outfs)
+            return None
         # threshes_all = np.concatenate(threshes_all,0)
         det_conf = np.concatenate(det_conf_all,axis =0)
         det_time_intervals = np.concatenate(det_time_intervals_all,axis = 0)
@@ -1029,8 +1046,8 @@ def visualize_sim_mat_inner(model, test_dataloader, dir_viz, dataset = 'ucf'):
         labels = batch['label']
 
         preds_mini = []
-        for idx_sample, sample in enumerate(samples):
-            # print idx_test
+        for idx_sample, sample in enumerate(samples[:100]):
+            print idx_sample
             vid_name = det_vid_names_ac[idx_test]
             out_shape_curr = sample.size(0)
 
@@ -1115,6 +1132,7 @@ def train_model(out_dir_train,
     model = model.cuda()
     model.train(True)
     model_str = str(model)
+
     log_file_writer.write(model_str+'\n')
     print model_str
     # out_file = os.path.join(out_dir_train,'model_-1.pt')

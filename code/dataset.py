@@ -26,7 +26,10 @@ class UCF_dataset(Dataset):
         train_file_curr = anno[0]
         label =np.array([int(label) for label in label]).astype(float)
         label = label/np.sum(label)
-        sample = np.load(train_file_curr)
+        if train_file_curr.endswith('.npz'):
+            sample = np.load(train_file_curr)['arr_0']
+        else:
+            sample = np.load(train_file_curr)
         # print 'in dataset',train_file_curr
         if sample.shape[0]>self.feature_limit and self.feature_limit is not None:
             if self.select_front:
@@ -51,7 +54,7 @@ class UCF_dataset(Dataset):
 
 
 class UCF_dataset_withNumSimilar(Dataset):
-    def __init__(self, text_file, feature_limit, select_front = False, num_similar = 0):
+    def __init__(self, text_file, feature_limit, select_front = False, num_similar = 0, just_one = True):
         self.anno_file = text_file
         self.files = util.readLinesFromFile(text_file)
         self.feature_limit = feature_limit
@@ -63,18 +66,23 @@ class UCF_dataset_withNumSimilar(Dataset):
 
         self.num_classes = self.annos.shape[1]
         ind_idx = np.sum(self.annos, axis = 1)
-        print self.annos[0]
+        # print self.annos[0]
+
 
         ind_idx = ind_idx ==1
-        print 'ind_idx.shape, np.sum(ind_idx)',ind_idx.shape, np.sum(ind_idx)
+        # print 'ind_idx.shape, np.sum(ind_idx)',ind_idx.shape, np.sum(ind_idx)
 
-        raw_input()
+        # raw_input()
         self.idx_per_class = []
         for idx_curr in range(self.num_classes):
-            bin_class = np.logical_and(self.annos[:,idx_curr]>0, ind_idx)
+            if just_one:
+                bin_class = np.logical_and(self.annos[:,idx_curr]>0, ind_idx)
+            else:
+                bin_class = self.annos[:,idx_curr]>0
+                
             self.idx_per_class.append(np.where(bin_class)[0])
-            print 'idx_curr, self.idx_per_class[-1]',idx_curr, self.idx_per_class[-1]
-        raw_input()
+        #     print 'idx_curr, self.idx_per_class[-1]',idx_curr, self.idx_per_class[-1]
+        # raw_input()
 
     def __len__(self):
         return len(self.files)
@@ -87,7 +95,12 @@ class UCF_dataset_withNumSimilar(Dataset):
         train_file_curr = anno[0]
         label =np.array([int(label) for label in label]).astype(float)
         label = label/np.sum(label)
-        sample = np.load(train_file_curr)
+        
+        # print train_file_curr
+        if train_file_curr.endswith('.npz'):
+            sample = np.load(train_file_curr)['arr_0']
+        else:
+            sample = np.load(train_file_curr)
         # print 'in dataset',train_file_curr
         if sample.shape[0]>self.feature_limit and self.feature_limit is not None:
             if self.select_front:
@@ -112,11 +125,11 @@ class UCF_dataset_withNumSimilar(Dataset):
             # print 'iter'
             # pick a rand class
             class_to_pick = np.random.randint(self.num_classes)
-            print 'class_to_pick',class_to_pick
+            # print 'class_to_pick',class_to_pick
             idx_rel = self.idx_per_class[class_to_pick]
-            print 'idx_rel',idx_rel
+            # print 'idx_rel',idx_rel
             idx_left = idx_rel[np.isin(idx_rel, idx_already_selected, invert = True)]
-            print 'idx_left',idx_left
+            # print 'idx_left',idx_left
 
             if idx_left.size == 0:
                 continue

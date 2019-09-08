@@ -4,6 +4,7 @@ import scipy.io
 import glob
 from helpers import util, visualize
 import sklearn.metrics
+import globals
 from globals import class_names
 from globals import class_names_activitynet
 import torch
@@ -77,10 +78,10 @@ def get_gt_vector(vid_name, out_shape_curr, class_idx, test = True,gt_return = F
 
 def save_sim_viz(vid_name, out_shape_curr, sim_mat, class_idx, out_dir, dataset = 'ucf'):
     gt_vals, det_times = get_gt_vector(vid_name, out_shape_curr, class_idx, dataset = dataset)
-    # if dataset.startswith('activitynet'):
-    #     class_names = class_names_activitynet
-    # else:
-        # class_names = 
+    if dataset.startswith('activitynet'):
+        class_names = globals.class_names_activitynet
+    else:
+        class_names = globals.class_names
     out_dir_curr = os.path.join(out_dir, class_names[class_idx])
     util.mkdir(out_dir_curr)
     pos_rows = sim_mat[gt_vals>0,:]
@@ -187,8 +188,10 @@ def save_sim_viz_mean(vid_name, out_shape_curr, sim_mat, class_idx, out_dir):
     print out_file_curr
 
 def make_htmls(out_dir):
-    for class_name in class_names:
-        out_dir_curr = os.path.join(out_dir, class_name)
+    # for class_name in class_names:
+    dirs = [dir_curr for dir_curr in glob.glob(os.path.join(out_dir,'*')) if os.path.isdir(dir_curr)]
+    for out_dir_curr in dirs:
+        # out_dir_curr = os.path.join(out_dir, class_name)
         visualize.writeHTMLForFolder(out_dir_curr)
 
 

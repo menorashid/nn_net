@@ -68,7 +68,7 @@ class Graph_Multi_Video(nn.Module):
                 raise ValueError(error_message)
 
 
-        self.linear_layer = nn.Sequential(*self.linear_layer)    
+        # self.linear_layer = nn.Sequential(*self.linear_layer)    
         # self.graph_layer = nn.ModuleList()
         
         # self.last_graph = nn.ModuleList()
@@ -110,7 +110,6 @@ class Graph_Multi_Video(nn.Module):
 
         # print 'graph_size', graph_size, self.training
         input_chunks = [[input[0]]]+[input[i:i + graph_size] for i in xrange(1, len(input), graph_size)]
-        # print 'INPUTTING'
         # input_chunks = [input[i:i + graph_size] for i in xrange(0, len(input), graph_size)]
 
         is_cuda = next(self.parameters()).is_cuda
@@ -138,7 +137,7 @@ class Graph_Multi_Video(nn.Module):
             # if hasattr(self, 'layer_bef') and self.layer_bef is not None:
             #     input = self.layer_bef(input)
 
-            feature_out = self.linear_layer(input)
+            # feature_out = self.linear_layer(input)
             # # for col_num in range(len(self.graph_layers)):
             # print 'feature_out.size()',feature_out.size()
 
@@ -146,7 +145,7 @@ class Graph_Multi_Video(nn.Module):
                 # if to_keep=='lin':
             # out_graph = self.graph_layer(input)
             #     else:             
-            out_graph = self.graph_layer(input, feature_out, to_keep = to_keep, graph_sum = self.graph_sum, identity = identity, method = method)
+            out_graph = self.graph_layer(input, input, to_keep = to_keep, graph_sum = self.graph_sum, identity = identity, method = method)
             
             
             if self.graph_sum:
@@ -233,7 +232,7 @@ class Graph_Multi_Video(nn.Module):
         if hasattr(self, 'layer_bef') and self.layer_bef is not None:
             input = self.layer_bef(input)
 
-        feature_out = self.linear_layer(input)
+        # feature_out = self.linear_layer(input)
         
         if sparsify:
             to_keep = self.sparsify
@@ -241,7 +240,7 @@ class Graph_Multi_Video(nn.Module):
         else:
             to_keep = None
 
-        sim_mat = self.graph_layer.get_affinity(feature_out, to_keep = to_keep,nosum = nosum)
+        sim_mat = self.graph_layer.get_affinity(input, to_keep = to_keep,nosum = nosum)
 
         return sim_mat
     
@@ -317,8 +316,8 @@ class Network:
         modules = []
         # if self.model.layer_bef is not None:
         #     modules.append(self.model.layer_bef)
-
-        modules+=[self.model.linear_layer, self.model.graph_layer, self.model.last_graph]
+        # self.model.linear_layer,
+        modules+=[ self.model.graph_layer, self.model.last_graph]
 
         for i,module in enumerate(modules):
             print i, lr[i]
