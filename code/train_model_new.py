@@ -1,6 +1,39 @@
 from train_test_mill import *
 
 
+def get_sparsity_threshold(model, train_dataloader):
+    model.eval()
+    min_max_median = []
+    
+    for num_iter_train,batch in enumerate(train_dataloader):    
+        samples = batch['features']
+        # labels = batch['label'].cuda()
+        print num_iter_train
+        min_max_median+=model.get_sparsity_threshold(samples)
+        if num_iter_train==100:
+            break
+
+    min_max_median = np.array(min_max_median)
+    sparsity_threshold = np.mean(min_max_median[:,2])
+
+    # mean_vals = np.mean(min_max_median, axis = 0)
+    # sparsity_threshold = (mean_vals[1]+mean_vals[0])*0.5
+    
+
+    sparsity_threshold = (np.max(min_max_median[:,1])+np.min(min_max_median[:,0]))*0.5
+
+    print min_max_median.shape
+    print np.min(min_max_median, axis = 0)
+    print np.max(min_max_median, axis = 0)
+    print np.mean(min_max_median, axis = 0)
+    print sparsity_threshold
+
+
+
+    model.train()
+    return float(sparsity_threshold)
+
+
 def train_model_new(out_dir_train,
                 train_data,
                 test_data,
@@ -114,6 +147,21 @@ def train_model_new(out_dir_train,
     
     criterion = criterion.cuda()
 
+    # print model.sparsify
+    # print hasattr(model,'sparsify')
+    # print model.sparsify=='static_media_mean'
+
+    if hasattr(model,'sparsify') and type(model.sparsify)==str and model.sparsify.startswith('static'):
+
+        # print 'before',model.sparsify
+        model.sparsify = get_sparsity_threshold(model,train_dataloader) 
+        # print 'after',model.sparsify
+        str_curr = 'Sparsity Threshold '+str(model.sparsify)
+        print str_curr
+        log_file_writer.write(str_curr+'\n')
+
+    print 'raw_inputting'
+    raw_input()
     for num_epoch in range(epoch_start,num_epochs):
 
         plot_arr_epoch = []

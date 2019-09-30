@@ -6,8 +6,8 @@ import numpy as np
 def thumos_bce():
     print 'hey girl'
     model_name = 'graph_multi_video_with_L1_retF'
-    # criterion_str = 'BinaryCrossEntropyMultiBranchWithL1_CASL'
-    criterion_str = 'MultiCrossEntropyMultiBranchWithL1_CASL'
+    criterion_str = 'BinaryCrossEntropyMultiBranchWithL1_CASL'
+    # criterion_str = 'MultiCrossEntropyMultiBranchWithL1_CASL'
     loss_weights = [1,1,1]
     plot_losses = True
     det_test = True
@@ -45,7 +45,7 @@ def thumos_bce():
     limit  = None
     save_after = 50
     
-    test_mode = True
+    test_mode = False
     save_outfs = False
     # test_method = 'wtalc'
     # test_method = 'wtalc'
@@ -57,6 +57,7 @@ def thumos_bce():
     test_post_pend = '_'+test_method+'_class'
 
     model_nums = [249]
+    # ,349,399,449,499]
     retrain = False
     viz_mode = False
     viz_sim = False
@@ -64,7 +65,7 @@ def thumos_bce():
     # post_pend = '_noBiasLastLayer'
     
     network_params = {}
-    network_params['deno'] = 8
+    network_params['deno'] = 'self_determination_simple'
     network_params['in_out'] = [2048,1024]
     network_params['feat_dim'] = [2048,1024]
     network_params['feat_ret']=True
@@ -72,6 +73,8 @@ def thumos_bce():
     network_params['graph_size'] = 2
     network_params['method'] = 'cos'
     network_params['sparsify'] = 'percent_0.5'
+
+    # 'static_mid_minmin_maxmax'
     network_params['graph_sum'] = attention
     network_params['non_lin'] = None
     network_params['aft_nonlin']='RL_L2'
@@ -80,13 +83,19 @@ def thumos_bce():
     # network_params['dropout'] = 0.8
     num_similar = 0
     
-    post_pend = 'changingSparsityAbs_'+str(num_similar)
-    first_thresh=0
-    class_weights = False
+    post_pend = '_changingSparsityAbs_'+str(num_similar)
+    first_thresh=-1
+    class_weights = True
     test_after = 10
     all_classes = False
     
-    second_thresh = -5.224
+    second_thresh = -2
+    # 'otsu_per_class_pmfthresh_justpos_0'
+    # 0.5
+    # 0.5
+    # 'min_max_0.5_per_class'
+    # second_thresh = 'otsu_per_class_gt'
+    # -5.224
     det_class = -1
     train_simple_mill_all_classes (model_name = model_name,
                         lr = lr,
@@ -127,10 +136,13 @@ def thumos_bce():
 def activitynet_bce():
     print 'hey girl'
     model_name = 'graph_multi_video_with_L1_retF'
-    criterion_str = 'MultiCrossEntropyMultiBranchWithL1_CASL'
-    # criterion_str = 'BinaryCrossEntropyMultiBranchWithL1_CASL'
+    # criterion_str = 'MultiCrossEntropyMultiBranchWithL1_CASL'
+    criterion_str = 'BinaryCrossEntropyMultiBranchWithL1_CASL'
     loss_weights = [1,1,1]
     plot_losses = True
+
+    # import torch.multiprocessing
+    # torch.multiprocessing.set_sharing_strategy('file_system')
 
     # model_name = 'graph_multi_video_with_L1'
     # # criterion_str = 'MultiCrossEntropyMultiBranchWithL1'
@@ -183,7 +195,7 @@ def activitynet_bce():
     test_method = 'original'
     test_post_pend = '_'+test_method+'_class'
 
-    model_nums = [249]
+    model_nums = [149]
     retrain = False
     viz_mode = False
     viz_sim = False
@@ -191,11 +203,11 @@ def activitynet_bce():
     # post_pend = '_noBiasLastLayer'
     
     network_params = {}
-    network_params['deno'] = 8
+    network_params['deno'] = 'self_determination'
     network_params['in_out'] = [2048,1024]
     network_params['feat_dim'] = [2048,1024]
     network_params['feat_ret']=True
- 
+  
     network_params['graph_size'] = 2
     network_params['method'] = 'cos'
     network_params['sparsify'] = 'percent_0.5'
@@ -203,13 +215,17 @@ def activitynet_bce():
     network_params['non_lin'] = None
     network_params['aft_nonlin']='RL_L2'
     network_params['sigmoid'] = False
-    post_pend = 'changingSparsityAbs_'+str(num_similar)
+    post_pend = 'weighted_mindeno8_changingSparsityAbs_'+str(num_similar)
     first_thresh=0
     class_weights = False
     test_after = 10
     all_classes = False
     
-    second_thresh =  -10.970
+    second_thresh = -3
+    # 'otsu_per_class_pmfthresh_justpos_0'
+    # 'min_max_per_class_pmfthresh_0'
+    # 'otsu_per_class_gt'
+    # -10.970
     # -9.514
     # 0.5
     # -11.699
@@ -250,7 +266,7 @@ def activitynet_bce():
                         criterion_str = criterion_str,
                         plot_losses = plot_losses,
                         num_similar = num_similar,
-                            save_outfs = save_outfs)
+                        save_outfs = save_outfs)
 
 
 def multithumos_bce():
@@ -639,10 +655,13 @@ def charades_mce():
                         num_similar = num_similar)
 
 
-def main():
 
-    # thumos_bce()
-    activitynet_bce()
+
+
+def main():
+    # print 'hello'
+    thumos_bce()
+    # activitynet_bce()
     # multithumos_bce()
     # charades_bce()
     # charades_mce()

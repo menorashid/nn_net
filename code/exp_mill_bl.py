@@ -348,7 +348,11 @@ def train_simple_mill_all_classes(model_name,
         # class_weights_val = util.get_class_weights_bce(util.readLinesFromFile(train_file),n_classes)
     # elif class_weights:
         print 'new class_weights'
+        pos_weight = util.get_pos_class_weight(util.readLinesFromFile(train_file),n_classes)
+        print 'pos_weight', pos_weight
         class_weights_val = util.get_class_weights_au(util.readLinesFromFile(train_file),n_classes)
+        class_weights_val = [pos_weight, class_weights_val]
+        raw_input()
     else:
         class_weights_val = None
 
@@ -387,7 +391,8 @@ def train_simple_mill_all_classes(model_name,
 
     out_dir_train =  os.path.join(out_dir_meta,strs_append)
     final_model_file = os.path.join(out_dir_train,'model_'+str(num_epochs-1)+'.pt')
-    
+    # print out_dir_train
+    # raw_input()
 
 
     if os.path.exists(final_model_file) and not test_mode and not retrain:

@@ -160,8 +160,23 @@ class Graph_Layer(nn.Module):
         else:
             return out
 
+    def get_graph_stats(self, sim_feat):
+        sim_feat = F.normalize(sim_feat)
+            
+        G = torch.mm(sim_feat,torch.t(sim_feat))
+        G_up = G[torch.triu(torch.ones(G.size(0),G.size(0)),diagonal=1) == 1]
+        # print G.size(), G_up.size()
+        min_val = torch.min(G_up)
+        max_val = torch.max(G_up)
+        median = torch.median(G_up)
+        # print min_val, max_val, median
+        return min_val, max_val, median
+            
+
     def get_affinity(self,input, to_keep = None, alpha = None, nosum = False,graph_sum = False, identity = False, method = None):
         
+        # print 'to keep',to_keep,type(to_keep)
+
         # print input.size()
         if method is None:
             method = self.method
@@ -193,9 +208,19 @@ class Graph_Layer(nn.Module):
             
             G = torch.mm(input,torch.t(input))
             
-            gsum = torch.sum(torch.abs(G.clone()))/(G.size(0)*G.size(1))
             
-
+            if graph_sum==2:
+                assert not nosum
+                G_dt = torch.abs(G.clone())
+                sums = torch.sum(G_dt, dim = 1, keepdim = True)
+                G_dt = G_dt/sums
+                k = torch.sum(G_dt>0,dim = 1, keepdim = True).type(torch.FloatTensor).cuda()
+                G_dt[G_dt==0]=1
+                G_dt = torch.sum(torch.log(G_dt),dim = 1, keepdim = True)
+                gsum = torch.cat([G_dt, k], dim =1)
+            else:
+                gsum = torch.sum(torch.abs(G.clone()))/(G.size(0)*G.size(1))
+            
             if 'exp' in method:
                 G = torch.exp(G)
 
@@ -257,6 +282,7 @@ class Graph_Layer(nn.Module):
                 G = G.scatter(1, indices, topk)
             elif type(to_keep)==float:
                 if to_keep>0:
+                    # print 'doing G shit here'
                     G[torch.abs(G)<to_keep] = 0
                     # G = torch.nn.functional.hardshrink(G.cpu(), lambd=0.5).cuda()
                 else:
@@ -309,15 +335,17 @@ class Graph_Layer(nn.Module):
 
         # #     G_sum =torch.sum(G, dim = 1, keepdim = True) 
         # el
+            
+
+        
+            
+            
         if not nosum:
             # print 'here'
             sums = torch.sum(G,dim = 1, keepdim = True)
             sums[sums==0]=1
             G = G/sums
-            
-
         
-
 
         if graph_sum:
             return [G, gsum]
@@ -376,6 +404,12 @@ class Graph_Layer_Wrapper(nn.Module):
             error_message = str('non_lin %s not recognized', non_lin)
             raise ValueError(error_message)
     
+    def get_graph_stats(self,sim_feat):
+        if self.non_linearity is not None:
+            sim_feat = self.non_linearity(sim_feat)
+        curr_graph_stats = self.graph_layer.get_graph_stats(sim_feat)
+        return curr_graph_stats
+
     def forward(self, x, sim_feat, to_keep = None, alpha = None, graph_sum = False, identity = False, method= None,nosum=False):
         if self.non_linearity is not None:
             sim_feat = self.non_linearity(sim_feat)

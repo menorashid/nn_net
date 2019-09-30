@@ -83,28 +83,7 @@ class Graph_Multi_Video(nn.Module):
             last_graph.append(nn.Sigmoid())
 
         self.last_graph = nn.Sequential(*last_graph)
-    
-
-    def get_sparsity_threshold(self,samples):
-
-        is_cuda = next(self.parameters()).is_cuda
-        stats_all = []
-
-        for input in samples:
-            
-            if is_cuda:
-                input = input.cuda()
-            
-            feature_out = self.linear_layer(input)
-            
-            stats = self.graph_layer.get_graph_stats(feature_out)
-            stats = [val.data.cpu().numpy() for val in stats]
-
-            stats_all.append(stats)
-            
-        return stats_all
-            
-
+        
     def forward(self, input, epoch_num = None, ret_bg =False, branch_to_test = -1):
         
         strip = False
@@ -172,7 +151,9 @@ class Graph_Multi_Video(nn.Module):
             
             if self.graph_sum:
                 [out_graph, graph_sum] = out_graph       
-                graph_sums.append(graph_sum.unsqueeze(0))
+                graph_sums.append(graph_sum)
+                # print graph_sums[-1].size()
+                # raw_input()
 
             # out_graph_all.append(out_graph)
             # print 'out_graph.size()',out_graph.size()
@@ -219,6 +200,8 @@ class Graph_Multi_Video(nn.Module):
         elif self.graph_sum:
             pmf_all = [pmf_all, torch.cat(graph_sums,dim = 0)]
 
+        # print pmf_all[1][0].size()
+
         # raw_input()
         if ret_bg:
             return x_all, pmf_all, None
@@ -227,116 +210,12 @@ class Graph_Multi_Video(nn.Module):
         
 
     def make_pmf(self,x):
-        # print self.deno
-        if self.deno=='self_determination_single':
-            mu = torch.mean(x,dim = 0)
-            # print mu
-            mu = torch.max(mu)
-            # print mu
-            ks = torch.round(x.size(0)*mu)
-            # print ks
-            min_val = max(x.size(0)//8, 1)
-            # print min_val
-            ks = int(torch.clamp(ks,min = min_val))
-            # print ks
-            pmf,_ = torch.sort(x, dim = 0, descending = True)
-
-            pmf = torch.sum(pmf[:ks,:],dim = 0)/ks
-            # print pmf
-            # raw_input()
-
-        elif self.deno=='self_determination':
-            # print 'hello'
-            mus = torch.mean(torch.sigmoid(x),dim = 0)
-            ks = torch.round(x.size(0)*mus)
-            min_val = max(x.size(0)//8, 1)
-            # ks[:] = 0
-            ks = torch.clamp(ks,min = min_val,max = x.size(0))
-            # 
-            # pmf_org,_ = torch.sort(x, dim = 0, descending = True)
-            # t = time.time()
-            # for idx_k, k in enumerate(ks):
-            #     pmf_org[int(k):,idx_k] = 0
-            # pmf = torch.sum(pmf_org, dim = 0)/ks
-            # print pmf
-            # print time.time()-t
-
-            pmf_org,_ = torch.sort(x, dim = 0, descending = True)
-            # t = time.time()
-            pmf = pmf_org.cumsum(0)
-            # print pmf[:10,0]
-
-            # print pmf.size()
-            # print ks.type(torch.cuda.LongTensor)
-            # ks_new = torch.cuda.LongTensor(ks)
-            # print ks, pmf.size()
-            pmf = torch.diag(torch.index_select(pmf,0,ks.type(torch.cuda.LongTensor)-1))
-            # print pmf.size()
-            pmf = pmf/ks
-            
-            # print pmf
-
-            # print time.time()-t
-            # raw_input()
-
-            # t = time.time()
-            # pmf_val = []
-            # for idx_k, k in enumerate(ks):
-            #     pmf_val.append(torch.mean(pmf[:int(k),idx_k]))
-            #      # = 0
-            # pmf = torch.Tensor(pmf_val)
-            # # torch.sum(pmf, dim = 0)/ks
-            # print time.time()-t
-            # raw_input()
-
-        elif self.deno=='self_determination_simple':
-            
-            # t = time.time()
-            # x_sorted,_ = torch.sort(x, dim = 0, descending = True)
-            # mus = torch.mean(torch.sigmoid(x),dim = 0)
-            # # .type(torch.cuda.IntTensor)
-            # print mus.size()
-            # pmf = []
-            # for class_idx in range(x.size(1)):
-            #     k = max(x.size(0)*mus[class_idx],1)
-            #     pmf.append(torch.sum(x_sorted[:k,class_idx])//k)
-            # pmf = torch.Tensor(pmf)
-            # print time.time()-t
-            # print pmf.size()
-            # print pmf
-
-
-            # t = time.time()
-            mus = torch.mean(torch.sigmoid(x),dim = 0)
-            # .type(torch.cuda.IntTensor)
-            ks = torch.round(x.size(0)*mus)
-            min_val = 1
-            ks = torch.clamp(ks,min = min_val)
-            pmf,_ = torch.sort(x, dim = 0, descending = True)
-
-            for idx_k, k in enumerate(ks.type(torch.cuda.IntTensor)):
-                pmf[k+1:,idx_k] = 0
-            
-            pmf = torch.sum(pmf, dim = 0)/ks
-        elif self.deno=='random':
-            
-            deno_curr = 2**np.random.randint(1,4)
-            # print deno_curr
-            k = max(1,x.size(0)//deno_curr)
-            pmf,_ = torch.sort(x, dim=0, descending=True)
-            pmf = pmf[:k,:]
-            pmf = torch.sum(pmf[:k,:], dim = 0)/k
-            # raw_input()
-        else:
-            k = max(1,x.size(0)//self.deno)
-            pmf,_ = torch.sort(x, dim=0, descending=True)
-            pmf = pmf[:k,:]
+        k = max(1,x.size(0)//self.deno)
         
-            pmf = torch.sum(pmf[:k,:], dim = 0)/k
+        pmf,_ = torch.sort(x, dim=0, descending=True)
+        pmf = pmf[:k,:]
         
-        # if not self.training:
-        #     print torch.mean(torch.sigmoid(x),dim = 0)
-        
+        pmf = torch.sum(pmf[:k,:], dim = 0)/k
         return pmf
 
     def get_similarity(self,input,idx_graph_layer = 0,sparsify = False, nosum = True):
