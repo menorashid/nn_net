@@ -10,6 +10,8 @@ import numpy as np
 import torch
 from globals import * 
 
+
+
 def get_data(dataset, limit, all_classes, just_primary, gt_vec, k_vec, test_pair = False, num_similar = 0):
 
     if dataset =='ucf':
