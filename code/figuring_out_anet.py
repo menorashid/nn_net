@@ -354,27 +354,36 @@ def visualizing_threshes():
     # dataset = 'anet'
     
     # res_dir = '../experiments/graph_multi_video_with_L1_retF/graph_multi_video_with_L1_retF_aft_nonlin_RL_L2_non_lin_None_sparsify_static_median_mean_graph_size_2_sigmoid_False_graph_sum_True_deno_8_n_classes_100_in_out_2048_1024_feat_dim_2048_1024_feat_ret_True_method_cos_activitynet/all_classes_False_just_primary_False_limit_None_cw_False_MultiCrossEntropyMultiBranchWithL1_CASL_250_step_250_0.1_0.001_0.001_0.001_lw_1.00_1.00_1.00_changingSparsityAbs_128/results_model_249_original_class_0_0.5_-2/outf'
-    res_dir = '../experiments/graph_multi_video_with_L1_retF/graph_multi_video_with_L1_retF_aft_nonlin_RL_L2_non_lin_None_sparsify_percent_0.5_graph_size_2_sigmoid_False_graph_sum_True_deno_8_n_classes_100_in_out_2048_1024_feat_dim_2048_1024_feat_ret_True_method_cos_activitynet/all_classes_False_just_primary_False_limit_None_cw_False_BinaryCrossEntropyMultiBranchWithL1_CASL_250_step_250_0.1_0.001_0.001_0.001_lw_1.00_1.00_1.00_changingSparsityAbs_128/results_model_249_original_class_-1_-4_-2/outf'
-    res_dir = '../experiments/graph_multi_video_with_L1_retF/graph_multi_video_with_L1_retF_aft_nonlin_RL_L2_non_lin_None_sparsify_percent_0.5_graph_size_2_sigmoid_False_graph_sum_True_deno_8_n_classes_100_in_out_2048_1024_feat_dim_2048_1024_feat_ret_True_method_cos_activitynet/all_classes_False_just_primary_False_limit_None_cw_False_BinaryCrossEntropyMultiBranchWithL1_CASL_250_step_250_0.1_0.001_0.001_0.001_lw_3.00_1.00_1.00_changingSparsityAbs_128/results_model_249_original_class_-1_-4_-2/outf'
-    res_dir = '../experiments/graph_multi_video_with_L1_retF/graph_multi_video_with_L1_retF_aft_nonlin_RL_L2_non_lin_None_sparsify_percent_0.5_graph_size_2_sigmoid_True_graph_sum_True_deno_8_n_classes_100_in_out_2048_1024_feat_dim_2048_1024_feat_ret_True_method_cos_activitynet/all_classes_False_just_primary_False_limit_None_cw_False_MultiCrossEntropyMultiBranchWithL1_CASL_250_step_250_0.1_0.001_0.001_0.001_lw_1.00_1.00_1.00_fs_diff_changingSparsityAbs_128/results_model_149_original_class_-1_-4_-2/outf'
-    res_dir = '../experiments/graph_multi_video_with_L1_retF/graph_multi_video_with_L1_retF_aft_nonlin_RL_L2_non_lin_None_sparsify_0.5_graph_size_2_sigmoid_True_graph_sum_True_deno_8_n_classes_100_in_out_2048_1024_feat_dim_2048_1024_feat_ret_True_method_cos_activitynet/all_classes_False_just_primary_False_limit_None_cw_False_MultiCrossEntropyMultiBranchWithL1_CASL_250_step_250_0.1_0.001_0.001_0.001_lw_1.00_1.00_1.00__classicwithsig_128/results_model_99_original_class_0_-0.1_-2/outf'
-    res_dir = '../experiments/graph_multi_video_with_L1_retF/graph_multi_video_with_L1_retF_aft_nonlin_RL_L2_non_lin_None_sparsify_percent_0.5_graph_size_2_sigmoid_True_graph_sum_True_deno_1_n_classes_100_in_out_2048_1024_feat_dim_2048_1024_feat_ret_True_method_cos_activitynet/all_classes_False_just_primary_False_limit_None_cw_False_MultiCrossEntropyMultiBranchWithL1_CASL_250_step_250_0.1_0.001_0.001_0.001_lw_1.00_1.00_1.00_changingSparsityAbs_128/results_model_249_original_class_-1_-0.1_-2/outf'
-    res_dir = '../experiments/graph_multi_video_with_L1_retF/graph_multi_video_with_L1_retF_aft_nonlin_RL_L2_non_lin_None_sparsify_percent_0.5_graph_size_2_sigmoid_False_graph_sum_True_deno_self_determination_n_classes_100_in_out_2048_1024_feat_dim_2048_1024_feat_ret_True_method_cos_activitynet/all_classes_False_just_primary_False_limit_None_cw_False_BinaryCrossEntropyMultiBranchWithL1_CASL_250_step_250_0.1_0.001_0.001_0.001_lw_1.00_1.00_1.00_mindeno8_changingSparsityAbs_128/results_model_249_original_class_-1_-2_-2/outf'
-    res_dir = '../experiments/graph_multi_video_with_L1_retF/graph_multi_video_with_L1_retF_aft_nonlin_RL_L2_non_lin_None_sparsify_percent_0.5_graph_size_2_sigmoid_True_graph_sum_True_deno_random_n_classes_100_in_out_2048_1024_feat_dim_2048_1024_feat_ret_True_method_cos_activitynet/all_classes_False_just_primary_False_limit_None_cw_False_MultiCrossEntropyMultiBranchWithL1_CASL_250_step_250_0.1_0.001_0.001_0.001_lw_1.00_1.00_1.00_changingSparsityAbs_128/results_model_149_original_class_-1_-0.1_-2/outf'
-    res_dir = '../experiments/graph_multi_video_with_L1_retF/graph_multi_video_with_L1_retF_aft_nonlin_RL_L2_non_lin_None_sparsify_percent_0.5_graph_size_2_sigmoid_False_graph_sum_True_deno_random_n_classes_100_in_out_2048_1024_feat_dim_2048_1024_feat_ret_True_method_cos_activitynet/all_classes_False_just_primary_False_limit_None_cw_False_BinaryCrossEntropyMultiBranchWithL1_CASL_250_step_250_0.1_0.001_0.001_0.001_lw_1.00_1.00_1.00_changingSparsityAbs_128/results_model_149_original_class_-1_0.5_-2/outf'
-    res_dir = '../experiments/graph_multi_video_with_L1_retF/graph_multi_video_with_L1_retF_aft_nonlin_RL_L2_non_lin_None_sparsify_percent_0.5_graph_size_2_sigmoid_False_graph_sum_True_deno_random_n_classes_100_in_out_2048_1024_feat_dim_2048_1024_feat_ret_True_method_cos_activitynet/all_classes_False_just_primary_False_limit_None_cw_False_BinaryCrossEntropyMultiBranchWithL1_CASL_250_step_250_0.1_0.001_0.001_0.001_lw_1.00_1.00_1.00_weighted_changingSparsityAbs_128/results_model_49_original_class_-1_-2_-2/outf'
-    dataset = 'anet'
+    # res_dir = '../experiments/graph_multi_video_with_L1_retF/graph_multi_video_with_L1_retF_aft_nonlin_RL_L2_non_lin_None_sparsify_percent_0.5_graph_size_2_sigmoid_False_graph_sum_True_deno_8_n_classes_100_in_out_2048_1024_feat_dim_2048_1024_feat_ret_True_method_cos_activitynet/all_classes_False_just_primary_False_limit_None_cw_False_BinaryCrossEntropyMultiBranchWithL1_CASL_250_step_250_0.1_0.001_0.001_0.001_lw_1.00_1.00_1.00_changingSparsityAbs_128/results_model_249_original_class_-1_-4_-2/outf'
+    # res_dir = '../experiments/graph_multi_video_with_L1_retF/graph_multi_video_with_L1_retF_aft_nonlin_RL_L2_non_lin_None_sparsify_percent_0.5_graph_size_2_sigmoid_False_graph_sum_True_deno_8_n_classes_100_in_out_2048_1024_feat_dim_2048_1024_feat_ret_True_method_cos_activitynet/all_classes_False_just_primary_False_limit_None_cw_False_BinaryCrossEntropyMultiBranchWithL1_CASL_250_step_250_0.1_0.001_0.001_0.001_lw_3.00_1.00_1.00_changingSparsityAbs_128/results_model_249_original_class_-1_-4_-2/outf'
+    # res_dir = '../experiments/graph_multi_video_with_L1_retF/graph_multi_video_with_L1_retF_aft_nonlin_RL_L2_non_lin_None_sparsify_percent_0.5_graph_size_2_sigmoid_True_graph_sum_True_deno_8_n_classes_100_in_out_2048_1024_feat_dim_2048_1024_feat_ret_True_method_cos_activitynet/all_classes_False_just_primary_False_limit_None_cw_False_MultiCrossEntropyMultiBranchWithL1_CASL_250_step_250_0.1_0.001_0.001_0.001_lw_1.00_1.00_1.00_fs_diff_changingSparsityAbs_128/results_model_149_original_class_-1_-4_-2/outf'
+    # res_dir = '../experiments/graph_multi_video_with_L1_retF/graph_multi_video_with_L1_retF_aft_nonlin_RL_L2_non_lin_None_sparsify_0.5_graph_size_2_sigmoid_True_graph_sum_True_deno_8_n_classes_100_in_out_2048_1024_feat_dim_2048_1024_feat_ret_True_method_cos_activitynet/all_classes_False_just_primary_False_limit_None_cw_False_MultiCrossEntropyMultiBranchWithL1_CASL_250_step_250_0.1_0.001_0.001_0.001_lw_1.00_1.00_1.00__classicwithsig_128/results_model_99_original_class_0_-0.1_-2/outf'
+    # res_dir = '../experiments/graph_multi_video_with_L1_retF/graph_multi_video_with_L1_retF_aft_nonlin_RL_L2_non_lin_None_sparsify_percent_0.5_graph_size_2_sigmoid_True_graph_sum_True_deno_1_n_classes_100_in_out_2048_1024_feat_dim_2048_1024_feat_ret_True_method_cos_activitynet/all_classes_False_just_primary_False_limit_None_cw_False_MultiCrossEntropyMultiBranchWithL1_CASL_250_step_250_0.1_0.001_0.001_0.001_lw_1.00_1.00_1.00_changingSparsityAbs_128/results_model_249_original_class_-1_-0.1_-2/outf'
+    # res_dir = '../experiments/graph_multi_video_with_L1_retF/graph_multi_video_with_L1_retF_aft_nonlin_RL_L2_non_lin_None_sparsify_percent_0.5_graph_size_2_sigmoid_False_graph_sum_True_deno_self_determination_n_classes_100_in_out_2048_1024_feat_dim_2048_1024_feat_ret_True_method_cos_activitynet/all_classes_False_just_primary_False_limit_None_cw_False_BinaryCrossEntropyMultiBranchWithL1_CASL_250_step_250_0.1_0.001_0.001_0.001_lw_1.00_1.00_1.00_mindeno8_changingSparsityAbs_128/results_model_249_original_class_-1_-2_-2/outf'
+    # res_dir = '../experiments/graph_multi_video_with_L1_retF/graph_multi_video_with_L1_retF_aft_nonlin_RL_L2_non_lin_None_sparsify_percent_0.5_graph_size_2_sigmoid_True_graph_sum_True_deno_random_n_classes_100_in_out_2048_1024_feat_dim_2048_1024_feat_ret_True_method_cos_activitynet/all_classes_False_just_primary_False_limit_None_cw_False_MultiCrossEntropyMultiBranchWithL1_CASL_250_step_250_0.1_0.001_0.001_0.001_lw_1.00_1.00_1.00_changingSparsityAbs_128/results_model_149_original_class_-1_-0.1_-2/outf'
+    # res_dir = '../experiments/graph_multi_video_with_L1_retF/graph_multi_video_with_L1_retF_aft_nonlin_RL_L2_non_lin_None_sparsify_percent_0.5_graph_size_2_sigmoid_False_graph_sum_True_deno_random_n_classes_100_in_out_2048_1024_feat_dim_2048_1024_feat_ret_True_method_cos_activitynet/all_classes_False_just_primary_False_limit_None_cw_False_BinaryCrossEntropyMultiBranchWithL1_CASL_250_step_250_0.1_0.001_0.001_0.001_lw_1.00_1.00_1.00_changingSparsityAbs_128/results_model_149_original_class_-1_0.5_-2/outf'
+    # res_dir = '../experiments/graph_multi_video_with_L1_retF/graph_multi_video_with_L1_retF_aft_nonlin_RL_L2_non_lin_None_sparsify_percent_0.5_graph_size_2_sigmoid_False_graph_sum_True_deno_random_n_classes_100_in_out_2048_1024_feat_dim_2048_1024_feat_ret_True_method_cos_activitynet/all_classes_False_just_primary_False_limit_None_cw_False_BinaryCrossEntropyMultiBranchWithL1_CASL_250_step_250_0.1_0.001_0.001_0.001_lw_1.00_1.00_1.00_weighted_changingSparsityAbs_128/results_model_49_original_class_-1_-2_-2/outf'
+    # dataset = 'anet'
 
-    # anno_file = '../data/ucf101/train_test_files/test.txt'
+    anno_file = '../data/ucf101/train_test_files/test.txt'
     # res_dir = '../experiments/graph_multi_video_with_L1_retF/graph_multi_video_with_L1_retF_aft_nonlin_RL_L2_non_lin_None_sparsify_percent_0.5_graph_size_2_sigmoid_False_graph_sum_True_deno_8_n_classes_20_in_out_2048_1024_feat_dim_2048_1024_feat_ret_True_method_cos_ucf/all_classes_False_just_primary_False_limit_None_cw_False_MultiCrossEntropyMultiBranchWithL1_CASL_250_step_250_0.1_0.001_0.001_0.001_lw_1.00_1.00_1.00_changingSparsityAbs_0/results_model_249_original_class_0_0.5_-2/outf'
     # res_dir = '../experiments/graph_multi_video_with_L1_retF/graph_multi_video_with_L1_retF_aft_nonlin_RL_L2_non_lin_None_sparsify_percent_0.5_graph_size_2_sigmoid_False_graph_sum_True_deno_8_n_classes_20_in_out_2048_1024_feat_dim_2048_1024_feat_ret_True_method_cos_ucf/all_classes_False_just_primary_False_limit_None_cw_False_BinaryCrossEntropyMultiBranchWithL1_CASL_250_step_250_0.1_0.001_0.001_0.001_lw_1.00_1.00_1.00_changingSparsityAbs_0/results_model_249_original_class_0.0_0.5_-2/outf'
     # res_dir = '../experiments/graph_multi_video_with_L1_retF/graph_multi_video_with_L1_retF_aft_nonlin_RL_L2_non_lin_None_sparsify_percent_0.5_graph_size_2_sigmoid_True_graph_sum_True_deno_8_n_classes_20_in_out_2048_1024_feat_dim_2048_1024_feat_ret_True_method_cos_ucf/all_classes_False_just_primary_False_limit_None_cw_False_MultiCrossEntropyMultiBranchWithL1_CASL_500_step_500_0.1_0.001_0.001_0.001_lw_1.00_1.00_1.00_changingSparsityAbs_0/results_model_249_original_class_0.0_0.5_-2/outf'
-    # dataset = 'ucf'
+    res_dir = '../experiments/graph_multi_video_with_L1_retF/graph_multi_video_with_L1_retF_aft_nonlin_RL_L2_non_lin_None_sparsify_percent_0.5_graph_size_2_sigmoid_False_graph_sum_True_deno_8_n_classes_20_in_out_2048_1024_feat_dim_2048_1024_feat_ret_True_method_cos_ucf/all_classes_False_just_primary_False_limit_None_cw_False_BinaryCrossEntropyMultiBranchWithL1_CASL_250_step_250_0.1_0.001_0.001_0.001_lw_1.00_1.00_1.00_hardtanh01_changingSparsityAbs_0/results_model_249_original_class_-1_-0.1_-2/outf'
+    dataset = 'ucf'
     
+    fps_stuff = 16./25.
+    threshold = 0.75
+
+    anno_file = '../data/charades/train_test_files/i3d_charades_both_test.txt'
+    # res_dir = '../experiments/graph_multi_video_with_L1_retF/graph_multi_video_with_L1_retF_aft_nonlin_RL_L2_non_lin_None_sparsify_percent_0.5_graph_size_2_sigmoid_True_graph_sum_True_deno_8_n_classes_157_in_out_2048_1024_feat_dim_2048_1024_feat_ret_True_method_cos_charades_i3d_charades_both/all_classes_False_just_primary_False_limit_None_cw_False_MultiCrossEntropyMultiBranchWithL1_CASL_250_step_250_0.1_0.001_0.001_0.001_lw_1.00_1.00_1.00_changingSparsityAbs_numSim_128/results_model_249_original_class_0_-0.1_-2/outf'
+    res_dir = '../experiments/graph_multi_video_with_L1_retF_tanh/graph_multi_video_with_L1_retF_tanh_aft_nonlin_RL_L2_non_lin_None_sparsify_percent_0.5_graph_size_2_sigmoid_True_graph_sum_True_deno_8_n_classes_157_in_out_2048_1024_feat_dim_2048_1024_feat_ret_True_method_cos_charades_i3d_charades_both/all_classes_False_just_primary_False_limit_None_cw_False_MultiCrossEntropyMultiBranchWithL1_CASL_250_step_250_0.1_0.001_0.001_0.001_lw_1.00_1.00_1.00_changingSparsityAbs_numSim_128/results_model_249_original_class_justraw_0_-0.9_-2/outf'
+    dataset = 'charades'
+    # fps_stuff = 1./6.
     # out_dir = '../scratch/looking_at_'+dataset+'/viz_pred_gt_percent_abs_0.5_thresh_ztest_per_class_all'
     # out_dir = '../scratch/looking_at_'+dataset+'/viz_pred_gt_percent_abs_0.5_thresh_otsu_individual'
     # out_dir = '../scratch/looking_at_'+dataset+'/viz_pred_median_mean_thresh_otsu_individual'
-    out_dir = '../scratch/looking_at_'+dataset+'/viz_pred_percent_0.5_bce_49_deno_random_weighted'
+    out_dir = '../scratch/looking_at_'+dataset+'/viz_pred_percent_0.5_mce_tanh'
     # _bce_3_1_1_249'
     util.makedirs(out_dir)
     
@@ -383,8 +392,7 @@ def visualizing_threshes():
 
     # anno_npz = '../data/activitynet/gt_npys/val_pruned.npz'
     
-    fps_stuff = 16./25.
-    threshold = 0.75
+   
 
     
     
@@ -416,6 +424,14 @@ def visualizing_threshes():
     elif dataset == 'ucf':
         gt_vid_names, gt_class_names, gt_time_intervals = et.load_ucf_gt(False)
         class_names = globals.class_names
+    elif dataset == 'charades':
+        # gt_vid_names, gt_class_names, gt_time_intervals = et.load_ucf_gt(False)
+        # class_names = globals.class_names
+        class_names = globals.class_names_charades
+        gt_vid_names, gt_class_names, gt_time_intervals = et.load_charades_gt(False)
+        # overlap_thresh_all = np.arange(0.1,0.2,0.1)
+        # aps = np.zeros((len(class_names)+1,1))
+        # fps_stuff = 16./25.
     
     gt_vid_names = np.array(gt_vid_names)
     gt_class_names = np.array(gt_class_names)
@@ -442,6 +458,7 @@ def visualizing_threshes():
 
         for rel_file in rel_files:
             pred_vals = np.load(rel_file)[:,class_idx]
+
             max_det_conf = np.max(pred_vals)
             min_det_conf = np.min(pred_vals)
             
@@ -476,7 +493,10 @@ def visualizing_threshes():
             bin_vid = gt_vid_names == rel_name
             
             rel_gt_time = gt_time_intervals[np.logical_and(bin_vid,bin_class)]
-
+            # print pred_vals.shape
+            # print rel_gt_time
+            # print rel_name
+            # raw_input()
             det_times = np.array(range(0,out_shape_curr))*fps_stuff
             gt_vals = np.zeros(det_times.shape)
 

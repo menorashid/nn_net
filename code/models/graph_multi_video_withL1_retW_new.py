@@ -81,8 +81,7 @@ class Graph_Multi_Video(nn.Module):
         last_graph.append(nn.Linear(in_out[-1],n_classes, bias = True))
         # last_graph.append(nn.Hardtanh(min_val = 1e-8, max_val = 1))
         if sigmoid:
-            last_graph.append(nn.Tanh())
-                # Sigmoid())
+            last_graph.append(nn.Sigmoid())
 
         self.last_graph = nn.Sequential(*last_graph)
     
@@ -196,7 +195,7 @@ class Graph_Multi_Video(nn.Module):
                 x_curr = out_col[start:end,:]
 
                 # THIS LINE IS DIFFERENT BETWEEN RETF AND NO RETF
-                out_graph_curr = feature_out[start:end,:]
+                out_graph_curr = out_graph[start:end,:]
 
                 x_all.append(x_curr)
                 out_graph_all.append(out_graph_curr)

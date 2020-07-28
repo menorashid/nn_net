@@ -148,8 +148,10 @@ def get_pos_class_weight(train_files, n_classes = None):
     arr = np.array(arr)
 
     arr[arr>0]=1
-    pos_count = np.sum(arr)
-    neg_count = np.sum(arr==0)
+    pos_count = np.mean(np.sum(arr, axis = 0))
+    neg_count = np.mean(np.sum(arr==0, axis = 0))
+    print pos_count, neg_count
+    
     pos_weight = neg_count/float(pos_count)
     return pos_weight
 
@@ -169,17 +171,17 @@ def get_class_weights_au(train_files, n_classes = None):
     counts = np.sum(arr,0)
 
     print counts
-    print np.sum(counts)/counts.size
+    # print np.sum(counts)/counts.size
     # raw_input()
     counts = counts/float(np.sum(counts))
     counts = np.array([1./val  if val>0 else 0 for val in counts])
-    print counts
+    # print counts
     
     counts = counts/float(np.sum(counts))  
     
     counts = counts*counts.size
-    print counts
-    raw_input()
+    # print counts
+    # raw_input()
     return counts
 
 def get_class_weights_bce(train_files, n_classes = None):

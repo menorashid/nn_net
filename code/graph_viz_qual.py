@@ -204,6 +204,11 @@ def make_html_for_folder():
     out_file_html = '../scratch/bg_fg_comparsion.html'
     visualize.writeHTMLForDifferentFolders(out_file_html,folders,captions,img_names,rel_path_replace='/data/maheen',height=200,width=200)
 
+
+def getting_percent_stats():
+
+
+
 def main():
     def_visualize_edge_hists()
     

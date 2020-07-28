@@ -38,7 +38,7 @@ class Graph_Multi_Video(nn.Module):
             n_classes+=1
 
         self.deno = deno
-        self.graph_size = graph_size
+        self.graph_size = None
         self.sparsify = sparsify
         self.graph_sum = graph_sum
         self.just_graph = just_graph
@@ -58,15 +58,8 @@ class Graph_Multi_Video(nn.Module):
         self.linear_layer = []
         self.linear_layer.append(nn.Linear(feat_dim[0], feat_dim[1], bias = True))
         
-        if non_lin is not None:
-            if non_lin.lower()=='ht':
-                self.linear_layer.append(nn.Hardtanh())
-            elif non_lin.lower()=='rl':
-                self.linear_layer.append(nn.ReLU())
-            else:
-                error_message = str('non_lin %s not recognized', non_lin)
-                raise ValueError(error_message)
-
+        self.linear_layer.append(nn.ReLU())
+        self.linear_layer.append(Normalize())
 
         self.linear_layer = nn.Sequential(*self.linear_layer)    
         # self.graph_layer = nn.ModuleList()
@@ -74,15 +67,15 @@ class Graph_Multi_Video(nn.Module):
         # self.last_graph = nn.ModuleList()
         
         
-        self.graph_layer = Graph_Layer_Wrapper(in_out[0],n_out = in_out[1], non_lin = None, method = method, aft_nonlin = aft_nonlin)
+        # self.graph_layer = Graph_Layer_Wrapper(in_out[0],n_out = in_out[1], non_lin = None, method = method, aft_nonlin = aft_nonlin)
         
         last_graph = []
         last_graph.append(nn.Dropout(dropout))
-        last_graph.append(nn.Linear(in_out[-1],n_classes, bias = True))
+        last_graph.append(nn.Linear(feat_dim[1],n_classes, bias = True))
         # last_graph.append(nn.Hardtanh(min_val = 1e-8, max_val = 1))
         if sigmoid:
             last_graph.append(nn.Tanh())
-                # Sigmoid())
+                # nn.Sigmoid())
 
         self.last_graph = nn.Sequential(*last_graph)
     
@@ -118,21 +111,23 @@ class Graph_Multi_Video(nn.Module):
         method = None
         
         # print 'self.graph_size' , self.graph_size
-        if not self.training:
-            graph_size = 1
-        else:
-            if self.graph_size is None:
-                graph_size = len(input)
-            elif self.graph_size=='rand':
-                graph_size = random.randint(1,len(input))
-            elif type(self.graph_size)==str and self.graph_size.startswith('randupto'):
-                graph_size = int(self.graph_size.split('_')[1])
-                graph_size = random.randint(1,min(graph_size, len(input)))
-            else:
-                graph_size = min(self.graph_size, len(input))
+        graph_size = len(input)
+        # if not self.training:
+        #     graph_size = 1
+        # else:
+        #     if self.graph_size is None:
+        #         graph_size = len(input)
+        #     elif self.graph_size=='rand':
+        #         graph_size = random.randint(1,len(input))
+        #     elif type(self.graph_size)==str and self.graph_size.startswith('randupto'):
+        #         graph_size = int(self.graph_size.split('_')[1])
+        #         graph_size = random.randint(1,min(graph_size, len(input)))
+        #     else:
+        #         graph_size = min(self.graph_size, len(input))
 
         # print 'graph_size', graph_size, self.training
-        input_chunks = [[input[0]]]+[input[i:i + graph_size] for i in xrange(1, len(input), graph_size)]
+        input_chunks = [input]
+        # [[input[0]]]+[input[i:i + graph_size] for i in xrange(1, len(input), graph_size)]
         # print 'INPUTTING'
         # input_chunks = [input[i:i + graph_size] for i in xrange(0, len(input), graph_size)]
 
@@ -161,20 +156,20 @@ class Graph_Multi_Video(nn.Module):
             # if hasattr(self, 'layer_bef') and self.layer_bef is not None:
             #     input = self.layer_bef(input)
 
-            feature_out = self.linear_layer(input)
+            out_graph = self.linear_layer(input)
             # # for col_num in range(len(self.graph_layers)):
             # print 'feature_out.size()',feature_out.size()
 
-            to_keep = self.sparsify
+            # to_keep = self.sparsify
                 # if to_keep=='lin':
             # out_graph = self.graph_layer(input)
             #     else:             
-            out_graph = self.graph_layer(input, feature_out, to_keep = to_keep, graph_sum = self.graph_sum, identity = identity, method = method)
+            # out_graph = self.graph_layer(input, feature_out, to_keep = to_keep, graph_sum = self.graph_sum, identity = identity, method = method)
             
             
-            if self.graph_sum:
-                [out_graph, graph_sum] = out_graph       
-                graph_sums.append(graph_sum.unsqueeze(0))
+            # if self.graph_sum:
+            #     [out_graph, graph_sum] = out_graph       
+            #     graph_sums.append(graph_sum.unsqueeze(0))
 
             # out_graph_all.append(out_graph)
             # print 'out_graph.size()',out_graph.size()
@@ -196,7 +191,7 @@ class Graph_Multi_Video(nn.Module):
                 x_curr = out_col[start:end,:]
 
                 # THIS LINE IS DIFFERENT BETWEEN RETF AND NO RETF
-                out_graph_curr = feature_out[start:end,:]
+                out_graph_curr = out_graph[start:end,:]
 
                 x_all.append(x_curr)
                 out_graph_all.append(out_graph_curr)
@@ -217,7 +212,7 @@ class Graph_Multi_Video(nn.Module):
         # print x_all.size(), out_graph_all.size()
         # print graph_sums
         if hasattr(self,'feat_ret') and self.feat_ret:
-            pmf_all = [pmf_all, [torch.cat(graph_sums,dim = 0),out_graph_all,input_sizes_all]]
+            pmf_all = [pmf_all, [0,out_graph_all,input_sizes_all]]
         elif self.graph_sum:
             pmf_all = [pmf_all, torch.cat(graph_sums,dim = 0)]
 
@@ -391,7 +386,7 @@ class Network:
         # if self.model.layer_bef is not None:
         #     modules.append(self.model.layer_bef)
 
-        modules+=[self.model.linear_layer, self.model.graph_layer, self.model.last_graph]
+        modules+=[self.model.linear_layer, self.model.last_graph]
 
         for i,module in enumerate(modules):
             print i, lr[i]

@@ -196,7 +196,7 @@ class Graph_Multi_Video(nn.Module):
                 x_curr = out_col[start:end,:]
 
                 # THIS LINE IS DIFFERENT BETWEEN RETF AND NO RETF
-                out_graph_curr = feature_out[start:end,:]
+                out_graph_curr = out_graph[start:end,:]
 
                 x_all.append(x_curr)
                 out_graph_all.append(out_graph_curr)

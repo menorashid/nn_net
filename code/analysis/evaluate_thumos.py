@@ -249,7 +249,8 @@ def load_charades_gt(train):
         mat_file = os.path.join(anno_dir, 'annos_test.npz')
 
     loaded = np.load(mat_file)
-    
+    # print loaded.keys()
+    # raw_input()
     gt_vid_names = list(loaded['gt_vid_names'])
     gt_class_names = list(loaded['gt_class_names'])
     gt_time_intervals = loaded['gt_time_intervals']
@@ -319,7 +320,7 @@ def test_overlap(det_vid_names_all, det_conf_all, det_time_intervals_all, second
         gt_vid_names, gt_class_names, gt_time_intervals = load_charades_gt(train)
         overlap_thresh_all = np.arange(0.1,0.2,0.1)
         aps = np.zeros((len(class_names)+1,1))
-        fps_stuff = 1./6.
+        fps_stuff = 16./25.
     elif dataset =='activitynet':
         class_names = globals.class_names_activitynet
         gt_vid_names, gt_class_names, gt_time_intervals = load_activitynet_gt(train)
@@ -340,7 +341,8 @@ def test_overlap(det_vid_names_all, det_conf_all, det_time_intervals_all, second
     else:
         raise ValueError('Problem. '+dataset+' not valid')
 
-
+    # print 'fps', fps_stuff
+    # raw_input()
     
     str_print = '\t'.join(['Overlap\t']+['%.1f' % ov for ov in overlap_thresh_all])
     print str_print

@@ -53,6 +53,7 @@ def get_data(dataset, limit, all_classes, just_primary, gt_vec, k_vec, test_pair
         files = [file_curr+pp for file_curr,pp in zip(files,post_pends)]
         
         train_file, test_train_file, test_file = files
+        # test_file = '../data/ucf101/train_test_files/test_onlyMultiFromGt.txt'
         if gt_vec or (k_vec is not None):
             train_data = UCF_dataset_gt_vec(train_file, limit)
             test_train_data = UCF_dataset_gt_vec(test_train_file, limit)
@@ -347,12 +348,13 @@ def train_simple_mill_all_classes(model_name,
         # print 'bce class_weights'
         # class_weights_val = util.get_class_weights_bce(util.readLinesFromFile(train_file),n_classes)
     # elif class_weights:
-        print 'new class_weights'
+        # print 'new class_weights'
         pos_weight = util.get_pos_class_weight(util.readLinesFromFile(train_file),n_classes)
         print 'pos_weight', pos_weight
         class_weights_val = util.get_class_weights_au(util.readLinesFromFile(train_file),n_classes)
+        print 'class_weights_val', class_weights_val
         class_weights_val = [pos_weight, class_weights_val]
-        raw_input()
+        # raw_input()
     else:
         class_weights_val = None
 
@@ -404,7 +406,7 @@ def train_simple_mill_all_classes(model_name,
     test_params_core = dict(
                 trim_preds = trim_preds,
                 second_thresh = second_thresh,
-                first_thresh = 0,
+                first_thresh = first_thresh,
                 multibranch = multibranch,
                 branch_to_test = branch_to_test,
                 dataset = dataset, 
@@ -472,7 +474,7 @@ def train_simple_mill_all_classes(model_name,
                 save_outfs = save_outfs,
                 test_pair = test_pair,
                 test_method = test_method)
-        test_model(**test_params)
+        # test_model(**test_params)
         if viz_mode:
             test_params = dict(out_dir_train = out_dir_train,
                     model_num = model_num,
@@ -490,18 +492,18 @@ def train_simple_mill_all_classes(model_name,
                     multibranch = multibranch,
                     branch_to_test =branch_to_test,
                     dataset = dataset)
-            # test_model(**test_params)
-            test_params = dict(out_dir_train = out_dir_train,
-                    model_num = model_num,
-                    test_data = test_data,
-                    batch_size_val = batch_size_val,
-                    gpu_id = gpu_id,
-                    num_workers = 0,
-                    second_thresh = second_thresh,
-                    first_thresh = first_thresh,
-                    dataset = dataset)
-            print 'visualizing'
-            visualize_sim_mat(**test_params)
+            test_model(**test_params)
+            # test_params = dict(out_dir_train = out_dir_train,
+            #         model_num = model_num,
+            #         test_data = test_data,
+            #         batch_size_val = batch_size_val,
+            #         gpu_id = gpu_id,
+            #         num_workers = 0,
+            #         second_thresh = second_thresh,
+            #         first_thresh = first_thresh,
+            #         dataset = dataset)
+            # print 'visualizing'
+            # visualize_sim_mat(**test_params)
 
 
 

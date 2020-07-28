@@ -50,7 +50,7 @@ def train_model_new(out_dir_train,
                 model_name = 'alexnet',
                 criterion = nn.CrossEntropyLoss(),
                 gpu_id = 0,
-                num_workers = 0,
+                num_workers = 16,
                 model_file = None,
                 epoch_start = 0,
                 network_params = None,
@@ -58,6 +58,7 @@ def train_model_new(out_dir_train,
                 multibranch = 1,
                 plot_losses = False,
                 det_test = False):
+    print 'num_workers', num_workers
 
     util.mkdir(out_dir_train)
     log_file = os.path.join(out_dir_train,'log.txt')
@@ -75,18 +76,20 @@ def train_model_new(out_dir_train,
     plot_acc_file = os.path.join(out_dir_train,'val_accu.jpg')
     plot_det_file = os.path.join(out_dir_train,'val_det.jpg')
 
-
-    # plot_det_arr = [([],[]),([],[]),([],[]),([],[]),([],[])]
-    # lengend_strs_detection = ['0.1','0.2','0.3','0.4','0.5']
-
-    plot_det_arr = [([],[])]
-    # ,([],[]),([],[]),([],[]),([],[])]
-    lengend_strs_detection = ['0.1']
+    if 'ucf' in out_dir_train:
+        plot_det_arr = [([],[]),([],[]),([],[]),([],[]),([],[])]
+        lengend_strs_detection = ['0.1','0.2','0.3','0.4','0.5']
+    elif 'activitynet' in out_dir_train:
+        plot_det_arr = [([],[]),([],[]),([],[])]
+        lengend_strs_detection = ['0.5','0.7','0.9']    
+    else:
+        plot_det_arr = [([],[])]
+        # ,([],[]),([],[]),([],[]),([],[])]
+        lengend_strs_detection = ['0.1']
     # ,'0.2','0.3','0.4','0.5']
 
 
-    # plot_det_arr = [([],[]),([],[]),([],[])]
-    # lengend_strs_detection = ['0.5','0.7','0.9']
+    
 
     network = models.get(model_name,network_params)
 
@@ -160,8 +163,8 @@ def train_model_new(out_dir_train,
         print str_curr
         log_file_writer.write(str_curr+'\n')
 
-    print 'raw_inputting'
-    raw_input()
+    # print 'raw_inputting'
+    # raw_input()
     for num_epoch in range(epoch_start,num_epochs):
 
         plot_arr_epoch = []

@@ -287,7 +287,7 @@ class Graph_Multi_Video(nn.Module):
         
         return pmf
 
-    def get_similarity(self,input,idx_graph_layer = 0,sparsify = False, nosum = True):
+    def get_similarity(self,input,idx_graph_layer = 0,sparsify = True, nosum = True):
 
         # if sparsify is None:
         #     sparsify = self.sparsify

@@ -80,7 +80,7 @@ def save_all_anno():
     print gt_vid_names.shape
     print problem
 
-    np.savez(out_file, gt_time_intervals = gt_time_intervals ,gt_class_names = gt_class_names ,gt_vid_names = gt_vid_names)
+    # np.savez(out_file, gt_time_intervals = gt_time_intervals ,gt_class_names = gt_class_names ,gt_vid_names = gt_vid_names)
 
 def save_features_mp((in_dir_rgb, out_file, idx_vid)):
     print idx_vid
@@ -217,7 +217,7 @@ def script_save_train_test_files():
     train_test_dir = os.path.join(meta_dir, 'train_test_files')
     util.mkdir(train_test_dir)
     
-    anno_files = [os.path.join(meta_dir, 'annos_test_wmiss.npz'),
+    anno_files = [os.path.join(meta_dir, 'annos_test.npz'),
                 os.path.join(meta_dir, 'annos_train.npz')]
 
     # anno_dir = os.path.join(meta_dir, 'vgg16_rgb_features_npy')
@@ -237,7 +237,7 @@ def script_save_train_test_files():
     #             os.path.join(train_test_dir, 'i3d_both_train_wmiss.txt')]
 
     anno_dir = os.path.join(meta_dir, 'i3d_charades_both')
-    out_files = [os.path.join(train_test_dir, 'i3d_charades_both_test_wmiss.txt'),
+    out_files = [os.path.join(train_test_dir, 'i3d_charades_both_test.txt'),
                 os.path.join(train_test_dir, 'i3d_charades_both_train_wmiss.txt')]
 
 

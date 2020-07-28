@@ -20,6 +20,7 @@ import wtalc
 from data_processors import preprocess_charades as pc
 import figuring_out_anet as foa
 import threshes_temp
+import scipy.special
 class Exp_Lr_Scheduler:
     def __init__(self, optimizer,step_curr, init_lr, decay_rate, decay_steps, min_lr=1e-6):
         self.optimizer = optimizer
@@ -179,7 +180,7 @@ def test_model_core(model, test_dataloader, criterion, log_arr, multibranch = 1)
 
     return accuracy, loss_iter
 
-def merge_detections(bin_keep, det_conf, det_time_intervals, merge_with = 'max'):
+def merge_detections(bin_keep, det_conf, det_time_intervals, merge_with = 'max',dummy_ret = False):
     bin_keep = bin_keep.astype(int)
     bin_keep_rot = np.roll(bin_keep, 1)
     bin_keep_rot[0] = 0
@@ -196,6 +197,10 @@ def merge_detections(bin_keep, det_conf, det_time_intervals, merge_with = 'max')
     
     det_conf_new = np.zeros((num_det,))
     det_time_intervals_new = np.zeros((num_det,2))
+    dummy = np.array(det_conf)
+    # np.ones(det_conf.shape)*-1
+    # 
+    # .shape)
 
     for idx_curr in range(num_det):
         idx_start = idx_start_all[idx_curr]
@@ -204,6 +209,7 @@ def merge_detections(bin_keep, det_conf, det_time_intervals, merge_with = 'max')
         det_conf_rel = det_conf[idx_start:idx_end]
         if merge_with=='max':
             det_conf_new[idx_curr]=np.max(det_conf_rel)
+            dummy[idx_start:idx_end] = np.max(det_conf_rel)
         elif merge_with=='min':
             det_conf_new[idx_curr]=np.min(det_conf_rel)
         elif merge_with=='mean':
@@ -228,7 +234,11 @@ def merge_detections(bin_keep, det_conf, det_time_intervals, merge_with = 'max')
     # print det_time_intervals_new.shape
 
     # raw_input()
-    return det_conf_new, det_time_intervals_new
+    # return det_conf_new, det_time_intervals_new, 
+    if dummy_ret:
+        return dummy, det_time_intervals_new, 
+    else:
+        return det_conf_new, det_time_intervals_new, 
 
 def visualize_dets(model, test_dataloader, dir_viz, first_thresh , second_thresh, bin_trim = None,  det_class = -1, branch_to_test =-1, criterion_str= None, dataset = 'ucf'):
 
@@ -349,43 +359,55 @@ def visualize_dets(model, test_dataloader, dir_viz, first_thresh , second_thresh
                 #     idx_test +=1
                 #     print 'PROBLEM'
                 #     continue
+            class_idx_all = np.where(labels[idx_sample].numpy())[0]
             
-            det_conf = out[:,class_idx]
-            if second_thresh<=0:
-                thresh = second_thresh
-            else:
-                thresh = np.max(det_conf)-(np.max(det_conf)-np.min(det_conf))*second_thresh
-            bin_second_thresh = det_conf>thresh
-
-            # print bin_second_thresh
-
-
-
-            det_conf_merged, det_time_intervals_merged = merge_detections(bin_second_thresh, det_conf, det_time_intervals_meta)
-            # if '0000324' in det_vid_names_ac[idx_test]:
-            #     # print det_conf
-            #     print det_conf_merged
-            #     print det_time_intervals_merged
-            #     print det_vid_names_ac[idx_test]
-
-            # raw_input()
-
-
-            det_time_intervals = det_time_intervals_meta
-
-            det_vid_names.extend([det_vid_names_ac[idx_test]]*det_conf.shape[0])
-            det_events_class.extend([class_idx_gt]*det_conf.shape[0])
-            # out_shapes.extend([out.shape[0]]*det_conf.shape[0])
-            out_shapes[det_vid_names_ac[idx_test]] = out.shape[0]
+            # if len(class_idx_all)>1:
+            #     print idx_test, idx_sample, labels[idx_sample],  det_vid_names_ac[idx_test]
             
-            det_conf_all.append(det_conf)
-            det_time_intervals_all.append(det_time_intervals)
+            # if '1468' not in det_vid_names_ac[idx_test]:
+            #     idx_test+=1
+            #     continue
 
-            det_conf_merged_all.append(det_conf_merged)
-            det_time_intervals_merged_all.append(det_time_intervals_merged)
-            det_vid_names_merged.extend([det_vid_names_ac[idx_test]]*det_conf_merged.shape[0])
-            det_events_class_merged.extend([class_idx_gt]*det_conf_merged.shape[0])
-            # out_shapes_merged.extend([out.shape[0]]*det_conf_merged.shape[0])
+            for class_idx in class_idx_all:
+                
+                # print class_idx, class_idx_all
+                class_idx_gt = class_idx
+                det_conf = out[:,class_idx]
+                if second_thresh<=0:
+                    thresh = second_thresh
+                else:
+                    thresh = np.max(det_conf)-(np.max(det_conf)-np.min(det_conf))*second_thresh
+                bin_second_thresh = det_conf>thresh
+
+                # print bin_second_thresh
+
+
+
+                det_conf_merged, det_time_intervals_merged = merge_detections(bin_second_thresh, det_conf, det_time_intervals_meta)
+                # if '0000324' in det_vid_names_ac[idx_test]:
+                #     # print det_conf
+                #     print det_conf_merged
+                #     print det_time_intervals_merged
+                #     print det_vid_names_ac[idx_test]
+
+                # raw_input()
+
+
+                det_time_intervals = det_time_intervals_meta
+
+                det_vid_names.extend([det_vid_names_ac[idx_test]]*det_conf.shape[0])
+                det_events_class.extend([class_idx_gt]*det_conf.shape[0])
+                # out_shapes.extend([out.shape[0]]*det_conf.shape[0])
+                out_shapes[det_vid_names_ac[idx_test]] = out.shape[0]
+                
+                det_conf_all.append(det_conf)
+                det_time_intervals_all.append(det_time_intervals)
+
+                det_conf_merged_all.append(det_conf_merged)
+                det_time_intervals_merged_all.append(det_time_intervals_merged)
+                det_vid_names_merged.extend([det_vid_names_ac[idx_test]]*det_conf_merged.shape[0])
+                det_events_class_merged.extend([class_idx_gt]*det_conf_merged.shape[0])
+                # out_shapes_merged.extend([out.shape[0]]*det_conf_merged.shape[0])
 
             idx_test +=1
             # break
@@ -427,6 +449,7 @@ def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh ,
     # print 'branch_to_test',branch_to_test
     # print 'dataset',dataset
     # print 'save_outfs',save_outfs
+    # raw_input()
     # print 'test_method',test_method
     # print 'fps_stuff',fps_stuff
 
@@ -476,6 +499,7 @@ def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh ,
     idx_test = 0
     predictions = []
     pmfs = []
+    labels_all = []
     out_fs = []
     threshes_all = []
     for num_iter_test,batch in enumerate(test_dataloader):
@@ -516,38 +540,62 @@ def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh ,
                         # print model
                         if save_outfs:
                             outf = out.data.cpu().numpy()
+                            # print np.min(outf), np.max(outf)
                             vid_name = det_vid_names_ac[idx_test]
-                            # print save_outfs
-                            out_file_f = os.path.join(save_outfs,vid_name+'.npy')
-                            print idx_test, len(det_vid_names_ac), vid_name, outf.shape
+                            # out_file_f = os.path.join(save_outfs,vid_name+'.npy')
+                            # np.save(out_file_f,outf)
 
-                            np.save(out_file_f,outf)
-                            # print outf.shape
-                            # print pmf[0].shape
-                            out_dir_pmf = os.path.join(os.path.split(save_outfs)[0],'outpmf')
-                            # print out_dir_pmf
-                            util.mkdir(out_dir_pmf)
-                            out_file_pmf = os.path.join(out_dir_pmf,vid_name+'.npy')
-                            np.save(out_file_pmf, pmf[0].data.cpu().numpy())
-
+                            # print pmf[0].data.cpu().numpy()
+                            # print labels[idx_test]
                             # raw_input()
+                            # bin_keep = pmf[0].data.cpu().numpy()>first_thresh
+                            # bin_keep = bin_keep[np.newaxis,:]
+                            # outf  = outf*bin_keep
+
+                            start_seq = np.array(range(0,outf.shape[0]))*fps_stuff
+                            end_seq = np.array(range(1,outf.shape[0]+1))*fps_stuff
+                            dtm = np.concatenate([start_seq[:,np.newaxis],end_seq[:,np.newaxis]],axis=1)
+
+                            bin_second_thresh = outf>second_thresh
+                            dca = []
+                            for class_idx in range(outf.shape[1]):
+                                det_conf, _ = merge_detections(bin_second_thresh[:,class_idx], outf[:,class_idx], dtm,dummy_ret = True)
+                                # det_conf = det_conf+1 
+                                dca.append(det_conf[:,np.newaxis])
+                            dca = np.concatenate(dca, axis = 1)
+                            
+                            
+                            # print idx_test, len(det_vid_names_ac), vid_name, outf.shape
+                            out_file_f = os.path.join(save_outfs,vid_name+'.npy')
+                            np.save(out_file_f,dca)
+
+
+                        #     # print outf.shape
+                        #     # print pmf[0].shape
+                        #     out_dir_pmf = os.path.join(os.path.split(save_outfs)[0],'outpmf')
+                        #     # print out_dir_pmf
+                        #     util.mkdir(out_dir_pmf)
+                        #     out_file_pmf = os.path.join(out_dir_pmf,vid_name+'.npy')
+                        #     np.save(out_file_pmf, pmf[0].data.cpu().numpy())
+
+                        #     # raw_input()
                             idx_test+=1
                             continue
 
-                        if save_outfs:
-                            outf = pmf[1][1]
-                            # .cpu().numpy()
-                            # print len(outf)
-                            # print outf[0].shape
-                            outf = outf[0].data.cpu().numpy()
-                            # raw_input()
-                            # .size()
-                            pmf = pmf[:2]
-                            # model.out_f(sample.cuda()).data.cpu().numpy()
-                            vid_name = det_vid_names_ac[idx_test]
-                            out_file_f = os.path.join(save_outfs,vid_name+'.npy')
+                        # if save_outfs:
+                        #     outf = pmf[1][1]
+                        #     # .cpu().numpy()
+                        #     # print len(outf)
+                        #     # print outf[0].shape
+                        #     outf = outf[0].data.cpu().numpy()
+                        #     # raw_input()
+                        #     # .size()
+                        #     pmf = pmf[:2]
+                        #     # model.out_f(sample.cuda()).data.cpu().numpy()
+                        #     vid_name = det_vid_names_ac[idx_test]
+                        #     out_file_f = os.path.join(save_outfs,vid_name+'.npy')
                             
-                            np.save(out_file_f,outf)
+                        #     np.save(out_file_f,outf)
                         # elif test_method=='best_worst_dot':
                         #     out_fs.append(model.out_f(sample.cuda()).data.cpu().numpy())
 
@@ -571,16 +619,16 @@ def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh ,
             # print out.size()
             # raw_input()
 
-            if second_thresh>=0 and soft_out and branch_to_test!=-2 and branch_to_test!=-4 and branch_to_test!=-5:
+            if (second_thresh>=0 and soft_out and branch_to_test!=-2 and branch_to_test!=-4 and branch_to_test!=-5) or (type(second_thresh)==str and second_thresh.startswith('smax')):
                 print 'smaxing'
                 out_temp = out.data.cpu().numpy()
-                idx_interesting = np.where(np.sum(out_temp,axis = 1)==0)[0]
+                # idx_interesting = np.where(np.sum(out_temp,axis = 1)==0)[0]
                 # print idx_interesting
                 # print out_temp[idx_interesting,:]
                 # print torch.sum(torch.sum(out,dim =1 )==0)
 
                 out = torch.nn.functional.softmax(out,dim = 1)
-                out[idx_interesting,:] = 0.
+                # out[idx_interesting,:] = 0.
                 out_temp = out.data.cpu().numpy()
                 # print np.sum(np.isnan(out_temp)), out_temp.size
                 
@@ -595,9 +643,19 @@ def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh ,
             det_time_intervals_meta = np.concatenate([start_seq[:,np.newaxis],end_seq[:,np.newaxis]],axis=1)
             
             # print pmf.size()
-            pmf = torch.nn.functional.softmax(pmf)
-            pmf = pmf.data.cpu().numpy()
+            # print pmf
+            # print labels[idx_sample]
+            # raw_input()
+            if first_thresh>=0:
+                pmf = torch.nn.functional.softmax(pmf)
+                pmf = pmf.data.cpu().numpy()
+            else:
+                # print 'not smacing'
+                pmf = pmf.data.cpu().numpy()
+                # first_thresh = -1*first_thresh
             # print pmf.shape
+            # print pmf
+
             # pmf = softmax(pmf)
             # print pmf.shape
             # raw_input()
@@ -607,11 +665,13 @@ def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh ,
                 det_vid_names.append(det_vid_names_ac[idx_test])
                 predictions.append(out)
                 pmfs.append(pmf)
+                labels_all.append(labels[idx_sample].data.cpu().numpy())
             else:
                 if first_thresh==-1:
                     bin_not_keep = labels[idx_sample].data.cpu().numpy()==0
                 else:
-                    bin_not_keep = pmf<first_thresh
+                    # print first_thresh, pmf
+                    bin_not_keep = pmf<-1*first_thresh
 
                 # print bin_not_keep
                 # raw_input()
@@ -640,10 +700,15 @@ def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh ,
                             threshes = [ -11.493487238883972 , -11.715554904937743 , -11.567303442955016 , -0.29134426116943235 , -9.127959728240967 , -11.774006605148315 , -10.586105346679688 , -10.005760955810548 , -4.0798876762390135 , -6.865327882766723 , -6.464476490020751 , -10.147429347038269 , -10.552372121810912 , -10.41338300704956 , -10.107991337776184 , -8.000696849823 , -3.2308075666427607 , -8.325735449790955 , 0.0018072128295898438 , -10.581804275512695 , -9.085333108901978 , -4.380960249900818 , -7.76091194152832 , -7.8100281953811646 , -8.015686750411987 , -10.228572845458984 , -8.89403510093689 , -10.035913586616516 , -6.485160398483275 , 1.5468014478683454 , -10.466089797019958 , -10.352537393569946 , -11.080861330032349 , -4.079550766944886 , -9.870902061462402 , -11.705468130111694 , -11.277372598648071 , -11.920127391815186 , -8.292747259140015 , -8.435733556747437 , -3.6880436658859246 , -9.962094902992249 , -10.136343955993652 , -10.096235990524292 , 1.8210916519165021 , -9.617901945114134 , -0.6553510189056384 , -8.892017841339111 , -9.910322070121765 , -5.507466173171997 , -9.935795688629149 , -0.40978360176086426 , -8.750633478164673 , -10.75163221359253 , -11.562832188606261 , -10.59936091899872 , -12.900600695610045 , -8.079093027114867 , -11.099324131011961 , -2.6412230968475336 , -11.352792143821716 , 1.7469805479049691 , -0.3136753559112533 , -12.025232648849489 , -9.967067241668701 , -11.40596890449524 , -12.218655109405518 , -11.722469282150268 , -8.90257215499878 , -8.502108573913574 , -4.826782011985779 , -12.014808773994446 , -10.319413661956787 , -11.360230445861816 , -9.46954345703125 , -8.555493474006653 , -12.345401000976562 , -10.13498330116272 , -6.36683886051178 , -10.883997225761412 , -7.914173603057861 , -12.55906960964203 , -10.209265351295471 , -8.52416455745697 , -9.731002688407898 , -11.799030280113222 , -10.429827213287354 , -11.352923154830933 , -9.692192912101746 , -4.177016687393189 , -10.813226962089537 , -10.608894610404967 , -11.23424062728882 , -9.35195436477661 , -11.124334073066713 , -10.96947717666626 , -10.344857096672058 , -0.38236346244812136 , -11.854193639755248 , -4.933973860740662  ]
                             thresh = threshes[class_idx]
                             # print thresh, class_idx
+                        elif second_thresh =='max_-4':
+                            thresh = np.max(det_conf)-(np.max(det_conf)-np.min(det_conf))*0.5
+                            thresh = min(-4,thresh)
+                        elif second_thresh.startswith('smax'):
+                            thresh = np.max(det_conf)-(np.max(det_conf)-np.min(det_conf))*0.5
                     elif second_thresh<=-1:
                         thresh = second_thresh
                     elif second_thresh<=0:
-                        thresh = -1*second_thresh
+                        thresh = second_thresh
                     else:
                         # print 'else'
                         thresh = np.max(det_conf)-(np.max(det_conf)-np.min(det_conf))*second_thresh
@@ -655,6 +720,7 @@ def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh ,
                     
                     det_vid_names.extend([det_vid_names_ac[idx_test]]*det_conf.shape[0])
                     det_events_class.extend([class_idx]*det_conf.shape[0])
+                    # print 'hello im here'
                     det_conf_all.append(det_conf)
                     det_time_intervals_all.append(det_time_intervals)
                 
@@ -722,13 +788,38 @@ def test_model_overlap(model, test_dataloader, criterion, log_arr,first_thresh ,
         print 'saved', out_file_feats
         raw_input()
     else:
+        # print 'hello'
         if save_outfs:
+            print 'creating charades det file'
             pc.create_charades_det_file(save_outfs)
             return None
+        # pmfs = np.array(pmfs)
+        # labels_all = np.array(labels_all)
+        # labels_all[labels_all>0] = 1
+        # labels_all = np.array(labels_all, dtype = np.int)
+
+        # print pmfs.shape, labels_all.shape, type(labels_all)
+        # print pmfs[0,:10]
+        # print labels_all[0]
+        # print sklearn.metrics.average_precision_score(labels_all, pmfs)
+        # print len(pmfs), len(labels_all)
+        # # .shape, np.min(labels), np.max(labels)
+        # raw_input()
+
         # threshes_all = np.concatenate(threshes_all,0)
         det_conf = np.concatenate(det_conf_all,axis =0)
+        # print np.min(det_conf), np.max(det_conf)
+        # bin_keep = det_conf>0.25
+        # print det_conf.shape, np.sum(bin_keep), bin_keep.shape
+
         det_time_intervals = np.concatenate(det_time_intervals_all,axis = 0)
         det_events_class = np.array(det_events_class)
+        
+        # det_time_intervals = det_time_intervals[bin_keep]
+        # det_events_class = det_events_class[bin_keep]
+        # det_conf = det_conf[bin_keep]
+        # det_vid_names =np.array(det_vid_names)[bin_keep]
+        # det_vid_names = list(det_vid_names)
         # print globs.class_names
 
         # class_idx = [7,9,12,21,22,23,24,26,31,33,36,40,45,51,68,79,85,92,93,97]

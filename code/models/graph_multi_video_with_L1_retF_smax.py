@@ -79,10 +79,10 @@ class Graph_Multi_Video(nn.Module):
         last_graph = []
         last_graph.append(nn.Dropout(dropout))
         last_graph.append(nn.Linear(in_out[-1],n_classes, bias = True))
-        # last_graph.append(nn.Hardtanh(min_val = 1e-8, max_val = 1))
-        if sigmoid:
-            last_graph.append(nn.Tanh())
-                # Sigmoid())
+        # self.smax = nn.Softmax(dim = 1)
+        last_graph.append(nn.Softmax(dim = 1))
+        # if sigmoid:
+        #     last_graph.append(nn.Sigmoid())
 
         self.last_graph = nn.Sequential(*last_graph)
     
@@ -276,6 +276,8 @@ class Graph_Multi_Video(nn.Module):
             pmf = torch.sum(pmf[:k,:], dim = 0)/k
             # raw_input()
         else:
+            # print x.size(),x[:10], torch.sum(x,dim = 1)[:10]
+            # raw_input()
             k = max(1,x.size(0)//self.deno)
             pmf,_ = torch.sort(x, dim=0, descending=True)
             pmf = pmf[:k,:]
